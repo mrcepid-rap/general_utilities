@@ -1,4 +1,4 @@
-from os.path import exists
+from pathlib import Path
 from typing import Tuple, List
 
 import dxpy
@@ -139,10 +139,12 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
     geno_tables = []
     for chromosome in get_chromosomes(is_snp_tar, is_gene_tar, chromosome=chromosome):
         # This handles the genes that we need to test:
-        if exists(tarball_prefix + "." + chromosome + ".STAAR.matrix.rds"):
+        tarball_path = Path(f'{tarball_prefix}.{chromosome}.STAAR.matrix.rds')
+        if tarball_path.exists():
             # This handles the actual genetic data:
             # This just makes a sparse matrix with columns: sample_id, gene name, genotype, ENST
             # All information is derived from the sparse STAAR matrix files
+            # TODO Get sparseMatrixProcessor into this package rather than the main codebase (runassociationtesting)
             cmd = "Rscript /prog/sparseMatrixProcessor.R " + \
                   "/test/" + tarball_prefix + "." + chromosome + ".STAAR.matrix.rds " + \
                   "/test/" + tarball_prefix + "." + chromosome + ".variants_table.STAAR.tsv " + \
