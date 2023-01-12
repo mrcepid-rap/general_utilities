@@ -1,15 +1,17 @@
-import math
 import sys
-
+import math
 import dxpy
 
+from typing import List, Any
+from typing.io import TextIO
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
 
 
 class ThreadUtility:
 
-    def __init__(self, threads: int, error_message, incrementor=500, thread_factor=4, output_writer=sys.stdout):
+    def __init__(self, threads: int, error_message: str = "A ThreadUtility thread failed.", incrementor: int = 500,
+                 thread_factor: int = 4, output_writer: TextIO = sys.stdout):
 
         self._error_message = error_message
         self._incrementor = incrementor
@@ -28,7 +30,7 @@ class ThreadUtility:
             self._future_pool.append(self._executor.submit(class_type,
                                                            **kwargs))
 
-    def collect_futures(self) -> list:
+    def collect_futures(self) -> List[Any]:
         self._already_collected = True
         print("{0:65}: {val}".format("Total number of threads to iterate through", val=self._num_jobs),
               file=self._output_writer)
