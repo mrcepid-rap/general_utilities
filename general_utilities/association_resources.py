@@ -1,5 +1,6 @@
 import os
 import csv
+import sys
 from typing import List
 
 import dxpy
@@ -12,7 +13,8 @@ import pandas.core.series
 # By default, commands are not run via Docker, but can be changed by setting is_docker = True
 # Also, by default, standard out is not saved, but can be modified with the 'stdout_file' parameter.
 # print_cmd is for internal debugging purposes when testing new code
-def run_cmd(cmd: str, is_docker: bool = False, stdout_file: str = None, print_cmd=False, livestream_out=False) -> None:
+def run_cmd(cmd: str, is_docker: bool = False, stdout_file: str = None,
+            print_cmd: bool = False, livestream_out: bool = False) -> None:
 
     # -v here mounts a local directory on an instance (in this case the home dir) to a directory internal to the
     # Docker instance named /test/. This allows us to run commands on files stored on the AWS instance within Docker.
@@ -31,11 +33,13 @@ def run_cmd(cmd: str, is_docker: bool = False, stdout_file: str = None, print_cm
     proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if livestream_out:
         for line in iter(proc.stdout.readline, b""):
-            print(line.decode('utf-8').rstrip())
+            sys.stdout.buffer.write(line)
 
         if proc.returncode != 0:
             print("The following cmd failed:")
             print(cmd)
+            raise dxpy.AppError("Failed to run properly...")
+
     else:
         stdout, stderr = proc.communicate()
         if stdout_file is not None:
