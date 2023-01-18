@@ -13,49 +13,53 @@ import pandas.core.series
 # By default, commands are not run via Docker, but can be changed by setting is_docker = True
 # Also, by default, standard out is not saved, but can be modified with the 'stdout_file' parameter.
 # print_cmd is for internal debugging purposes when testing new code
-def run_cmd(cmd: str, is_docker: bool = False, stdout_file: str = None,
-            print_cmd: bool = False, livestream_out: bool = False) -> None:
+def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/', script_dir: str = '/usr/bin/',
+            stdout_file: str = None, print_cmd: bool = False, livestream_out: bool = False,
+            dry_run: bool = False) -> None:
 
     # -v here mounts a local directory on an instance (in this case the home dir) to a directory internal to the
     # Docker instance named /test/. This allows us to run commands on files stored on the AWS instance within Docker.
     # This looks slightly different from other versions of this command I have written as I needed to write a custom
     # R script to run STAAR. That means we have multiple mounts here to enable this code to find the script.
     if is_docker:
-        cmd = "docker run " \
-              "-v /home/dnanexus:/test " \
-              "-v /usr/bin/:/prog " \
-              "egardner413/mrcepid-burdentesting " + cmd
+        cmd = f"docker run " \
+              f"-v {data_dir}:/test " \
+              f"-v {script_dir}:/prog " \
+              f"egardner413/mrcepid-burdentesting {cmd}"
 
     if print_cmd:
         print(cmd)
 
-    # Standard python calling external commands protocol
-    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if livestream_out:
-        for line in iter(proc.stdout.readline, b""):
-            sys.stdout.buffer.write(line)
-
-        if proc.returncode != 0:
-            print("The following cmd failed:")
-            print(cmd)
-            raise dxpy.AppError("Failed to run properly...")
-
+    if dry_run:
+        print(cmd)
     else:
-        stdout, stderr = proc.communicate()
-        if stdout_file is not None:
-            with open(stdout_file, 'w') as stdout_writer:
-                stdout_writer.write(stdout.decode('utf-8'))
-            stdout_writer.close()
+        # Standard python calling external commands protocol
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if livestream_out:
+            for line in iter(proc.stdout.readline, b""):
+                sys.stdout.buffer.write(line)
 
-        # If the command doesn't work, print the error stream and close the AWS instance out with 'dxpy.AppError'
-        if proc.returncode != 0:
-            print("The following cmd failed:")
-            print(cmd)
-            print("STDOUT follows\n")
-            print(stdout.decode('utf-8'))
-            print("STDERR follows\n")
-            print(stderr.decode('utf-8'))
-            raise dxpy.AppError("Failed to run properly...")
+            if proc.returncode != 0:
+                print("The following cmd failed:")
+                print(cmd)
+                raise dxpy.AppError("Failed to run properly...")
+
+        else:
+            stdout, stderr = proc.communicate()
+            if stdout_file is not None:
+                with open(stdout_file, 'w') as stdout_writer:
+                    stdout_writer.write(stdout.decode('utf-8'))
+                stdout_writer.close()
+
+            # If the command doesn't work, print the error stream and close the AWS instance out with 'dxpy.AppError'
+            if proc.returncode != 0:
+                print("The following cmd failed:")
+                print(cmd)
+                print("STDOUT follows\n")
+                print(stdout.decode('utf-8'))
+                print("STDERR follows\n")
+                print(stderr.decode('utf-8'))
+                raise dxpy.AppError("Failed to run properly...")
 
 
 # This is to generate a global CHROMOSOMES variable for parallelisation
