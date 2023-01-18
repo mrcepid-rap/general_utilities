@@ -42,6 +42,10 @@ def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/'
             if proc.returncode != 0:
                 print("The following cmd failed:")
                 print(cmd)
+                print("STDOUT follows\n")
+                print(proc.stdout.decode('utf-8'))
+                print("STDERR follows\n")
+                print(proc.stderr.decode('utf-8'))
                 raise dxpy.AppError("Failed to run properly...")
 
         else:
