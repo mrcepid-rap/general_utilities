@@ -37,7 +37,7 @@ def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/'
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if livestream_out:
             for line in iter(proc.stdout.readline, b""):
-                sys.stdout.buffer.write(line)
+                print(f'SUBPROCESS STDOUT: {line}\n')
 
             if proc.returncode != 0:
                 print("The following cmd failed:")
