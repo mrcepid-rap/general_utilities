@@ -34,7 +34,7 @@ def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/'
         print(cmd)
     else:
         # Standard python calling external commands protocol
-        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
         if livestream_out:
             for line in iter(proc.stdin.readline, b""):
                 print(f'SUBPROCESS STDIN: {line}\n')
