@@ -4,6 +4,7 @@ import sys
 from typing import List
 
 import dxpy
+import logging
 import subprocess
 import pandas as pd
 import pandas.core.series
@@ -36,12 +37,26 @@ def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/'
         # Standard python calling external commands protocol
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if livestream_out:
+
+            # This is required if running on DNA Nexus to propogate messages from subprocesses to their
+            # custom event-reporter
+            job_id = os.getenv('DX_JOB_ID')  # If we are running inside a DNANexus job, we set the logger to the dxpy handler
+            if job_id is not None:
+                logger = logging.getLogger(__name__)
+                logger.addHandler(dxpy.DXLogHandler())
+                logger.propagate = False
+            else:
+                logging.basicConfig()
+                logger = logging.getLogger(__name__)
+            logger.setLevel(logging.INFO)
+
             for line in iter(proc.stdout.readline, b""):
-                print(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
+                logger.info(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
 
             for line in iter(proc.stderr.readline, b""):
-                print(f'SUBPROCESS STDERR: {bytes.decode(line).rstrip()}')
+                logger.info(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
 
+            proc.wait()  # Make sure the process has actually finished...
             if proc.returncode != 0:
                 print("The following cmd failed:")
                 print(cmd)
