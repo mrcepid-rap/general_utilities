@@ -37,7 +37,7 @@ class ThreadUtility:
         self._check_and_format_progress_message()
         next(self._future_iterator).result()
 
-    def __iter__(self) -> Iterator[Future[Any]]:
+    def __iter__(self) -> Iterator[Future]:
 
         self._already_collected = True
 
