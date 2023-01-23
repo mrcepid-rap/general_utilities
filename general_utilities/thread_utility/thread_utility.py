@@ -35,11 +35,13 @@ class ThreadUtility:
 
     def __next__(self) -> Any:
 
-        while next(self._future_iterator) is None:
-            sleep(0)
+        curr_future = next(self._future_iterator)
+        while curr_future is None:
+            curr_future = next(self._future_iterator)
+            sleep(0.5)
 
         self._check_and_format_progress_message()
-        next(self._future_iterator).result()
+        curr_future.result()
 
     def __iter__(self) -> Iterator[Future]:
 
