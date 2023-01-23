@@ -35,7 +35,7 @@ class ThreadUtility:
 
     # I have a feeling this is VERY inefficient but I am unsure of how to fix at the moment...
     def __next__(self) -> Any:
-        print('Is next called?')
+
         curr_future = next(self._future_iterator)
         while curr_future is None:
             curr_future = next(self._future_iterator)
@@ -43,7 +43,7 @@ class ThreadUtility:
             print(curr_future)
 
         self._check_and_format_progress_message()
-        curr_future.result()
+        return curr_future.result()
 
     def __iter__(self) -> Iterator[Future]:
 
