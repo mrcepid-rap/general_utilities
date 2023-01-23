@@ -33,14 +33,13 @@ class ThreadUtility:
             self._future_pool.append(self._executor.submit(class_type,
                                                            **kwargs))
 
-    # I have a feeling this is VERY inefficient but I am unsure of how to fix at the moment...
+    # I have a feeling the sleep() part is VERY inefficient but I am unsure of how to fix at the moment...
     def __next__(self) -> Any:
 
         curr_future = next(self._future_iterator)
         while curr_future is None:
             curr_future = next(self._future_iterator)
-            sleep(0.5)
-            print(curr_future)
+            sleep(0.1)
 
         self._check_and_format_progress_message()
         return curr_future.result()
