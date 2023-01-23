@@ -36,6 +36,8 @@ class ThreadUtility:
     # I have a feeling the sleep() part is VERY inefficient but I am unsure of how to fix at the moment...
     def __next__(self) -> Any:
 
+        # Due to how futures work, most of the time a next() call will recieve a 'None' return. We need to create a
+        # waiter that will hold until we get something OTHER than None, so we can return it to the main class.
         curr_future = next(self._future_iterator)
         while curr_future is None:
             curr_future = next(self._future_iterator)
