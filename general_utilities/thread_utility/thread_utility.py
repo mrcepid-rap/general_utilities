@@ -1,11 +1,12 @@
 import sys
 import math
+from typing import Any, Iterator
+
 import dxpy
 
-from typing import List, Any
 from typing.io import TextIO
 from concurrent import futures
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
 
 
 class ThreadUtility:
@@ -31,12 +32,12 @@ class ThreadUtility:
             self._future_pool.append(self._executor.submit(class_type,
                                                            **kwargs))
 
-    def __next__(self):
+    def __next__(self) -> Any:
 
         self._check_and_format_progress_message()
-        next(self.future_iterator)
+        next(self._future_iterator).result()
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[Future[Any]]:
 
         self._already_collected = True
 
@@ -46,8 +47,8 @@ class ThreadUtility:
         print("{0:65}: {val}".format("Total number of threads to iterate through", val=self._num_jobs),
               file=self._output_writer)
 
-        self.future_iterator = futures.as_completed(self._future_pool)
-        return self.future_iterator
+        self._future_iterator = futures.as_completed(self._future_pool)
+        return self._future_iterator
 
     def _check_and_format_progress_message(self):
         self._total_finished_models += 1
