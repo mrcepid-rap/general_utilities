@@ -1,5 +1,6 @@
 import sys
 import math
+from time import sleep
 from typing import Any, Iterator
 
 import dxpy
@@ -33,6 +34,9 @@ class ThreadUtility:
                                                            **kwargs))
 
     def __next__(self) -> Any:
+
+        while next(self._future_iterator) is None:
+            sleep(0)
 
         self._check_and_format_progress_message()
         next(self._future_iterator).result()
