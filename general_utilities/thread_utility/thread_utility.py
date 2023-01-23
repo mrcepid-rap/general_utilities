@@ -25,19 +25,11 @@ class ThreadUtility:
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
         self._future_pool = []
 
-    def launch_job(self, class_type, **kwargs) -> None:
-        if self._already_collected:
-            dxpy.AppError("Thread executor has already been collected from!")
-        else:
-            self._num_jobs += 1
-            self._future_pool.append(self._executor.submit(class_type,
-                                                           **kwargs))
-
     # I have a feeling the sleep() part is VERY inefficient but I am unsure of how to fix at the moment...
+    # Due to how futures work, most of the time a next() call will receive a 'None' return. We need to create a
+    # waiter that will hold until we get something OTHER than None, so we can return it to the main class.
     def __next__(self) -> Any:
 
-        # Due to how futures work, most of the time a next() call will recieve a 'None' return. We need to create a
-        # waiter that will hold until we get something OTHER than None, so we can return it to the main class.
         curr_future = next(self._future_iterator)
         while curr_future is None:
             curr_future = next(self._future_iterator)
@@ -58,6 +50,21 @@ class ThreadUtility:
 
         self._future_iterator = futures.as_completed(self._future_pool)
         return self
+
+    def launch_job(self, class_type, **kwargs) -> None:
+        if self._already_collected:
+            dxpy.AppError("Thread executor has already been collected from!")
+        else:
+            self._num_jobs += 1
+            self._future_pool.append(self._executor.submit(class_type,
+                                                           **kwargs))
+
+    # This is a utility method that will make essentially 'hold' until all threads added to this class are completed.
+    # It just makes it so if one does not need to access the futures, there is no need to implement an empty for loop
+    # in your code.
+    def collect_futures(self) -> None:
+        for _ in self:
+            pass
 
     def _check_and_format_progress_message(self):
         self._total_finished_models += 1
