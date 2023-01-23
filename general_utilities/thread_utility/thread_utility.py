@@ -18,6 +18,7 @@ class ThreadUtility:
         self._output_writer = output_writer
         self._already_collected = False  # A flag to make sure we don't submit jobs to a closed executor
         self._num_jobs = 0
+        self._total_finished_models = 0
         available_workers = math.floor((threads - 1) / thread_factor)
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
         self._future_pool = []
@@ -30,20 +31,28 @@ class ThreadUtility:
             self._future_pool.append(self._executor.submit(class_type,
                                                            **kwargs))
 
-    def collect_futures(self) -> List[Any]:
-        self._already_collected = True
+    def __next__(self):
+
+        self._check_and_format_progress_message()
+        next(self.future_iterator)
+
+    def __iter__(self):
+        if len(self._future_pool) == 0:
+            raise dxpy.AppError('No jobs submitted to future pool!')
+
         print("{0:65}: {val}".format("Total number of threads to iterate through", val=self._num_jobs),
               file=self._output_writer)
-        total_finished_models = 0
+
+        self.future_iterator = futures.as_completed(self._future_pool)
+        return self.future_iterator
+
+    def collect_futures(self) -> List[Any]:
+        self._already_collected = True
+
         future_results = []
         for future in futures.as_completed(self._future_pool):
             try:
-                total_finished_models += 1
-                if math.remainder(total_finished_models, self._incrementor) == 0 \
-                        or total_finished_models == self._num_jobs:
-                    print(f'{"Total number of threads finished":{65}}: {total_finished_models} / {self._num_jobs} '
-                          f'({((total_finished_models / self._num_jobs) * 100):0.2f}%)',
-                          file=self._output_writer)
+                self._check_and_format_progress_message()
                 future_results.append(future.result())
             except Exception as err:
                 print(self._error_message)
@@ -52,4 +61,11 @@ class ThreadUtility:
 
         return future_results
 
+    def _check_and_format_progress_message(self):
+        self._total_finished_models += 1
+        if math.remainder(self._total_finished_models, self._incrementor) == 0 \
+                or self._total_finished_models == self._num_jobs:
+            print(f'{"Total number of threads finished":{65}}: {self._total_finished_models} / {self._num_jobs} '
+                  f'({((self._total_finished_models / self._num_jobs) * 100):0.2f}%)',
+                  file=self._output_writer)
 
