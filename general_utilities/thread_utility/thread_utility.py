@@ -37,6 +37,9 @@ class ThreadUtility:
         next(self.future_iterator)
 
     def __iter__(self):
+
+        self._already_collected = True
+
         if len(self._future_pool) == 0:
             raise dxpy.AppError('No jobs submitted to future pool!')
 
@@ -45,21 +48,6 @@ class ThreadUtility:
 
         self.future_iterator = futures.as_completed(self._future_pool)
         return self.future_iterator
-
-    def collect_futures(self) -> List[Any]:
-        self._already_collected = True
-
-        future_results = []
-        for future in futures.as_completed(self._future_pool):
-            try:
-                self._check_and_format_progress_message()
-                future_results.append(future.result())
-            except Exception as err:
-                print(self._error_message)
-                print(Exception, err)
-                raise dxpy.AppError(self._error_message)
-
-        return future_results
 
     def _check_and_format_progress_message(self):
         self._total_finished_models += 1
