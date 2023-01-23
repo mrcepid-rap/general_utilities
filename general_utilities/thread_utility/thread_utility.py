@@ -48,7 +48,7 @@ class ThreadUtility:
               file=self._output_writer)
 
         self._future_iterator = futures.as_completed(self._future_pool)
-        return self._future_iterator
+        return self
 
     def _check_and_format_progress_message(self):
         self._total_finished_models += 1
