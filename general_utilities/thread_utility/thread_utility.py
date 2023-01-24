@@ -69,5 +69,4 @@ class ThreadUtility:
         if math.remainder(self._total_finished_models, self._incrementor) == 0 \
                 or self._total_finished_models == self._num_jobs:
             logging.info(f'{"Total number of threads finished":{65}}: {self._total_finished_models} / {self._num_jobs} '
-                         f'({((self._total_finished_models / self._num_jobs) * 100):0.2f}%)',
-                         file=self._output_writer)
+                         f'({((self._total_finished_models / self._num_jobs) * 100):0.2f}%)')
