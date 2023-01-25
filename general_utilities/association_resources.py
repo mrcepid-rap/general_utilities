@@ -301,7 +301,7 @@ def transform_gt(gt: str) -> float:
 # Downloads a dxfile and uses it's actual name as given by dxfile.describe()
 def download_dxfile_by_name(file: Union[dict, str], print_status: bool = True) -> str:
 
-    curr_dxfile = dxpy.DXFile(file['$dnanexus_link'])
+    curr_dxfile = dxpy.DXFile(file)
     curr_filename = curr_dxfile.describe()['name']
 
     if print_status:
