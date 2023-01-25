@@ -18,7 +18,7 @@ class ThreadUtility:
         self._already_collected = False  # A flag to make sure we don't submit jobs to a closed executor
         self._num_jobs = 0
         self._total_finished_models = 0
-        available_workers = math.floor((threads - 1) / thread_factor)
+        available_workers = math.floor(threads / thread_factor)
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
         self._future_pool = []
         logging.basicConfig(level=logging.INFO)

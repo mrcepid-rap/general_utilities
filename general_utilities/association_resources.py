@@ -75,6 +75,7 @@ def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/'
                 logging.error(stderr.decode('utf-8'))
                 raise dxpy.AppError("Failed to run properly...")
 
+
 # This is to generate a global CHROMOSOMES variable for parallelisation
 def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromosome: str = None) -> List[str]:
 
