@@ -42,28 +42,18 @@ def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/'
             # custom event-reporter
             job_id = os.getenv('DX_JOB_ID')  # If we are running inside a DNANexus job, we set the logger to the dxpy handler
             if job_id is not None:
-                logger = logging.getLogger(__name__)
-                logger.addHandler(dxpy.DXLogHandler())
-                logger.propagate = False
+                logging.getLogger().addHandler(dxpy.DXLogHandler())
             else:
-                logging.basicConfig()
-                logger = logging.getLogger(__name__)
-            logger.setLevel(logging.INFO)
+                logging.basicConfig(level=logging.INFO)
 
             for line in iter(proc.stdout.readline, b""):
-                logger.info(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
-
-            for line in iter(proc.stderr.readline, b""):
-                logger.info(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
+                logging.info(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
 
             proc.wait()  # Make sure the process has actually finished...
             if proc.returncode != 0:
-                print("The following cmd failed:")
-                print(cmd)
-                print("STDOUT follows\n")
-                for line in iter(proc.stdout.readline, b""):
-                    sys.stdout.buffer.write(line)
-                print("STDERR follows\n")
+                logging.error("The following cmd failed:")
+                logging.error(cmd)
+                logging.error("STDERR follows\n")
                 for line in iter(proc.stderr.readline, b""):
                     sys.stdout.buffer.write(line)
                 raise dxpy.AppError("Failed to run properly...")
@@ -77,14 +67,13 @@ def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/'
 
             # If the command doesn't work, print the error stream and close the AWS instance out with 'dxpy.AppError'
             if proc.returncode != 0:
-                print("The following cmd failed:")
-                print(cmd)
-                print("STDOUT follows\n")
-                print(stdout.decode('utf-8'))
-                print("STDERR follows\n")
-                print(stderr.decode('utf-8'))
+                logging.error("The following cmd failed:")
+                logging.error(cmd)
+                logging.error("STDOUT follows\n")
+                logging.error(stdout.decode('utf-8'))
+                logging.error("STDERR follows\n")
+                logging.error(stderr.decode('utf-8'))
                 raise dxpy.AppError("Failed to run properly...")
-
 
 # This is to generate a global CHROMOSOMES variable for parallelisation
 def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromosome: str = None) -> List[str]:
@@ -306,3 +295,16 @@ def transform_gt(gt: str) -> float:
         return 2
     else:
         return float('NaN')
+
+
+# Downloads a dxfile and uses it's actual name as given by dxfile.describe()
+def download_dxfile_by_name(file: dict, print_status: bool = True) -> str:
+
+    curr_dxfile = dxpy.DXFile(file['$dnanexus_link'])
+    curr_filename = curr_dxfile.describe()['name']
+
+    if print_status:
+        print(f'Downloading file {curr_filename} ({curr_dxfile.get_id()})')
+    dxpy.download_dxfile(curr_dxfile.get_id(), curr_filename)
+
+    return curr_filename
