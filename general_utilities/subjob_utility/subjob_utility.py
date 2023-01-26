@@ -3,6 +3,8 @@ from asyncio import sleep
 import dxpy
 import dxpy.api
 
+from general_utilities.association_resources import run_cmd
+
 
 class SubjobUtility:
 
@@ -51,6 +53,9 @@ class SubjobUtility:
                                             always_retry=False)
             print(launched_job)
             job_ids.append(launched_job['id'])
+
+        sleep(60*10)
+        run_cmd('ls ./', livestream_out=True)
 
     def _monitor_submitted(self, job_ids: list):
         pass
