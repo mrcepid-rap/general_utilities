@@ -1,4 +1,4 @@
-from asyncio import sleep
+from time import sleep
 
 import dxpy
 import dxpy.api
