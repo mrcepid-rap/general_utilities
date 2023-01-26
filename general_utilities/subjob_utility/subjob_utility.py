@@ -47,8 +47,10 @@ class SubjobUtility:
                     sleep(1)
 
             current_jobs += 1
-            job_ids.append(dxpy.api.job_new(input_params=job,
-                                            always_retry=False))
+            launched_job = dxpy.api.job_new(input_params=job,
+                                            always_retry=False)
+            print(launched_job)
+            job_ids.append(launched_job['id'])
 
     def _monitor_submitted(self, job_ids: list):
         pass
