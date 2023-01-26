@@ -51,15 +51,16 @@ class ThreadUtility:
 
     def launch_job(self, class_type, **kwargs) -> None:
         if self._already_collected:
-            dxpy.AppError("Thread executor has already been collected from!")
+            raise dxpy.AppError("Thread executor has already been collected from!")
         else:
             self._num_jobs += 1
             self._future_pool.append(self._executor.submit(class_type,
                                                            **kwargs))
 
-    # This is a utility method that will make essentially 'hold' until all threads added to this class are completed.
+    # This is a utility method that will essentially 'hold' until all threads added to this class are completed.
     # It just makes it so if one does not need to access the futures, there is no need to implement an empty for loop
-    # in your code.
+    # in your code. Since 'self' represents this class, and this class implements __iter__, it will run the code in
+    # the __iter__ class, which will hold until all jobs are completed.
     def collect_futures(self) -> None:
         for _ in self:
             pass

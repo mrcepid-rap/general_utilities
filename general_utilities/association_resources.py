@@ -14,7 +14,9 @@ import pandas.core.series
 # By default, commands are not run via Docker, but can be changed by setting is_docker = True
 # Also, by default, standard out is not saved, but can be modified with the 'stdout_file' parameter.
 # print_cmd is for internal debugging purposes when testing new code
-def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/', script_dir: str = '/usr/bin/',
+# TODO: Convert this to a class that sets the DockerImage at startup by RunAssociationTesting/plugin AbstractClass(es)
+def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
+            data_dir: str = '/home/dnanexus/', script_dir: str = '/usr/bin/',
             stdout_file: str = None, print_cmd: bool = False, livestream_out: bool = False,
             dry_run: bool = False) -> None:
 
@@ -23,10 +25,13 @@ def run_cmd(cmd: str, is_docker: bool = False, data_dir: str = '/home/dnanexus/'
     # This looks slightly different from other versions of this command I have written as I needed to write a custom
     # R script to run STAAR. That means we have multiple mounts here to enable this code to find the script.
     if is_docker:
+        if docker_image is None:
+            raise dxpy.AppError('Requested to run via docker without providing a Docker image!')
+
         cmd = f"docker run " \
               f"-v {data_dir}:/test " \
               f"-v {script_dir}:/prog " \
-              f"egardner413/mrcepid-burdentesting {cmd}"
+              f"{docker_image} {cmd}"
 
     if print_cmd:
         print(cmd)
@@ -116,11 +121,11 @@ def process_bgen_file(chrom_bgen_index: dict, chromosome: str, download_only: bo
               f'--export bgen-1.2 "bits="8 ' \
               f'--out /test/{chromosome}.markers ' \
               f'--keep /test/SAMPLES_Include.txt'
-        run_cmd(cmd, True)
+        run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
         # And index the file
         cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
-        run_cmd(cmd, True)
+        run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
         # The sample file output by plink2 is a disaster, so fix it here:
         os.rename(chromosome + '.markers.sample', chromosome + '.old')
@@ -218,7 +223,7 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
     cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.txt -Ob -o /test/' \
           f'{tarball_prefix}.{file_prefix}.saige_input.bcf /test/' \
           f'{tarball_prefix}.{file_prefix}.SAIGE.bcf'
-    run_cmd(cmd, True)
+    run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
     # Build a fake gene_info that can feed into the other functions in this class
     gene_info = pd.Series({'chrom': file_prefix, 'SYMBOL': file_prefix})

@@ -1,9 +1,9 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='general_utilities',
     version='',
-    packages=['general_utilities', 'general_utilities.linear_model', 'general_utilities.thread_utility'],
+    packages=find_packages(),
     url='',
     license='',
     author='ejgardner',

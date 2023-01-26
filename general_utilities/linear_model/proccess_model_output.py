@@ -60,9 +60,9 @@ def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, i
 
             # And bgzip and tabix...
             cmd = "bgzip /test/" + output_prefix + '.genes.glm.stats.tsv'
-            run_cmd(cmd, True)
+            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
             cmd = "tabix -S 1 -s 2 -b 3 -e 4 /test/" + output_prefix + '.genes.glm.stats.tsv.gz'
-            run_cmd(cmd, True)
+            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
         outputs = [output_prefix + '.genes.glm.stats.tsv.gz',
                    output_prefix + '.genes.glm.stats.tsv.gz.tbi']
@@ -137,9 +137,9 @@ def process_staar_outputs(completed_staar_files: List[str], output_prefix: str, 
 
             # And bgzip and tabix...
             cmd = "bgzip /test/" + output_prefix + '.genes.STAAR.stats.tsv'
-            run_cmd(cmd, True)
+            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
             cmd = "tabix -S 1 -s 2 -b 3 -e 4 /test/" + output_prefix + '.genes.STAAR.stats.tsv.gz'
-            run_cmd(cmd, True)
+            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
         outputs = [output_prefix + '.genes.STAAR.stats.tsv.gz',
                    output_prefix + '.genes.STAAR.stats.tsv.gz.tbi']
@@ -207,9 +207,9 @@ def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_t
 
             # And bgzip and tabix...
             cmd = "bgzip /test/" + output_prefix + '.genes.STAAR_glm.stats.tsv'
-            run_cmd(cmd, True)
+            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
             cmd = "tabix -S 1 -s 2 -b 3 -e 4 /test/" + output_prefix + '.genes.STAAR_glm.stats.tsv.gz'
-            run_cmd(cmd, True)
+            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
         outputs = [output_prefix + '.genes.STAAR_glm.stats.tsv.gz',
                    output_prefix + '.genes.STAAR_glm.stats.tsv.gz.tbi']

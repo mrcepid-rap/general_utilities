@@ -24,7 +24,7 @@ def staar_null(phenoname: str, is_binary: bool,
         cmd += " " + ','.join(found_categorical_covariates)
     else:
         cmd += " NULL"
-    run_cmd(cmd, True)
+    run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
 
 # Run rare variant association testing using STAAR
@@ -49,6 +49,6 @@ def staar_genes(tarball_prefix: str, chromosome: str, phenoname: str, has_gene_i
     else:
         cmd += f'none'  # This is always none when doing a genome-wide study.
 
-    run_cmd(cmd, True)
+    run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
     return tarball_prefix, chromosome, phenoname

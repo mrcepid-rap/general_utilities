@@ -150,7 +150,7 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
                   "/test/" + tarball_prefix + "." + chromosome + ".variants_table.STAAR.tsv " + \
                   tarball_prefix + " " + \
                   chromosome
-            run_cmd(cmd, True)
+            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
             # And read in the resulting table
             geno_table = pd.read_csv(tarball_prefix + "." + chromosome + ".lm_sparse_matrix.tsv",
