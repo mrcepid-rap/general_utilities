@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 from enum import Enum
 from time import sleep
@@ -30,9 +31,10 @@ class JobStatus(Enum):
 
 class SubjobUtility:
 
-    def __init__(self, concurrent_job_limit: int = 100, retries: int = 1):
+    def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500):
 
         self._concurrent_job_limit = concurrent_job_limit
+        self._incrementor = incrementor
 
         # Make a queue for job submission
         self._job_queue = []
@@ -123,9 +125,9 @@ class SubjobUtility:
             for output in job['outputs']:
                 output_list.append(job['job_class'].get_output_ref(output))
             self._output_array.append(output_list)
-            self._num_completed_jobs += 1
 
-            if self._num_completed_jobs:
+            self._num_completed_jobs += 1
+            if math.remainder(self._num_completed_jobs, self._incrementor) == 0:
                 logging.info(
                     f'{"Total number of jobs finished":{65}}: {self._num_completed_jobs} / {self._total_jobs} '
                     f'({((self._num_completed_jobs / self._total_jobs) * 100):0.2f}%)')
@@ -147,9 +149,9 @@ class SubjobUtility:
                         job_ids[job_id]['finished'] = True
                         self._current_running_jobs -= 1
 
-                sleep(10)
+            sleep(10)
 
-    def _monitor_completed(self, job_ids: Dict[str, DXJobDict]):
+    def _monitor_completed(self, job_ids: Dict[str, DXJobDict]) -> None:
 
         all_completed = False
         while all_completed is False:
