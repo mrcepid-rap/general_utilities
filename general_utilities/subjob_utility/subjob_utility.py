@@ -77,9 +77,9 @@ class SubjobUtility:
                             'outputs': outputs}
 
         if instance_type is None:  # This might work...
-            input_parameters['systemRequirements'] = self._default_instance_type
+            input_parameters['instance_type'] = self._default_instance_type
         else:
-            input_parameters['systemRequirements'] = instance_type
+            input_parameters['instance_type'] = instance_type
 
         self._job_queue.append(input_parameters)
         self._total_jobs += 1
