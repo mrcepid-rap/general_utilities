@@ -6,11 +6,8 @@ from time import sleep
 
 import dxpy
 import dxpy.api
-from dxpy import DXJob
 
-from general_utilities.association_resources import run_cmd
-
-from typing import TypedDict, Dict, Any, List
+from typing import TypedDict, Dict, Any, List, Iterator
 
 
 class DXJobDict(TypedDict):
@@ -56,11 +53,8 @@ class SubjobUtility:
         # Ensure logging handled
         logging.basicConfig(level=logging.INFO)
 
-    def __next__(self) -> List[Any]:
-        return self._output_array.pop()
-
-    def __iter__(self):
-        return self
+    def __iter__(self) -> Iterator:
+        return iter(self._output_array)
 
     def __len__(self):
         return len(self._output_array)
@@ -109,7 +103,7 @@ class SubjobUtility:
             self._current_running_jobs += 1
             dxjob = dxpy.new_dxjob(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'])
             job_ids[dxjob.describe(fields={'id': True})['id']] = {'finished': False, 'job_class': dxjob, 'retries': 0,
-                                                            'outputs': job['outputs']}
+                                                                  'outputs': job['outputs']}
 
             if self._current_running_jobs > self._concurrent_job_limit:
                 can_submit = False
