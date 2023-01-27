@@ -108,7 +108,7 @@ class SubjobUtility:
 
             self._current_running_jobs += 1
             dxjob = dxpy.new_dxjob(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'])
-            job_ids[dxjob.describe(fields={'id': True})] = {'finished': False, 'job_class': dxjob, 'retries': 0,
+            job_ids[dxjob.describe(fields={'id': True})['id']] = {'finished': False, 'job_class': dxjob, 'retries': 0,
                                                             'outputs': job['outputs']}
 
             if self._current_running_jobs > self._concurrent_job_limit:
