@@ -1,63 +1,167 @@
+import logging
+import os
+from enum import Enum
 from time import sleep
 
 import dxpy
 import dxpy.api
+from dxpy import DXJob
 
 from general_utilities.association_resources import run_cmd
+
+from typing import TypedDict, Dict, Any, List
+
+
+class DXJobDict(TypedDict):
+    finished: bool
+    job_class: dxpy.DXJob
+    retries: int
+    outputs: List[str]
+
+
+class JobStatus(Enum):
+    DONE = True
+    IDLE = False
+    RUNNABLE = False
+    RUNNING = False
+    TERMINATED = None
+    FAILED = None
 
 
 class SubjobUtility:
 
-    def __init__(self, concurrent_job_limit: int = 100):
+    def __init__(self, concurrent_job_limit: int = 100, retries: int = 1):
 
         self._concurrent_job_limit = concurrent_job_limit
 
+        # Make a queue for job submission
         self._job_queue = []
-        self._num_jobs = 0
+
+        # Job count monitoring
         self._queue_closed = False
-        pass
+        self._total_jobs = 0
+        self._current_running_jobs = 0
+        self._num_completed_jobs = 0
 
-    def launch_job(self, function_name: str, inputs: dict, outputs: dict, instance_type: str = None) -> None:
+        # Set default job parameters
+        self._retries = retries  # TODO: Implement retries...
+        parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
+        self._default_instance_type = parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
 
+        # Manage returned outputs
+        self._output_array = []
+
+        # Ensure logging handled
+        logging.basicConfig(level=logging.INFO)
+
+    def __next__(self) -> List[Any]:
+        return self._output_array.pop()
+
+    def __iter__(self):
+        return self
+
+    def __len__(self):
+        return len(self._output_array)
+
+    def launch_job(self, function_name: str, inputs: Dict[str, Any], outputs: List[str] = None, instance_type: str = None) -> None:
+
+        if outputs is None:
+            outputs = {}
         if self._queue_closed is True:
             raise dxpy.AppError('Cannot submit new subjobs after calling monitor_subjobs()!')
 
         input_parameters = {'function': function_name,
                             'input': inputs,
                             'outputs': outputs}
-        if instance_type is not None:  # This might work...
-            input_parameters['systemRequirements'] = {"*": {"instanceType": instance_type}}
+
+        if instance_type is None:  # This might work...
+            input_parameters['systemRequirements'] = self._default_instance_type
+        else:
+            input_parameters['systemRequirements'] = instance_type
 
         self._job_queue.append(input_parameters)
-        self._num_jobs += 1
+        self._total_jobs += 1
 
-    def monitor_subjobs(self):
+    def monitor_subjobs(self) -> None:
 
+        # Close the queue to future job submissions to save my sanity for weird edge cases
         self._queue_closed = True
 
+        logging.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
+
+        # Set a boolean for allowing to submit jobs UNTILL we hit the job limit (defined by self._concurrent_job_limit)
         can_submit = True
-        job_ids = []
-        current_jobs = 0
+
+        # Store all jobs in a dictionary with specific information about them
+        job_ids = dict()
         for job in self._job_queue:
 
             # Make sure the queue isn't full...
             while can_submit is False:
-                if current_jobs <= self._concurrent_job_limit:
+                if self._current_running_jobs <= self._concurrent_job_limit:
                     can_submit = True
-                else:
-                    self._monitor_submitted(job_ids)
-                    sleep(1)
 
-            current_jobs += 1
-            launched_job = dxpy.api.job_new(input_params=job,
-                                            always_retry=False)
-            print(launched_job)
-            job_ids.append(launched_job['id'])
+                self._monitor_submitted(job_ids)
 
-        sleep(60*10)
-        run_cmd('ls ./', livestream_out=True)
+            self._current_running_jobs += 1
+            dxjob = dxpy.new_dxjob(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'])
+            job_ids[dxjob.describe(fields={'id': True})] = {'finished': False, 'job_class': dxjob, 'retries': 0,
+                                                            'outputs': job['outputs']}
 
-    def _monitor_submitted(self, job_ids: list):
-        pass
+            if self._current_running_jobs > self._concurrent_job_limit:
+                can_submit = False
+
+        # And monitor until all jobs completed
+        self._monitor_completed(job_ids)
+
+    def _check_job_status(self, job: DXJobDict) -> bool:
+
+        description = job['job_class'].describe(fields={'state': True})
+        curr_status = JobStatus[description['state'].upper()]
+        if curr_status.value:
+            output_list = []
+            for output in job['outputs']:
+                output_list.append(job['job_class'].get_output_ref(output))
+            self._output_array.append(output_list)
+            self._num_completed_jobs += 1
+
+            if self._num_completed_jobs:
+                logging.info(
+                    f'{"Total number of jobs finished":{65}}: {self._num_completed_jobs} / {self._total_jobs} '
+                    f'({((self._num_completed_jobs / self._total_jobs) * 100):0.2f}%)')
+
+            return True
+        elif curr_status.value is False:
+            return False
+        elif curr_status.value is None:
+            raise dxpy.AppError(f'A subjob {description["id"]} failed!')
+
+    def _monitor_submitted(self, job_ids: Dict[str, DXJobDict]) -> None:
+
+        can_submit = False
+        while can_submit is False:
+            for job_id in job_ids.keys():
+                if job_ids[job_id]['finished'] is False:
+                    job_complete = self._check_job_status(job_ids[job_id])
+                    if job_complete:
+                        job_ids[job_id]['finished'] = True
+                        self._current_running_jobs -= 1
+
+                sleep(10)
+
+    def _monitor_completed(self, job_ids: Dict[str, DXJobDict]):
+
+        all_completed = False
+        while all_completed is False:
+            for job_id in job_ids.keys():
+                if job_ids[job_id]['finished'] is False:
+                    job_complete = self._check_job_status(job_ids[job_id])
+                    if job_complete:
+                        self._current_running_jobs -= 1
+
+            if self._current_running_jobs == 0:
+                all_completed = True
+            else:
+                sleep(10)
 
 
