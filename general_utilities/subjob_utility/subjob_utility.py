@@ -65,10 +65,11 @@ class SubjobUtility:
     def __len__(self):
         return len(self._output_array)
 
-    def launch_job(self, function_name: str, inputs: Dict[str, Any], outputs: List[str] = None, instance_type: str = None) -> None:
+    def launch_job(self, function_name: str, inputs: Dict[str, Any], outputs: List[str] = None,
+                   instance_type: str = None) -> None:
 
         if outputs is None:
-            outputs = {}
+            outputs = []
         if self._queue_closed is True:
             raise dxpy.AppError('Cannot submit new subjobs after calling monitor_subjobs()!')
 
