@@ -22,6 +22,8 @@ class JobStatus(Enum):
     IDLE = False
     RUNNABLE = False
     RUNNING = False
+    WAITING_ON_OUTPUT = False
+    WAITING_ON_INPUT = False
     TERMINATED = None
     FAILED = None
 
