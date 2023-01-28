@@ -89,7 +89,7 @@ class SubjobUtility:
         # Close the queue to future job submissions to save my sanity for weird edge cases
         self._queue_closed = True
 
-        logging.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
+        print("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
 
         # Set a boolean for allowing to submit jobs UNTILL we hit the job limit (defined by self._concurrent_job_limit)
         can_submit = True
@@ -128,7 +128,7 @@ class SubjobUtility:
 
             self._num_completed_jobs += 1
             if math.remainder(self._num_completed_jobs, self._incrementor) == 0:
-                logging.info(
+                print(
                     f'{"Total number of jobs finished":{65}}: {self._num_completed_jobs} / {self._total_jobs} '
                     f'({((self._num_completed_jobs / self._total_jobs) * 100):0.2f}%)')
 
@@ -161,9 +161,10 @@ class SubjobUtility:
                     if job_complete:
                         self._current_running_jobs -= 1
 
+            print(f'Current running jobs: {self._current_running_jobs}')
             if self._current_running_jobs == 0:
                 all_completed = True
             else:
-                sleep(10)
+                sleep(60)
 
 
