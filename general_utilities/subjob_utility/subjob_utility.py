@@ -146,10 +146,15 @@ class SubjobUtility:
                 if job_ids[job_id]['finished'] is False:
                     job_complete = self._check_job_status(job_ids[job_id])
                     if job_complete:
+                        print(f'Job finished: {job_id}')
                         job_ids[job_id]['finished'] = True
                         self._current_running_jobs -= 1
 
-            sleep(10)
+            print(f'Current running jobs (submitted): {self._current_running_jobs}')
+            if self._current_running_jobs < self._concurrent_job_limit:
+                can_submit = True
+            sleep(60)
+
 
     def _monitor_completed(self, job_ids: Dict[str, DXJobDict]) -> None:
 
@@ -159,12 +164,13 @@ class SubjobUtility:
                 if job_ids[job_id]['finished'] is False:
                     job_complete = self._check_job_status(job_ids[job_id])
                     if job_complete:
+                        print(f'Job finished: {job_id}')
+                        job_ids[job_id]['finished'] = True
                         self._current_running_jobs -= 1
 
-            print(f'Current running jobs: {self._current_running_jobs}')
+            print(f'Current running jobs (completed): {self._current_running_jobs}')
             if self._current_running_jobs == 0:
                 all_completed = True
-            else:
-                sleep(60)
+            sleep(60)
 
 
