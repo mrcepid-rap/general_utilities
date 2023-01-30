@@ -155,7 +155,6 @@ class SubjobUtility:
                 can_submit = True
             sleep(60)
 
-
     def _monitor_completed(self, job_ids: Dict[str, DXJobDict]) -> None:
 
         all_completed = False
