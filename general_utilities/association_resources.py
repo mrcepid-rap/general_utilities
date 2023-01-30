@@ -44,9 +44,8 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
         if livestream_out:
 
             # This is required if running on DNA Nexus to propogate messages from subprocesses to their
-            # custom event-reporter
-            job_id = os.getenv('DX_JOB_ID')  # If we are running inside a DNANexus job, we set the logger to the dxpy handler
-            if job_id is not None:
+            # custom event-reporter. So, if we are running inside a DNANexus job, we set the logger to the dxpy handler.
+            if 'DX_JOB_ID' in os.environ:
                 logging.getLogger().addHandler(dxpy.DXLogHandler())
             else:
                 logging.basicConfig(level=logging.INFO)

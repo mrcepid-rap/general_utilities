@@ -1,4 +1,6 @@
 import math
+import os
+
 import dxpy
 import logging
 
@@ -10,18 +12,27 @@ from concurrent.futures import ThreadPoolExecutor
 
 class ThreadUtility:
 
-    def __init__(self, threads: int, error_message: str = "A ThreadUtility thread failed.", incrementor: int = 500,
-                 thread_factor: int = 4):
+    def __init__(self, threads: int = None, error_message: str = "A ThreadUtility thread failed.",
+                 incrementor: int = 500, thread_factor: int = 4):
 
         self._error_message = error_message
         self._incrementor = incrementor
         self._already_collected = False  # A flag to make sure we don't submit jobs to a closed executor
         self._num_jobs = 0
         self._total_finished_models = 0
-        available_workers = math.floor(threads / thread_factor)
+
+        # Set number of threads if not requested
+        if threads is None:
+            self._threads = self._get_threads()
+        else:
+            self._threads = threads
+        available_workers = math.floor(self._threads / thread_factor)
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
         self._future_pool = []
-        logging.basicConfig(level=logging.INFO)
+        if 'DX_JOB_ID' in os.environ:
+            logging.getLogger().addHandler(dxpy.DXLogHandler())
+        else:
+            logging.basicConfig(level=logging.INFO)
 
     # I have a feeling the sleep() part is VERY inefficient but I am unsure of how to fix at the moment...
     # Due to how futures work, most of the time a next() call will receive a 'None' return. We need to create a
@@ -71,3 +82,9 @@ class ThreadUtility:
                 or self._total_finished_models == self._num_jobs:
             logging.info(f'{"Total number of threads finished":{65}}: {self._total_finished_models} / {self._num_jobs} '
                          f'({((self._total_finished_models / self._num_jobs) * 100):0.2f}%)')
+
+    @staticmethod
+    def _get_threads() -> int:
+        threads = os.cpu_count()
+        print('Number of threads available: %i' % threads)
+        return threads
