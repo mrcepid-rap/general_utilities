@@ -1,7 +1,6 @@
 import os
 import csv
 import sys
-from enum import Enum
 from typing import List, Union
 
 import dxpy
@@ -292,12 +291,13 @@ def define_covariate_string(found_quantitative_covariates: List[str], found_cate
     return suffix
 
 
-class NAType(Enum):
-    PANDAS = pd.NA
-    FLOAT = float('NaN')
-
-
-def gt_to_integer(gt: str, na_type: NAType):
+# This method is a slightly incorrect as it converts a string genotype into a 0,2 range, but as a float instead of
+# as the expected int. This is because:
+# 1) integers cannot by NULL / NA in python
+# 2) I use pandas to handle most of my genotype information, which can only use floats as a nullable datatype
+# Thus I convert to a float and then cast to an integer in string format if required by the output that uses this
+# method
+def gt_to_float(gt: str) -> float:
     if gt == '0/0':
         return 0
     elif gt == '0/1':
@@ -305,7 +305,7 @@ def gt_to_integer(gt: str, na_type: NAType):
     elif gt == '1/1':
         return 2
     else:
-        return na_type.value
+        return float('NaN')
 
 
 # Downloads a dxfile and uses it's actual name as given by dxfile.describe()
