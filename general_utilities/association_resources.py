@@ -1,6 +1,7 @@
 import os
 import csv
 import sys
+from enum import Enum
 from typing import List, Union
 
 import dxpy
@@ -291,7 +292,12 @@ def define_covariate_string(found_quantitative_covariates: List[str], found_cate
     return suffix
 
 
-def transform_gt(gt: str) -> float:
+class NAType(Enum):
+    PANDAS = pd.NA
+    FLOAT = float('NaN')
+
+
+def gt_to_integer(gt: str, na_type: NAType):
     if gt == '0/0':
         return 0
     elif gt == '0/1':
@@ -299,7 +305,7 @@ def transform_gt(gt: str) -> float:
     elif gt == '1/1':
         return 2
     else:
-        return float('NaN')
+        return na_type.value
 
 
 # Downloads a dxfile and uses it's actual name as given by dxfile.describe()
