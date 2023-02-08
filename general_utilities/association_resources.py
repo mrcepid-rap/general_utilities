@@ -1,7 +1,7 @@
 import os
 import csv
 import sys
-from typing import List, Union
+from typing import List, Union, TypedDict
 
 import dxpy
 import logging
@@ -100,14 +100,22 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
     return chromosomes
 
 
+# A TypedDict holding information about each chromosome's available genetic data
+class BGENInformation(TypedDict):
+    index: dxpy.DXFile
+    sample: dxpy.DXFile
+    bgen: dxpy.DXFile
+    vep: dxpy.DXFile
+
+
 # This downloads and process a bgen file when requested
-def process_bgen_file(chrom_bgen_index: dict, chromosome: str, download_only: bool = False) -> None:
+def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, download_only: bool = False) -> None:
 
     # First we have to download the actual data
-    bgen_index = dxpy.DXFile(chrom_bgen_index['index'])
-    bgen_sample = dxpy.DXFile(chrom_bgen_index['sample'])
-    bgen = dxpy.DXFile(chrom_bgen_index['bgen'])
-    vep = dxpy.DXFile(chrom_bgen_index['vep'])
+    bgen_index = chrom_bgen_index['index']
+    bgen_sample = chrom_bgen_index['sample']
+    bgen = chrom_bgen_index['bgen']
+    vep = chrom_bgen_index['vep']
     dxpy.download_dxfile(bgen_index.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
     dxpy.download_dxfile(bgen_sample.get_id(), f'filtered_bgen/{chromosome}.filtered.sample')
     dxpy.download_dxfile(bgen.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen')
