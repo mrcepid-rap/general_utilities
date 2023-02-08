@@ -33,9 +33,10 @@ class DXJobDict(TypedDict):
 
 
 class RunningStatus(Enum):
-    COMPLETE = auto
-    RUNNING = auto
-    FAILED = auto
+    # DO NOT remove the '()' after auto, even though pycharm says it is wrong. IT IS NOT WRONG.
+    COMPLETE = auto()
+    RUNNING = auto()
+    FAILED = auto()
 
 
 class JobStatus(Enum):
@@ -142,12 +143,7 @@ class SubjobUtility:
 
         # Keep going until we get every job submitted or finished...
         while len(self._job_queue) > 0 or len(self._job_running.keys()) > 0:
-            print(f'{"Jobs currently in the queue":{65}}: {len(self._job_queue)}')
-            print(f'{"Jobs currently running":{65}}: {len(self._job_running.keys())}')
-            print(f'{"Jobs failed":{65}}: {len(self._job_failed)}')
-
-            curr_time = datetime.today()
-            print(f'{curr_time.isoformat("|", "seconds"):{"-"}^{65}}')
+            self._print_status()
             self._monitor_subjobs()
             sleep(60)
 
@@ -157,6 +153,14 @@ class SubjobUtility:
                 print(f'FAILED: {failed_job}')
         else:
             print('All jobs completed, No failed jobs...')
+
+    def _print_status(self):
+        print(f'{"Jobs currently in the queue":{65}}: {len(self._job_queue)}')
+        print(f'{"Jobs currently running":{65}}: {len(self._job_running.keys())}')
+        print(f'{"Jobs failed":{65}}: {len(self._job_failed)}')
+
+        curr_time = datetime.today()
+        print(f'{curr_time.isoformat("|", "seconds"):{"-"}^{65}}')
 
     def _monitor_subjobs(self) -> None:
 
@@ -172,13 +176,8 @@ class SubjobUtility:
                 if len(self._job_running.keys()) < self._concurrent_job_limit:
                     can_submit = True
 
+                self._print_status()
                 self._monitor_submitted()
-                print(f'{"Jobs currently in the queue":{65}}: {len(self._job_queue)}')
-                print(f'{"Jobs currently running":{65}}: {len(self._job_running.keys())}')
-                print(f'{"Jobs failed":{65}}: {len(self._job_failed)}')
-
-                curr_time = datetime.today()
-                print(f'{curr_time.isoformat("|", "seconds"):{"-"}^{65}}')
                 sleep(60)
 
             if job['job_type'] == Environment.DX:
@@ -204,7 +203,7 @@ class SubjobUtility:
     def _check_job_status(self, job: DXJobDict) -> RunningStatus:
 
         description = job['job_class'].describe(fields={'state': True})
-        curr_status = JobStatus[description['state'].upper()]
+        curr_status = JobStatus[description['state'].rstrip().upper()]
         if curr_status.value == RunningStatus.COMPLETE:
             output_list = []
             for output in job['job_info']['outputs']:
@@ -223,11 +222,10 @@ class SubjobUtility:
 
         curr_keys = list(self._job_running.keys())
         for job_id in curr_keys:
-            job_complete = self._check_job_status(self._job_running[job_id])
-            if job_complete is RunningStatus.COMPLETE:
-                print(f'Job finished: {job_id}')
+            job_status = self._check_job_status(self._job_running[job_id])
+            if job_status is RunningStatus.COMPLETE:
                 del self._job_running[job_id]
-            if job_complete is RunningStatus.FAILED:
+            elif job_status is RunningStatus.FAILED:
                 job = self._job_running[job_id]['job_info']
                 del self._job_running[job_id]
                 if job['retries'] < self._retries:
