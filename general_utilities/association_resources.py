@@ -1,6 +1,7 @@
 import os
 import csv
 import sys
+from pathlib import Path
 from typing import List, Union, TypedDict
 
 import dxpy
@@ -103,6 +104,16 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
                 raise dxpy.AppError(f'Provided chromosome ({chromosome}) is not 1-22, X. Please try again (possibly omitting "chr").')
 
     return chromosomes
+
+
+# This is a helper function to upload a local file and then remove it from the instance.
+# This is different than other applets I have written since CADD takes up so much space.
+# I don't want to have to use a massive instance costing lots of £s!
+def generate_linked_dx_file(file: Union[str, Path]) -> dxpy.DXFile:
+
+    linked_file = dxpy.upload_local_file(file=file)
+    Path(file).unlink()
+    return linked_file
 
 
 # A TypedDict holding information about each chromosome's available genetic data
