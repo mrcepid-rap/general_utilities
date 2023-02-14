@@ -111,8 +111,12 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
 # I don't want to have to use a massive instance costing lots of £s!
 def generate_linked_dx_file(file: Union[str, Path]) -> dxpy.DXFile:
 
-    linked_file = dxpy.upload_local_file(file=file)
-    Path(file).unlink()
+    if type(file) == str:
+        linked_file = dxpy.upload_local_file(filename=file)
+        Path(file).unlink()
+    else:
+        linked_file = dxpy.upload_local_file(file=file)
+        file.unlink()
     return linked_file
 
 
