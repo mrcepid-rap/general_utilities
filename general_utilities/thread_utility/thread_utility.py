@@ -29,10 +29,6 @@ class ThreadUtility:
         available_workers = math.floor(self._threads / thread_factor)
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
         self._future_pool = []
-        if 'DX_JOB_ID' in os.environ:
-            logging.getLogger().addHandler(dxpy.DXLogHandler())
-        else:
-            logging.basicConfig(level=logging.INFO)
 
     # I have a feeling the sleep() part is VERY inefficient but I am unsure of how to fix at the moment...
     # Due to how futures work, most of the time a next() call will receive a 'None' return. We need to create a

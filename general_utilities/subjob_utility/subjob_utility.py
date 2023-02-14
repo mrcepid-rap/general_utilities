@@ -78,12 +78,6 @@ class SubjobUtility:
         # Manage returned outputs
         self._output_array = []
 
-        # Ensure logging handled
-        if 'DX_JOB_ID' in os.environ:
-            logging.getLogger().addHandler(dxpy.DXLogHandler())
-        else:
-            logging.basicConfig(level=logging.INFO)
-
     def __iter__(self) -> Iterator:
         return iter(self._output_array)
 
