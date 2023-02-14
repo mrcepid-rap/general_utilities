@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 class ThreadUtility:
 
     def __init__(self, threads: int = None, error_message: str = "A ThreadUtility thread failed.",
-                 incrementor: int = 500, thread_factor: int = 4):
+                 incrementor: int = 500, thread_factor: int = 1):
 
         self._error_message = error_message
         self._incrementor = incrementor
