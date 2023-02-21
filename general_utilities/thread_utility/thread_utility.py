@@ -16,6 +16,7 @@ class ThreadUtility:
     def __init__(self, threads: int = None, error_message: str = "A ThreadUtility thread failed.",
                  incrementor: int = 500, thread_factor: int = 1):
 
+        print(__name__)
         self._error_message = error_message
         self._incrementor = incrementor
         self._already_collected = False  # A flag to make sure we don't submit jobs to a closed executor
@@ -57,7 +58,7 @@ class ThreadUtility:
         if len(self._future_pool) == 0:
             raise dxpy.AppError('No jobs submitted to future pool!')
 
-        logging.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._num_jobs))
+        self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._num_jobs))
 
         self._future_iterator = futures.as_completed(self._future_pool)
         return self
