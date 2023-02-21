@@ -1,4 +1,3 @@
-import concurrent.futures.thread
 import math
 import os
 
@@ -16,7 +15,6 @@ class ThreadUtility:
     def __init__(self, threads: int = None, error_message: str = "A ThreadUtility thread failed.",
                  incrementor: int = 500, thread_factor: int = 1):
 
-        print(__name__)
         self._error_message = error_message
         self._incrementor = incrementor
         self._already_collected = False  # A flag to make sure we don't submit jobs to a closed executor
