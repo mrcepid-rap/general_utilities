@@ -1,19 +1,21 @@
-import math
 import os
-
+import math
 import dxpy
-import logging
 
 from typing import Any, Iterator
 from time import sleep
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
 
+from general_utilities.mrc_logger import MRCLogger
+
 
 class ThreadUtility:
 
     def __init__(self, threads: int = None, error_message: str = "A ThreadUtility thread failed.",
                  incrementor: int = 500, thread_factor: int = 1):
+
+        self._logger = MRCLogger().get_logger()
 
         self._error_message = error_message
         self._incrementor = incrementor
@@ -81,11 +83,10 @@ class ThreadUtility:
         self._total_finished_models += 1
         if math.remainder(self._total_finished_models, self._incrementor) == 0 \
                 or self._total_finished_models == self._num_jobs:
-            logging.info(f'{"Total number of threads finished":{65}}: {self._total_finished_models} / {self._num_jobs} '
-                         f'({((self._total_finished_models / self._num_jobs) * 100):0.2f}%)')
+            self._logger.info(f'{"Total number of threads finished":{65}}: {self._total_finished_models} / {self._num_jobs} '
+                              f'({((self._total_finished_models / self._num_jobs) * 100):0.2f}%)')
 
-    @staticmethod
-    def _get_threads() -> int:
+    def _get_threads(self) -> int:
         threads = os.cpu_count()
-        logging.info('Number of threads available: %i' % threads)
+        self._logger.info('Number of threads available: %i' % threads)
         return threads
