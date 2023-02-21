@@ -82,5 +82,5 @@ class ThreadUtility:
     @staticmethod
     def _get_threads() -> int:
         threads = os.cpu_count()
-        print('Number of threads available: %i' % threads)
+        logging.info('Number of threads available: %i' % threads)
         return threads
