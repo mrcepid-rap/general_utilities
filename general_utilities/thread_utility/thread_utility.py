@@ -1,3 +1,4 @@
+import concurrent.futures.thread
 import math
 import os
 
@@ -26,6 +27,11 @@ class ThreadUtility:
             self._threads = self._get_threads()
         else:
             self._threads = threads
+
+        if self._threads < thread_factor:
+            raise ValueError(f'Not enough threads on machine to complete task. Number of threads on this machine '
+                             f'({self._threads}) is less than thread_factor ({thread_factor}).')
+
         available_workers = math.floor(self._threads / thread_factor)
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
         self._future_pool = []
