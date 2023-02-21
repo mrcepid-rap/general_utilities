@@ -15,7 +15,7 @@ class ThreadUtility:
     def __init__(self, threads: int = None, error_message: str = "A ThreadUtility thread failed.",
                  incrementor: int = 500, thread_factor: int = 1):
 
-        self._logger = MRCLogger().get_logger()
+        self._logger = MRCLogger(__name__).get_logger()
 
         self._error_message = error_message
         self._incrementor = incrementor
