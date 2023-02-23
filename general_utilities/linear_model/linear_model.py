@@ -1,10 +1,11 @@
-from pathlib import Path
-from typing import Tuple, List
-
 import dxpy
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
+
+from pathlib import Path
+from typing import Tuple, List
+from importlib.resources import files
 
 from general_utilities.association_resources import get_chromosomes, run_cmd
 
@@ -38,6 +39,8 @@ class LinearModelResult:
                  p_val_init: float = float('nan'), p_val_full: float = float('nan'),
                  effect: float = float('nan'), std_err: float = float('nan')):
 
+        data_file = files('sparseMatrixProcessor.R')
+        print(data_file)
         self.p_val_init = p_val_init
         self.n_car = n_car
         self.cMAC = cMAC
