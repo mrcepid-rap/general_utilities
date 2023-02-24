@@ -5,7 +5,6 @@ import statsmodels.api as sm
 
 from pathlib import Path
 from typing import Tuple, List
-from importlib_resources import files
 
 from general_utilities.association_resources import get_chromosomes, run_cmd
 
@@ -32,6 +31,7 @@ class LinearModelPack:
         self.n_model = len(self.phenotypes)
 
 
+# Class that holds results from linear models
 class LinearModelResult:
 
     def __init__(self, n_car: int, cMAC: int, n_model: int, ENST: str, maskname: str,
