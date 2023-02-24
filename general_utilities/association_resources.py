@@ -35,7 +35,6 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
             docker_mount_string = ' '.join([f'-v {mount}' for mount in docker_mounts])
         cmd = f'docker run ' \
               f'-v {data_dir}:/test ' \
-              f'-v {script_dir}:/prog ' \
               f'{docker_mount_string} ' \
               f'{docker_image} {cmd}'
 
