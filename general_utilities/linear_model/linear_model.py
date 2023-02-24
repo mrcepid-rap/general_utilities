@@ -150,8 +150,8 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
             # This handles the actual genetic data:
             # This just makes a sparse matrix with columns: sample_id, gene name, genotype, ENST
             # All information is derived from the sparse STAAR matrix files
-            Rscript: Path = files('general_utilities.R_resources').joinpath('sparseMatrixProcessor.R')
-            cmd = f'Rscript /scripts/{Rscript.resolve()} ' \
+            r_script: Path = files('general_utilities.R_resources').joinpath('sparseMatrixProcessor.R')
+            cmd = f'Rscript /scripts/{r_script.resolve()} ' \
                   f'/test/{tarball_prefix}.{chromosome}.STAAR.matrix.rds ' \
                   f'/test/{tarball_prefix}.{chromosome}.variants_table.STAAR.tsv ' \
                   f'{tarball_prefix} ' \

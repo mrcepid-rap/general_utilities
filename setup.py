@@ -21,5 +21,5 @@ setup(
     description='',
     install_requires=load_requirements(Path("requirements.txt")),
     include_package_data=True,
-    package_data={'general_utilities.R_resources': ['R_resources/*.R']}
+    package_data={'': ['R_resources/*.R']}
 )
