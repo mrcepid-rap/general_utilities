@@ -39,7 +39,7 @@ class LinearModelResult:
                  p_val_init: float = float('nan'), p_val_full: float = float('nan'),
                  effect: float = float('nan'), std_err: float = float('nan')):
 
-        data_file = files('sparseMatrixProcessor.R')
+        data_file = files('sparseMatrixProcessor.Rs')
         print(data_file)
         self.p_val_init = p_val_init
         self.n_car = n_car
