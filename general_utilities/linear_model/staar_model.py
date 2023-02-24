@@ -28,7 +28,7 @@ def staar_null(phenoname: str, is_binary: bool,
     else:
         cmd += f'NULL '
     run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting',
-            docker_mounts=[f'{r_script.root}:/scripts/'])
+            docker_mounts=[f'{r_script.parent}/:/scripts/'])
 
 
 # Run rare variant association testing using STAAR
@@ -37,7 +37,7 @@ def staar_genes(tarball_prefix: str, chromosome: str, phenoname: str, has_gene_i
 
     # I have made a custom script in order to generate STAAR per-gene models that is installed using pip
     # as part of the general_utilities package. We can extract the system location of this script:
-    r_script: files('general_utilities.R_resources').joinpath('runSTAAR_Genes.R')
+    r_script = files('general_utilities.R_resources').joinpath('runSTAAR_Genes.R')
 
     # This generates a text output file of p.values
     # See the README.md for more information on these parameters
@@ -56,6 +56,6 @@ def staar_genes(tarball_prefix: str, chromosome: str, phenoname: str, has_gene_i
         cmd += f'none'  # This is always none when doing a genome-wide study.
 
     run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting',
-            docker_mounts=[f'{r_script.root}:/scripts/'])
+            docker_mounts=[f'{r_script.parent}/:/scripts/'])
 
     return tarball_prefix, chromosome, phenoname
