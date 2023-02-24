@@ -1,4 +1,11 @@
-from general_utilities.association_resources import *
+import os
+import csv
+import dxpy
+import pandas as pd
+
+from typing import List
+
+from general_utilities.association_resources import build_transcript_table, run_cmd, define_field_names_from_pandas
 
 
 def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False,
