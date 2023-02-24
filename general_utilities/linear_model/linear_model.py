@@ -8,7 +8,12 @@ from typing import Tuple, List
 from importlib_resources import files
 
 from general_utilities.association_resources import get_chromosomes, run_cmd
-
+class ImportRScriptTest:
+    def __init__(self):
+        self._data_file = files('general_utilities.R_resources.sparseMatrixProcessor.R')
+        print(self._data_file)
+    def get_data_file(self):
+        return self._data_file
 
 class LinearModelPack:
 
