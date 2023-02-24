@@ -19,7 +19,7 @@ setup(
     author='ejgardner',
     author_email='',
     description='',
-    install_requires=load_requirements(Path("requirements.txt"))
-    # include_package_data=True,
-    # package_data={'': ['R_resources/*.R']}
+    install_requires=load_requirements(Path("requirements.txt")),
+    include_package_data=True,
+    package_data={'': ['R_resources/*.R']}
 )
