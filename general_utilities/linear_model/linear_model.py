@@ -10,6 +10,16 @@ from importlib_resources import files
 from general_utilities.association_resources import get_chromosomes, run_cmd
 
 
+class ImportRScriptTest:
+
+    def __init__(self):
+        self._data_file = files('sparseMatrixProcessor.Rs')
+        print(self._data_file)
+
+    def get_data_file(self):
+        return self._data_file
+
+
 class LinearModelPack:
 
     # This is a helper class to store information for running linear models
@@ -39,8 +49,6 @@ class LinearModelResult:
                  p_val_init: float = float('nan'), p_val_full: float = float('nan'),
                  effect: float = float('nan'), std_err: float = float('nan')):
 
-        data_file = files('sparseMatrixProcessor.Rs')
-        print(data_file)
         self.p_val_init = p_val_init
         self.n_car = n_car
         self.cMAC = cMAC
