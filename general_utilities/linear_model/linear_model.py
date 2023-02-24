@@ -8,12 +8,7 @@ from typing import Tuple, List
 from importlib_resources import files
 
 from general_utilities.association_resources import get_chromosomes, run_cmd
-class ImportRScriptTest:
-    def __init__(self):
-        self._data_file = files('general_utilities.R_resources.sparseMatrixProcessor.R')
-        print(self._data_file)
-    def get_data_file(self):
-        return self._data_file
+
 
 class LinearModelPack:
 
@@ -156,7 +151,7 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
                   f'/test/{tarball_prefix}.{chromosome}.variants_table.STAAR.tsv ' \
                   f'{tarball_prefix} ' \
                   f'{chromosome}'
-            run_cmd(cmd, is_docker=True, print_cmd=True, docker_image='egardner413/mrcepid-burdentesting', docker_mounts=[f'{Rscript.root}:/scripts/'])
+            run_cmd(cmd, is_docker=True, print_cmd=True, docker_image='egardner413/mrcepid-burdentesting', docker_mounts=[f'{r_script.root}:/scripts/'])
 
             # And read in the resulting table
             geno_table = pd.read_csv(tarball_prefix + "." + chromosome + ".lm_sparse_matrix.tsv",
