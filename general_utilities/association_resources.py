@@ -17,7 +17,7 @@ import pandas.core.series
 # print_cmd is for internal debugging purposes when testing new code
 # TODO: Convert this to a class that sets the DockerImage at startup by RunAssociationTesting/plugin AbstractClass(es)?
 def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
-            data_dir: str = '/home/dnanexus/', script_dir: str = '/usr/bin/', docker_mounts: List = None,
+            data_dir: str = '/home/dnanexus/', docker_mounts: List = None,
             stdout_file: str = None, print_cmd: bool = False, livestream_out: bool = False,
             dry_run: bool = False) -> None:
 
