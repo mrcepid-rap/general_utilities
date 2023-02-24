@@ -10,16 +10,6 @@ from importlib_resources import files
 from general_utilities.association_resources import get_chromosomes, run_cmd
 
 
-class ImportRScriptTest:
-
-    def __init__(self):
-        self._data_file = files('general_utilities.R_resources').joinpath('sparseMatrixProcessor.R')
-        print(self._data_file)
-
-    def get_data_file(self):
-        return self._data_file
-
-
 class LinearModelPack:
 
     # This is a helper class to store information for running linear models
@@ -155,13 +145,13 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
             # This handles the actual genetic data:
             # This just makes a sparse matrix with columns: sample_id, gene name, genotype, ENST
             # All information is derived from the sparse STAAR matrix files
-            # TODO Get sparseMatrixProcessor into this package rather than the main codebase (runassociationtesting)
-            cmd = "Rscript /prog/sparseMatrixProcessor.R " + \
-                  "/test/" + tarball_prefix + "." + chromosome + ".STAAR.matrix.rds " + \
-                  "/test/" + tarball_prefix + "." + chromosome + ".variants_table.STAAR.tsv " + \
-                  tarball_prefix + " " + \
-                  chromosome
-            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+            Rscript: Path = files('general_utilities.R_resources').joinpath('sparseMatrixProcessor.R')
+            cmd = f'Rscript /scripts/{Rscript.resolve()} ' \
+                  f'/test/{tarball_prefix}.{chromosome}.STAAR.matrix.rds ' \
+                  f'/test/{tarball_prefix}.{chromosome}.variants_table.STAAR.tsv ' \
+                  f'{tarball_prefix} ' \
+                  f'{chromosome}'
+            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting', docker_mounts=[f'{Rscript.root}:/scripts/'])
 
             # And read in the resulting table
             geno_table = pd.read_csv(tarball_prefix + "." + chromosome + ".lm_sparse_matrix.tsv",
