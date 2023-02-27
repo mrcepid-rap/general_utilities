@@ -39,8 +39,6 @@ class LinearModelResult:
                  p_val_init: float = float('nan'), p_val_full: float = float('nan'),
                  effect: float = float('nan'), std_err: float = float('nan')):
 
-        data_file = files('sparseMatrixProcessor.R')
-        print(data_file)
         self.p_val_init = p_val_init
         self.n_car = n_car
         self.cMAC = cMAC
@@ -144,16 +142,17 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
         # This handles the genes that we need to test:
         tarball_path = Path(f'{tarball_prefix}.{chromosome}.STAAR.matrix.rds')
         if tarball_path.exists():
-            # This handles the actual genetic data:
-            # This just makes a sparse matrix with columns: sample_id, gene name, genotype, ENST
+            # The R script (sparseMatrixProcessor.R) just makes a sparse matrix with columns:
+            # sample_id, gene name, genotype, ENST
             # All information is derived from the sparse STAAR matrix files
-            # TODO Get sparseMatrixProcessor into this package rather than the main codebase (runassociationtesting)
-            cmd = "Rscript /prog/sparseMatrixProcessor.R " + \
-                  "/test/" + tarball_prefix + "." + chromosome + ".STAAR.matrix.rds " + \
-                  "/test/" + tarball_prefix + "." + chromosome + ".variants_table.STAAR.tsv " + \
-                  tarball_prefix + " " + \
-                  chromosome
-            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+            r_script = files('general_utilities.R_resources').joinpath('sparseMatrixProcessor.R')
+            cmd = f'Rscript /scripts/{r_script.name} ' \
+                  f'/test/{tarball_prefix}.{chromosome}.STAAR.matrix.rds ' \
+                  f'/test/{tarball_prefix}.{chromosome}.variants_table.STAAR.tsv ' \
+                  f'{tarball_prefix} ' \
+                  f'{chromosome}'
+            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting',
+                    docker_mounts=[f'{r_script.parent}/:/scripts/'])
 
             # And read in the resulting table
             geno_table = pd.read_csv(tarball_prefix + "." + chromosome + ".lm_sparse_matrix.tsv",
