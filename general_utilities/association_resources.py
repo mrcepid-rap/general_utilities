@@ -347,3 +347,26 @@ def download_dxfile_by_name(file: Union[dict, str], print_status: bool = True) -
     dxpy.download_dxfile(curr_dxfile.get_id(), curr_filename)
 
     return curr_filename
+
+
+# This function will locate an associated tbi/csi index:
+def find_index(parent_file: dxpy.DXFile, index_suffix: str) -> dxpy.DXFile:
+
+    # Describe the file to get attributes:
+    file_description = parent_file.describe(fields={'folder': True, 'name': True, 'project': True})
+
+    # First set the likely details of the corresponding index:
+    project_id = file_description['project']
+    index_folder = file_description['folder']
+    index_name = file_description['name'] + '.' + index_suffix
+
+    # Run a dxpy query.
+    # This will fail if no or MULTIPLE indices are found
+    index_object = dxpy.find_one_data_object(more_ok=False, classname='file', project=project_id,
+                                             folder=index_folder,
+                                             name=index_name, name_mode='exact')
+
+    # Set a dxfile of the index itself:
+    found_index = dxpy.DXFile(dxid=index_object['id'], project=index_object['project'])
+
+    return found_index
