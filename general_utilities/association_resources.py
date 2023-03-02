@@ -16,7 +16,7 @@ from general_utilities.mrc_logger import MRCLogger
 # TODO: Convert this to a class that sets the DockerImage at startup by RunAssociationTesting/plugin AbstractClass(es)?
 def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
             data_dir: str = '/home/dnanexus/', docker_mounts: List = None,
-            stdout_file: str = None, print_cmd: bool = False, livestream_out: bool = False,
+            stdout_file: Union[str, Path] = None, print_cmd: bool = False, livestream_out: bool = False,
             dry_run: bool = False) -> None:
 
     """Run a command in the shell either with / without Docker
@@ -70,13 +70,12 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
               f'{docker_mount_string} ' \
               f'{docker_image} {cmd}'
 
-    if print_cmd:
-        logger.info(cmd)
-
     if dry_run:
         logger.info(cmd)
-        logger.info(__name__)
     else:
+        if print_cmd:
+            logger.info(cmd)
+
         # Standard python calling external commands protocol
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if livestream_out:
