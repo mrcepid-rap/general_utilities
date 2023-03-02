@@ -41,12 +41,12 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
     :param print_cmd: Print `cmd` but still run the command (as opposed to dry_run). For debug purposes only.
     :param livestream_out: Livestream the output from the requested process. For debug purposes only.
     :param dry_run: Print `cmd` and exit without running. For debug purposes only.
-    :return:
+    :return: None
     """
 
-    # This is required if running on DNA Nexus to propogate messages from subprocesses to their
-    # custom event-reporter. So, if we are running inside a DNANexus job, we set the logger to the dxpy handler.
-    # Otherwise, just use a default logger.
+    # This is required if running on DNA Nexus to propogate messages from subprocesses to their custom
+    # event-reporter. So, if we are running inside a DNANexus job, we set the logger to the dxpy handler. Otherwise,
+    # just use a default logger.
     if 'DX_JOB_ID' in os.environ:
         logger = MRCLogger(__name__).get_logger()
     else:
@@ -101,12 +101,12 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
 
             # If the command doesn't work, print the error stream and close the AWS instance out with 'dxpy.AppError'
             if proc.returncode != 0:
-                logging.error("The following cmd failed:")
-                logging.error(cmd)
-                logging.error("STDOUT follows\n")
-                logging.error(stdout.decode('utf-8'))
-                logging.error("STDERR follows\n")
-                logging.error(stderr.decode('utf-8'))
+                logger.error("The following cmd failed:")
+                logger.error(cmd)
+                logger.error("STDOUT follows")
+                logger.error(stdout.decode('utf-8'))
+                logger.error("STDERR follows")
+                logger.error(stderr.decode('utf-8'))
                 raise dxpy.AppError("Failed to run properly...")
 
 
