@@ -1,14 +1,14 @@
 import os
 import csv
 import sys
-from pathlib import Path
-from typing import List, Union, TypedDict
-
 import dxpy
 import logging
 import subprocess
 import pandas as pd
 import pandas.core.series
+
+from pathlib import Path
+from typing import List, Union, TypedDict
 
 from general_utilities.mrc_logger import MRCLogger
 
@@ -107,7 +107,7 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
                 logger.error(stdout.decode('utf-8'))
                 logger.error("STDERR follows")
                 logger.error(stderr.decode('utf-8'))
-                raise dxpy.AppError("Failed to run properly...")
+                raise RuntimeError(f'run_cmd() failed to run requested job properly')
 
 
 # This is to generate a global CHROMOSOMES variable for parallelisation
@@ -131,7 +131,7 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
 
 
 # This is a helper function to upload a local file and then remove it from the instance.
-# This is different than other applets I have written since CADD takes up so much space.
+# This is different than other applets I have written since some files take up so much space.
 # I don't want to have to use a massive instance costing lots of £s!
 def generate_linked_dx_file(file: Union[str, Path]) -> dxpy.DXFile:
 
@@ -139,7 +139,7 @@ def generate_linked_dx_file(file: Union[str, Path]) -> dxpy.DXFile:
         linked_file = dxpy.upload_local_file(filename=file)
         Path(file).unlink()
     else:
-        linked_file = dxpy.upload_local_file(file=file)
+        linked_file = dxpy.upload_local_file(file=file.open('rb'))
         file.unlink()
     return linked_file
 
