@@ -10,16 +10,48 @@ import subprocess
 import pandas as pd
 import pandas.core.series
 
+from general_utilities.mrc_logger import MRCLogger
 
-# This function runs a command on an instance, either with or without calling the docker instance we downloaded
-# By default, commands are not run via Docker, but can be changed by setting is_docker = True
-# Also, by default, standard out is not saved, but can be modified with the 'stdout_file' parameter.
-# print_cmd is for internal debugging purposes when testing new code
+
 # TODO: Convert this to a class that sets the DockerImage at startup by RunAssociationTesting/plugin AbstractClass(es)?
 def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
             data_dir: str = '/home/dnanexus/', docker_mounts: List = None,
             stdout_file: str = None, print_cmd: bool = False, livestream_out: bool = False,
             dry_run: bool = False) -> None:
+
+    """Run a command in the shell either with / without Docker
+
+    This function runs a command on an instance via the subprocess module, either with or without calling the Docker
+    instance we downloaded; by default, commands are not run via Docker, but can be changed by setting is_docker =
+    True. However, if running with Docker, a docker image **MUST** be provided or this method will fail. Docker
+    images are run in headless mode, which cannot be modified. Also, by default, standard out is not saved,
+    but can be modified with the 'stdout_file' parameter. print_cmd, livestream_out, and/or dry_run are for internal
+    debugging purposes when testing new code. All options other than `cmd` are optional.
+
+    :param cmd: The command to be run
+    :param is_docker: Run the command via a docker image (image must be provided via `docker_image`)
+    :param docker_image: Docker image on some repository to run the command via. This image does not necessarily have
+        to be on the image, but if in a non public repository (e.g., AWS ECR) this will cause the command to fail.
+    :param data_dir: Mount location where data to be processed in Docker is located. By default is the home directory
+        on an DNANexus AWS instance (`/home/dnanexus/`). This directory will be mounted as `/test/` inside of the Docker
+        image.
+    :param docker_mounts: Additional Docker mounts to attach to this process via the `-v` commandline argument to
+        Docker. See the documentation for Docker for more information.
+    :param stdout_file: Capture stdout from the process into the given file
+    :param print_cmd: Print `cmd` but still run the command (as opposed to dry_run). For debug purposes only.
+    :param livestream_out: Livestream the output from the requested process. For debug purposes only.
+    :param dry_run: Print `cmd` and exit without running. For debug purposes only.
+    :return:
+    """
+
+    # This is required if running on DNA Nexus to propogate messages from subprocesses to their
+    # custom event-reporter. So, if we are running inside a DNANexus job, we set the logger to the dxpy handler.
+    # Otherwise, just use a default logger.
+    if 'DX_JOB_ID' in os.environ:
+        logger = MRCLogger(__name__).get_logger()
+    else:
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger()
 
     # -v here mounts a local directory on an instance (in this case the home dir) to a directory internal to the
     # Docker instance named /test/. This allows us to run commands on files stored on the AWS instance within Docker.
@@ -39,21 +71,15 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
               f'{docker_image} {cmd}'
 
     if print_cmd:
-        print(cmd)
+        logger.info(cmd)
 
     if dry_run:
-        print(cmd)
+        logger.info(cmd)
+        logger.info(__name__)
     else:
         # Standard python calling external commands protocol
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if livestream_out:
-
-            # This is required if running on DNA Nexus to propogate messages from subprocesses to their
-            # custom event-reporter. So, if we are running inside a DNANexus job, we set the logger to the dxpy handler.
-            if 'DX_JOB_ID' in os.environ:
-                logging.getLogger().addHandler(dxpy.DXLogHandler())
-            else:
-                logging.basicConfig(level=logging.INFO)
 
             for line in iter(proc.stdout.readline, b""):
                 logging.info(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
@@ -70,7 +96,7 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
         else:
             stdout, stderr = proc.communicate()
             if stdout_file is not None:
-                with open(stdout_file, 'w') as stdout_writer:
+                with Path(stdout_file).open('w') as stdout_writer:
                     stdout_writer.write(stdout.decode('utf-8'))
                 stdout_writer.close()
 
