@@ -12,7 +12,7 @@ def load_requirements(fname: Path):
 
 setup(
     name='general_utilities',
-    version='',
+    version='1.0.1',
     packages=find_packages(),
     url='',
     license='',

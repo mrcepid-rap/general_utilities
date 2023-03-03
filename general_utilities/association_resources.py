@@ -2,6 +2,7 @@ import os
 import csv
 import sys
 import dxpy
+import random
 import logging
 import subprocess
 import pandas as pd
@@ -41,22 +42,22 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
     :param print_cmd: Print `cmd` but still run the command (as opposed to dry_run). For debug purposes only.
     :param livestream_out: Livestream the output from the requested process. For debug purposes only.
     :param dry_run: Print `cmd` and exit without running. For debug purposes only.
-    :return: None
     """
 
     # This is required if running on DNA Nexus to propogate messages from subprocesses to their custom
     # event-reporter. So, if we are running inside a DNANexus job, we set the logger to the dxpy handler. Otherwise,
     # just use a default logger.
     if 'DX_JOB_ID' in os.environ:
-        logger = MRCLogger(__name__).get_logger()
+        job_id = f'job{random.randint(0,1000000):07d}'  # need a random ID so we don't log the same thing 500,000 times
+        logger = MRCLogger(job_id).get_logger()
     else:
         logging.basicConfig(level=logging.INFO)
         logger = logging.getLogger()
 
     # -v here mounts a local directory on an instance (in this case the home dir) to a directory internal to the
     # Docker instance named /test/. This allows us to run commands on files stored on the AWS instance within Docker.
-    # This looks slightly different from other versions of this command I have written as I needed to write a custom
-    # R script to run STAAR. That means we have multiple mounts here to enable this code to find the script.
+    # Multiple mounts can be added (via docker_mounts) to enable this code to find other specialised files (e.g.,
+    # some R scripts included in the associationtesting suite).
     if is_docker:
         if docker_image is None:
             raise dxpy.AppError('Requested to run via docker without providing a Docker image!')
