@@ -20,13 +20,15 @@ class MRCLogger:
         """
 
         if name_suffix is None:
-            self._logger = logging.getLogger('MRCLogger')
+            name = 'MRCLogger'
         else:
-            self._logger = logging.getLogger('.'.join(['MRCLogger', name_suffix]))
+            name = '.'.join(['MRCLogger', name_suffix])
 
-        self._logger.addHandler(dxpy.DXLogHandler())
-        self._logger.propagate = False
-        self._logger.setLevel(logging.INFO)
+        self._logger = logging.getLogger(name)
+        if not self._logger.hasHandlers():
+            self._logger.addHandler(dxpy.DXLogHandler())
+            self._logger.propagate = False
+            self._logger.setLevel(logging.INFO)
 
     def get_logger(self) -> Logger:
         """Getter for the logger built by this class
