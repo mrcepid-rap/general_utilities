@@ -16,7 +16,7 @@ class MRCLogger:
         2. Without a name_suffix, which builds the top-level logger which every other logger hooks into when a
             name_suffix is provided.
 
-        :param name_suffix: Name to start the logger with. Typically will be derived from the __name__ automethod
+        :param name_suffix: Name to start the logger with. Typically, will be derived from the __name__ automethod
         """
 
         if name_suffix is None:
@@ -25,10 +25,29 @@ class MRCLogger:
             name = '.'.join(['MRCLogger', name_suffix])
 
         self._logger = logging.getLogger(name)
-        if not self._logger.hasHandlers():
+
+        if not self._check_previous_handlers():
             self._logger.addHandler(dxpy.DXLogHandler())
             self._logger.propagate = False
             self._logger.setLevel(logging.INFO)
+
+    def _check_previous_handlers(self) -> bool:
+        """Check to make sure the DXLogHandler has not previously been attached to this logger
+
+        This situation can arise if a class is instantiated multiple times, as the default method is to build the
+        logger with the name of the class. So if an instance of class 'Foo' has already been created then the logger
+        MRCLogger.Foo already exists. If 'Foo' is built again, then it will try to attach another DXLogHandler to the
+        logger causing logs to be printed as many times as 'Foo' has been created.
+
+        :return: boolean indicating if a dxpy.DXLogHandler has already been attached to this logger
+        """
+
+        found_dx_handler = False
+        for handler in self._logger.handlers:
+            if isinstance(handler, dxpy.DXLogHandler):
+                found_dx_handler = True
+
+        return found_dx_handler
 
     def get_logger(self) -> Logger:
         """Getter for the logger built by this class
