@@ -1,0 +1,1 @@
+# v1.1.0 Need to have a test to ensure that logger doesn't print multiple lines
