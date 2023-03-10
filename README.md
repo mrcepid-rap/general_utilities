@@ -2,6 +2,9 @@
 
 ## Changelog
 
+* v1.1.1
+  * Fixed a bug in find_index() that wouldn't properly search outside of the users current project
+
 * v1.1.0
   * Adding an import_utils package that includes classes for import of data
   * Fixed a bug that caused MRCLogger to print multiple lines if the logger was built multiple times with the same class name
