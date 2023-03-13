@@ -2,8 +2,6 @@ import os
 import csv
 import sys
 import dxpy
-import random
-import logging
 import subprocess
 import pandas as pd
 import pandas.core.series
@@ -12,6 +10,9 @@ from pathlib import Path
 from typing import List, Union, TypedDict
 
 from general_utilities.mrc_logger import MRCLogger
+
+
+LOGGER = MRCLogger(__name__).get_logger()
 
 
 # TODO: Convert this to a class that sets the DockerImage at startup by RunAssociationTesting/plugin AbstractClass(es)?
@@ -44,16 +45,6 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
     :param dry_run: Print `cmd` and exit without running. For debug purposes only.
     """
 
-    # This is required if running on DNA Nexus to propogate messages from subprocesses to their custom
-    # event-reporter. So, if we are running inside a DNANexus job, we set the logger to the dxpy handler. Otherwise,
-    # just use a default logger.
-    if 'DX_JOB_ID' in os.environ:
-        job_id = f'job{random.randint(0,1000000):07d}'  # need a random ID so we don't log the same thing 500,000 times
-        logger = MRCLogger(job_id).get_logger()
-    else:
-        logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger()
-
     # -v here mounts a local directory on an instance (in this case the home dir) to a directory internal to the
     # Docker instance named /test/. This allows us to run commands on files stored on the AWS instance within Docker.
     # Multiple mounts can be added (via docker_mounts) to enable this code to find other specialised files (e.g.,
@@ -72,23 +63,23 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
               f'{docker_image} {cmd}'
 
     if dry_run:
-        logger.info(cmd)
+        LOGGER.info(cmd)
     else:
         if print_cmd:
-            logger.info(cmd)
+            LOGGER.info(cmd)
 
         # Standard python calling external commands protocol
         proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if livestream_out:
 
             for line in iter(proc.stdout.readline, b""):
-                logging.info(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
+                LOGGER.info(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
 
             proc.wait()  # Make sure the process has actually finished...
             if proc.returncode != 0:
-                logging.error("The following cmd failed:")
-                logging.error(cmd)
-                logging.error("STDERR follows\n")
+                LOGGER.error("The following cmd failed:")
+                LOGGER.error(cmd)
+                LOGGER.error("STDERR follows\n")
                 for line in iter(proc.stderr.readline, b""):
                     sys.stdout.buffer.write(line)
                 raise dxpy.AppError("Failed to run properly...")
@@ -102,12 +93,12 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
 
             # If the command doesn't work, print the error stream and close the AWS instance out with 'dxpy.AppError'
             if proc.returncode != 0:
-                logger.error("The following cmd failed:")
-                logger.error(cmd)
-                logger.error("STDOUT follows")
-                logger.error(stdout.decode('utf-8'))
-                logger.error("STDERR follows")
-                logger.error(stderr.decode('utf-8'))
+                LOGGER.error("The following cmd failed:")
+                LOGGER.error(cmd)
+                LOGGER.error("STDOUT follows")
+                LOGGER.error(stdout.decode('utf-8'))
+                LOGGER.error("STDERR follows")
+                LOGGER.error(stderr.decode('utf-8'))
                 raise RuntimeError(f'run_cmd() failed to run requested job properly')
 
 
@@ -123,10 +114,11 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
         chromosomes.extend(['X'])
         if chromosome:
             if chromosome in chromosomes:
-                print(f'Restricting following analysis to chrom{chromosome}...')
+                LOGGER.info(f'Restricting following analysis to chrom{chromosome}...')
                 chromosomes = [chromosome]
             else:
-                raise dxpy.AppError(f'Provided chromosome ({chromosome}) is not 1-22, X. Please try again (possibly omitting "chr").')
+                raise ValueError(f'Provided chromosome ({chromosome}) is not 1-22, X. Please try again '
+                                 f'(possibly omitting "chr").')
 
     return chromosomes
 
@@ -223,26 +215,26 @@ def build_transcript_table() -> pandas.DataFrame:
 def get_gene_id(gene_id: str, transcripts_table: pandas.DataFrame) -> pandas.core.series.Series:
 
     if 'ENST' in gene_id:
-        print("gene_id – " + gene_id + " – looks like an ENST value... validating...")
+        LOGGER.info("gene_id – " + gene_id + " – looks like an ENST value... validating...")
         try:
             gene_info = transcripts_table.loc[gene_id]
-            print(f'Found one matching ENST ({gene_id} - {gene_info["coord"]})... proceeding...')
+            LOGGER.info(f'Found one matching ENST ({gene_id} - {gene_info["coord"]})... proceeding...')
         except KeyError:
             raise dxpy.AppError(f'Did not find a transcript with ENST value {gene_id}... terminating...')
     else:
-        print("gene_id – " + gene_id + " – does not look like an ENST value, searching for symbol instead...")
+        LOGGER.warning("gene_id – " + gene_id + " – does not look like an ENST value, searching for symbol instead...")
         found_rows = transcripts_table[transcripts_table['SYMBOL'] == gene_id]
         if len(found_rows) == 1:
             found_enst = found_rows.index[0]
             gene_info = transcripts_table.loc[found_enst]
-            print(f'Found one matching ENST ({found_enst} - {gene_info["coord"]}) for SYMBOL {gene_id}... '
-                  f'proceeding...')
+            LOGGER.info(f'Found one matching ENST ({found_enst} - {gene_info["coord"]}) for SYMBOL {gene_id}... '
+                        f'proceeding...')
         elif len(found_rows) > 1:
-            raise dxpy.AppError(f'Found {len(found_rows)} ENST IDs ({",".join(found_rows.index.to_list())} for SYMBOL '
-                                f'{gene_id}... Please re-run using exact ENST to ensure consistent results...')
+            raise ValueError(f'Found {len(found_rows)} ENST IDs ({",".join(found_rows.index.to_list())} for SYMBOL '
+                             f'{gene_id}... Please re-run using exact ENST to ensure consistent results...')
         else:
-            raise dxpy.AppError(f'Did not find an associated ENST ID for SYMBOL {gene_id}... '
-                                f'Please re-run after checking SYMBOL/ENST used...')
+            raise ValueError(f'Did not find an associated ENST ID for SYMBOL {gene_id}... '
+                             f'Please re-run after checking SYMBOL/ENST used...')
 
     return gene_info
 
@@ -250,11 +242,11 @@ def get_gene_id(gene_id: str, transcripts_table: pandas.DataFrame) -> pandas.cor
 def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
 
     if is_snp_tar:
-        print("Running in SNP mode...")
+        LOGGER.info("Running in SNP mode...")
         file_prefix = 'SNP'
         gene_id = 'ENST00000000000'
     elif is_gene_tar:
-        print("Running in GENE mode...")
+        LOGGER.info("Running in GENE mode...")
         file_prefix = 'GENE'
         gene_id = 'ENST99999999999'
     else:
@@ -344,13 +336,20 @@ def define_covariate_string(found_quantitative_covariates: List[str], found_cate
     return suffix
 
 
-# This method is a slightly incorrect as it converts a string genotype into a 0,2 range, but as a float instead of
-# as the expected int. This is because:
-# 1) integers cannot by NULL / NA in python
-# 2) I use pandas to handle most of my genotype information, which can only use floats as a nullable datatype
-# Thus I convert to a float and then cast to an integer in string format if required by the output that uses this
-# method
 def gt_to_float(gt: str) -> float:
+    """Convert a VCF genotype-like string into a float
+
+    This method is a slightly incorrect as it converts a string genotype into a 0,2 range, but as a float instead of
+    as the expected int. This is because:
+
+    1. Integers cannot by NULL / NA in python.
+
+    2. I use pandas to handle most of my genotype information, which can only use floats as a nullable datatype Thus
+    I convert to a float and then cast to an integer in string format if required by the output that uses this method.
+
+    :param gt: A VCF genotype-like string (e.g., 0/0)
+    :return: A float representation of the string between 0 - 2
+    """
     if gt == '0/0':
         return 0
     elif gt == '0/1':
@@ -361,15 +360,33 @@ def gt_to_float(gt: str) -> float:
         return float('NaN')
 
 
-# Downloads a dxfile and uses it's actual name as given by dxfile.describe()
-def download_dxfile_by_name(file: Union[dict, str], print_status: bool = True) -> str:
+def download_dxfile_by_name(file: Union[dict, str, dxpy.DXFile], print_status: bool = True) -> Path:
+    """Download a dxfile and downloads to the file 'name' as given by dxfile.describe()
 
-    curr_dxfile = dxpy.DXFile(file)
-    curr_filename = curr_dxfile.describe()['name']
+    This method can take either:
+
+    1. A DNANexus link (i.e., in the style provided to :func:`main` at startup)
+
+    2. A string representation of a DNANexus file (e.g., file-12345...)
+
+    3. A DNANexus file object from dxpy.DXFile
+
+    And will download and find
+
+    (".","-1","-1",".",".",".",".",".")
+
+
+    :param file:
+    :param print_status:
+    :return:
+    """
+    if not type(file) == dxpy.DXFile:
+        file = dxpy.DXFile(file)
+    curr_filename = file.describe()['name']
 
     if print_status:
-        print(f'Downloading file {curr_filename} ({curr_dxfile.get_id()})')
-    dxpy.download_dxfile(curr_dxfile.get_id(), curr_filename)
+        LOGGER.info(f'Downloading file {curr_filename} ({file.get_id()})')
+    dxpy.download_dxfile(file.get_id(), curr_filename)
 
     return curr_filename
 
