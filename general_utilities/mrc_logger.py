@@ -1,3 +1,4 @@
+import os
 import dxpy
 import logging
 
@@ -27,7 +28,10 @@ class MRCLogger:
         self._logger = logging.getLogger(name)
 
         if not self._check_previous_handlers():
-            self._logger.addHandler(dxpy.DXLogHandler())
+            if 'DX_JOB_ID' in os.environ:
+                self._logger.addHandler(dxpy.DXLogHandler())
+            else:
+                self._logger.addHandler(logging.StreamHandler())
             self._logger.propagate = False
             self._logger.setLevel(logging.INFO)
 
