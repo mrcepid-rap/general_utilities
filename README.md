@@ -3,10 +3,12 @@
 ## Changelog
 
 * v1.1.2
-  * `download_dxfile_by_name` now additional accepts a `Path` and returns a `Path` instead of a string.
+  * `download_dxfile_by_name` now accepts a `Path` and returns a `Path` instead of a string.
   * Implemented `MRCLogger` for all methods in `association_resources.py`
     * Minor changes to run_cmd() to facilitate this change (which had already implemented MRCLogger)
   * MRCLogger should now function properly outside the DNANexus environment
+  * Began adding better documentation and tests for individual methods in the `association_resources` module
+  * `process_bgen_file` in `association_resources` has been simplified
 
 * v1.1.1
   * Fixed a bug in find_index() that wouldn't properly search outside the users current project
