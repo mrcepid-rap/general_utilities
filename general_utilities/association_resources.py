@@ -452,7 +452,7 @@ def download_dxfile_by_name(file: Union[dict, str, dxpy.DXFile], print_status: b
         LOGGER.info(f'Downloading file {curr_filename} ({file.get_id()})')
     dxpy.download_dxfile(file.get_id(), curr_filename)
 
-    return curr_filename
+    return Path(curr_filename)
 
 
 # This function will locate an associated tbi/csi index:

@@ -2,6 +2,9 @@
 
 ## Changelog
 
+* v1.1.3
+  * Bug fix for `download_dxfile_by_name`. Function was still returning a string.
+
 * v1.1.2
   * `download_dxfile_by_name` now accepts a `Path` and returns a `Path` instead of a string.
   * Implemented `MRCLogger` for all methods in `association_resources.py`
