@@ -45,6 +45,7 @@ class JobStatus(Enum):
     RUNNING = RunningStatus.RUNNING
     WAITING_ON_OUTPUT = RunningStatus.RUNNING
     WAITING_ON_INPUT = RunningStatus.RUNNING
+    TERMINATING = RunningStatus.RUNNING
     TERMINATED = RunningStatus.FAILED
     FAILED = RunningStatus.FAILED
 
