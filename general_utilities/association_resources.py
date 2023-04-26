@@ -132,7 +132,7 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
         chromosomes.extend(['X'])
         if chromosome:
             if chromosome in chromosomes:
-                LOGGER.info(f'Restricting following analysis to chrom{chromosome}...')
+                LOGGER.info(f'Restricting following analysis to chrom {chromosome}...')
                 chromosomes = [chromosome]
             else:
                 raise ValueError(f'Provided chromosome ({chromosome}) is not 1-22, X. Please try again '
