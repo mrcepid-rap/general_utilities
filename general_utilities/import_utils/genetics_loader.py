@@ -31,6 +31,7 @@ class GeneticsLoader:
 
         self._ingest_genetic_data()
         if len(sample_files) > 0:  # Only do this is sample file(s) are provided to synchronise on
+            self._logger.info('Multiple sample data types detected, synchronising sample lists...')
             self._union_sample = self._write_union_sample(sample_files)
             self._synchronise_genetic_data()
         self._generate_filtered_genetic_data()
@@ -51,6 +52,7 @@ class GeneticsLoader:
         dxpy.download_dxfile(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
         if self._low_mac_list is not None:
             dxpy.download_dxfile(self._low_mac_list.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
+        self._logger.info('Genetic array data downloaded...')
 
     @staticmethod
     def _generate_sample_set(sample_path: Path) -> Set[str]:
