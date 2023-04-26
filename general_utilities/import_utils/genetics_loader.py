@@ -1,4 +1,5 @@
 import csv
+import re
 from typing import Set, List
 
 import dxpy
@@ -203,6 +204,6 @@ class GeneticsLoader:
 
         with Path('plink_filtered.out').open('r') as plink_out:
             for line in plink_out:
-                self._logger.info(line)
-                if 'loaded from' in line:
-                    self._logger.info(f'{"Plink individuals written":{65}}: {line.rstrip(" loaded from")}')
+                count_matcher = re.match('(\\d+) samples \(\\d+ females, \\d+ males; \\d+ founders\) loaded from', line)
+                if count_matcher:
+                    self._logger.info(f'{"Plink individuals written":{65}}: {count_matcher.group(1)}')
