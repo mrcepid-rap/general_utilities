@@ -93,8 +93,7 @@ def ingest_tarballs(association_tarballs: dxpy.DXFile,
 
     # association_tarballs likely to be a list of tarballs:
     else:
-        tarball_list = download_dxfile_by_name(association_tarballs)
-        dxpy.download_dxfile(association_tarballs, 'tarball_list.txt')
+        tarball_list = download_dxfile_by_name(association_tarballs, print_status=False)
         with tarball_list.open('r') as tarball_reader:
             for association_tarball in tarball_reader:
                 association_tarball = association_tarball.rstrip()
@@ -102,7 +101,7 @@ def ingest_tarballs(association_tarballs: dxpy.DXFile,
 
     # And then process them in order
     for tar_file in tar_files:
-        current_tar = download_dxfile_by_name(tar_file)
+        current_tar = download_dxfile_by_name(tar_file, print_status=False)
         if tarfile.is_tarfile(current_tar):
             tarball_prefix = current_tar.name.replace('.tar.gz', '')
             tarball_prefixes.append(tarball_prefix)
