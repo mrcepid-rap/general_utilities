@@ -196,12 +196,13 @@ class GeneticsLoader:
         run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
         # I have to do this to recover the sample information from plink
-        cmd = 'docker run -v /home/dnanexus/:/test/ egardner413/mrcepid-associationtesting plink2 ' \
+        cmd = 'plink2 ' \
               '--bfile /test/genetics/UKBB_470K_Autosomes_QCd_WBA ' \
-              '--validate | grep samples'
-        run_cmd(cmd, stdout_file='plink_filtered.out')
+              '--validate'
+        run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting', stdout_file='plink_filtered.out')
 
         with Path('plink_filtered.out').open('r') as plink_out:
             for line in plink_out:
+                self._logger.info(line)
                 if 'loaded from' in line:
                     self._logger.info(f'{"Plink individuals written":{65}}: {line.rstrip(" loaded from")}')
