@@ -174,8 +174,8 @@ class GeneticsLoader:
 
             self._logger.info(f'{"Number of INCLUDE samples":<65}: {indv_written}')
 
-        new_combo_path.rename(combo_path)
-        new_include_path.rename(include_path)
+        new_combo_path.replace(combo_path)
+        new_include_path.replace(include_path)
 
         # 3. Finally, we need to go back through the genetic data and write out samples that we need to exclude...
         # Read in valid samples from the imputed data, crosscheck the valid covariate samples, and write the
