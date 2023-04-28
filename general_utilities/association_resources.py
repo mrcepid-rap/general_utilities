@@ -6,7 +6,7 @@ import pandas as pd
 import pandas.core.series
 
 from pathlib import Path
-from typing import List, Union, TypedDict
+from typing import List, Union, TypedDict, Tuple
 
 from general_utilities.mrc_logger import MRCLogger
 
@@ -482,3 +482,35 @@ def find_index(parent_file: dxpy.DXFile, index_suffix: str) -> dxpy.DXFile:
     found_index = dxpy.DXFile(dxid=index_object['id'], project=index_object['project'])
 
     return found_index
+
+
+def bgzip_and_tabix(file_path: Path, comment_char: str = None,
+                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
+    """BGZIP and TABIX a provided file path
+
+    This is a wrapper for bgzip and tabix. In its simplest form will take a filepath and run bgzip and tabix,
+    with default sequence, begin, and end columns. The user can modify default column specs using parameters and also
+    provide a comment character to set a header line in tabix.
+
+    :param file_path: A Pathlike to a file on this platform.
+    :param comment_char: A comment character to skip. MUST be a single character. Defaults to 'None'
+    :param sequence_row:
+    :param begin_row:
+    :param end_row:
+    :return: A Tuple consisting of the bgziped file and it's corresponding tabix index
+    """
+
+    # Run bgzip
+    bgzip_cmd = f'bgzip /test/{file_path}'
+    run_cmd(bgzip_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+
+    # Run tabix, and incorperate comment character if requested
+    tabix_cmd = 'tabix '
+    if comment_char:
+        tabix_cmd += f'-C {comment_char} '
+    tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
+    run_cmd(tabix_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+    
+    return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
+
+
