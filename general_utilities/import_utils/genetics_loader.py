@@ -112,7 +112,7 @@ class GeneticsLoader:
         Sometimes the imputed/dosage/WES data may have fewer individuals than the genetics bed files. This method
         rectifies that.
 
-        Specifically, this methid synchronises the samples of three files:
+        Specifically, this method synchronises the samples of three files:
         1. SAMPLES_Include.txt (Genetics individuals processed down to those with phenotype / covariate information)
         2. dosage/imputed samples
         3. phenotypes_covariates.formatted.txt – not necessary to ask for these samples at first as they are
