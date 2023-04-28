@@ -507,7 +507,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None,
     # Run tabix, and incorperate comment character if requested
     tabix_cmd = 'tabix '
     if comment_char:
-        tabix_cmd += f'-C {comment_char} '
+        tabix_cmd += f'-c {comment_char} '
     tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
     run_cmd(tabix_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
     
