@@ -227,9 +227,8 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
         # And index the file
         cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
         run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-# Error in sample.int(length(x), size, replace, prob) (simulate_data.R#184): cannot take a sample larger than the population when 'replace = FALSE'
 
-# Build the pandas DataFrame of transcripts
+
 def build_transcript_table() -> pd.DataFrame:
     """A wrapper around pd.read_csv to load transcripts.tsv.gz into a pd.DataFrame
 
@@ -504,7 +503,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None,
     bgzip_cmd = f'bgzip /test/{file_path}'
     run_cmd(bgzip_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
 
-    # Run tabix, and incorperate comment character if requested
+    # Run tabix, and incorporate comment character if requested
     tabix_cmd = 'tabix '
     if comment_char:
         tabix_cmd += f'-c {comment_char} '
