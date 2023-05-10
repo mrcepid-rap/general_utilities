@@ -2,6 +2,16 @@
 
 ## Changelog
 
+* v1.1.4
+  * Added a new method `bgzip_and_tabix` that automatically bgzips and tabix indexes a .tsv file and returns Path-objects for both
+  * Refactored all Path.rename to Path.replace to avoid OS-specific issues
+  * Made `get_chromosome()` log messages make slightly more sense
+  * Added better comments for `genetics_loader()`
+  * Fixed a bug in the plink sample counter to ensure proper reporting of number of individuals in an association run and simplified the code
+  * Added an `import_lib.py` package to contain various import resources
+    * This will continue to grow as methods are refactored from various packages into a single file of import resources
+  * define_covariate_string() can now correct for array batch if requested
+
 * v1.1.3
   * Bug fix for `download_dxfile_by_name`. Function was still returning a string.
 
