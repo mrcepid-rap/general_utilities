@@ -6,7 +6,7 @@ import pandas as pd
 import pandas.core.series
 
 from pathlib import Path
-from typing import List, Union, TypedDict
+from typing import List, Union, TypedDict, Tuple
 
 from general_utilities.mrc_logger import MRCLogger
 
@@ -132,7 +132,7 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
         chromosomes.extend(['X'])
         if chromosome:
             if chromosome in chromosomes:
-                LOGGER.info(f'Restricting following analysis to chrom{chromosome}...')
+                LOGGER.info(f'Restricting following analysis to chrom {chromosome}...')
                 chromosomes = [chromosome]
             else:
                 raise ValueError(f'Provided chromosome ({chromosome}) is not 1-22, X. Please try again '
@@ -227,9 +227,8 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
         # And index the file
         cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
         run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-# Error in sample.int(length(x), size, replace, prob) (simulate_data.R#184): cannot take a sample larger than the population when 'replace = FALSE'
 
-# Build the pandas DataFrame of transcripts
+
 def build_transcript_table() -> pd.DataFrame:
     """A wrapper around pd.read_csv to load transcripts.tsv.gz into a pd.DataFrame
 
@@ -374,7 +373,7 @@ def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: p
 
 # Helper function to decide what covariates are included in the various REGENIE commands
 def define_covariate_string(found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
-                            is_binary: bool) -> str:
+                            is_binary: bool, add_array: bool) -> str:
 
     suffix = ''
     if len(found_quantitative_covariates) > 0:
@@ -385,9 +384,15 @@ def define_covariate_string(found_quantitative_covariates: List[str], found_cate
 
     if len(found_categorical_covariates) > 0:
         cat_covars_join = ','.join(found_categorical_covariates)
-        suffix = suffix + '--catCovarList wes_batch,' + cat_covars_join + ' '
+        if add_array:
+            suffix = suffix + '--catCovarList wes_batch,array_batch,' + cat_covars_join + ' '
+        else:
+            suffix = suffix + '--catCovarList wes_batch,' + cat_covars_join + ' '
     else:
-        suffix = suffix + '--catCovarList wes_batch '
+        if add_array:
+            suffix = suffix + '--catCovarList wes_batch,array_batch '
+        else:
+            suffix = suffix + '--catCovarList wes_batch '
 
     if is_binary:
         suffix = suffix + '--bt --firth --approx'
@@ -476,3 +481,35 @@ def find_index(parent_file: dxpy.DXFile, index_suffix: str) -> dxpy.DXFile:
     found_index = dxpy.DXFile(dxid=index_object['id'], project=index_object['project'])
 
     return found_index
+
+
+def bgzip_and_tabix(file_path: Path, comment_char: str = None,
+                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
+    """BGZIP and TABIX a provided file path
+
+    This is a wrapper for bgzip and tabix. In its simplest form will take a filepath and run bgzip and tabix,
+    with default sequence, begin, and end columns. The user can modify default column specs using parameters and also
+    provide a comment character to set a header line in tabix.
+
+    :param file_path: A Pathlike to a file on this platform.
+    :param comment_char: A comment character to skip. MUST be a single character. Defaults to 'None'
+    :param sequence_row:
+    :param begin_row:
+    :param end_row:
+    :return: A Tuple consisting of the bgziped file and it's corresponding tabix index
+    """
+
+    # Run bgzip
+    bgzip_cmd = f'bgzip /test/{file_path}'
+    run_cmd(bgzip_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+
+    # Run tabix, and incorporate comment character if requested
+    tabix_cmd = 'tabix '
+    if comment_char:
+        tabix_cmd += f'-c {comment_char} '
+    tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
+    run_cmd(tabix_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+    
+    return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
+
+
