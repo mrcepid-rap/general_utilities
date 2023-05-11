@@ -2,6 +2,10 @@
 
 ## Changelog
 
+* v1.1.6
+  * Added a skip_row parameter to bgzip_and_tabix for the -S parameter of tabix
+  * Modernised process_model_output to return Paths and use bgzip_and_tabix()
+
 * v1.1.5
   * Updated dxpy package to latest version due to SSH / SSL issues
 
