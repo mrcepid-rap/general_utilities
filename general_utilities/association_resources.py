@@ -483,7 +483,7 @@ def find_index(parent_file: dxpy.DXFile, index_suffix: str) -> dxpy.DXFile:
     return found_index
 
 
-def bgzip_and_tabix(file_path: Path, comment_char: str = None,
+def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = None,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
     """BGZIP and TABIX a provided file path
 
@@ -493,6 +493,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None,
 
     :param file_path: A Pathlike to a file on this platform.
     :param comment_char: A comment character to skip. MUST be a single character. Defaults to 'None'
+    :param skip_row: Number of lines at the beginning of the file to skip using tabix -S parameter
     :param sequence_row:
     :param begin_row:
     :param end_row:
@@ -507,6 +508,8 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None,
     tabix_cmd = 'tabix '
     if comment_char:
         tabix_cmd += f'-c {comment_char} '
+    if skip_row:
+        tabix_cmd += f'-S {skip_row} '
     tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
     run_cmd(tabix_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
     
