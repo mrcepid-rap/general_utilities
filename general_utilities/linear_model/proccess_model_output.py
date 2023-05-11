@@ -4,12 +4,14 @@ import dxpy
 import pandas as pd
 
 from typing import List
+from pathlib import Path
 
-from general_utilities.association_resources import build_transcript_table, run_cmd, define_field_names_from_pandas
+from general_utilities.association_resources import build_transcript_table, run_cmd, define_field_names_from_pandas, \
+    bgzip_and_tabix
 
 
 def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False,
-                                 gene_infos: list = None) -> list:
+                                 gene_infos: list = None) -> List[Path]:
 
     if gene_infos is not None:
         valid_genes = []
@@ -21,11 +23,11 @@ def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, i
     if is_snp_tar:
         os.rename(output_prefix + '.lm_stats.tmp',
                   output_prefix + '.SNP.glm.stats.tsv')
-        outputs = [output_prefix + '.SNP.glm.stats.tsv']
+        outputs = [Path(f'{output_prefix}.SNP.glm.stats.tsv')]
     elif is_gene_tar:
         os.rename(output_prefix + '.lm_stats.tmp',
                   output_prefix + '.GENE.glm.stats.tsv')
-        outputs = [output_prefix + '.GENE.glm.stats.tsv']
+        outputs = [Path(f'{output_prefix}.GENE.glm.stats.tsv')]
     else:
         # read in the GLM stats file:
         glm_table = pd.read_csv(open(output_prefix + ".lm_stats.tmp", 'r'), sep="\t")
@@ -55,31 +57,25 @@ def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, i
         glm_table[field_names] = glm_table['maskname'].str.split("-", expand=True)
         glm_table = glm_table.drop(columns=['maskname'])
 
-        # Now merge the transcripts table into the gene table to add annotation and the write
+        # Now merge the transcripts table into the gene table to add annotation and write
         glm_table = pd.merge(transcripts_table, glm_table, on='ENST', how="left")
-        with open(output_prefix + '.genes.glm.stats.tsv', 'w') as gene_out:
+        gene_tsv = Path(f'{output_prefix}.genes.glm.stats.tsv')
+        with gene_tsv.open('w') as gene_out:
 
             # Sort just in case
             glm_table = glm_table.sort_values(by=['chrom', 'start', 'end'])
 
             glm_table.to_csv(path_or_buf=gene_out, index=False, sep="\t", na_rep='NA')
-            gene_out.close()
 
-            # And bgzip and tabix...
-            cmd = "bgzip /test/" + output_prefix + '.genes.glm.stats.tsv'
-            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-            cmd = "tabix -S 1 -s 2 -b 3 -e 4 /test/" + output_prefix + '.genes.glm.stats.tsv.gz'
-            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-
-        outputs = [output_prefix + '.genes.glm.stats.tsv.gz',
-                   output_prefix + '.genes.glm.stats.tsv.gz.tbi']
+        # And bgzip and tabix...
+        outputs = list(bgzip_and_tabix(gene_tsv, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
 
     return outputs
 
 
 # Helper method to just write STAAR outputs from the 'process_staar_outputs' function below
-def write_staar_csv(file_name: str, completed_staar_files: List[str]):
-    with open(file_name, 'w') as staar_output:
+def write_staar_csv(file_path: Path, completed_staar_files: List[str]) -> Path:
+    with file_path.open('w') as staar_output:
         output_csv = csv.DictWriter(staar_output,
                                     delimiter="\t",
                                     fieldnames=['SNP', 'n.samps', 'pheno_name', 'relatedness.correction',
@@ -94,10 +90,12 @@ def write_staar_csv(file_name: str, completed_staar_files: List[str]):
             curr_file_reader.close()
         staar_output.close()
 
+    return file_path
+
 
 # Process STAAR output files
 def process_staar_outputs(completed_staar_files: List[str], output_prefix: str, is_snp_tar: bool = False,
-                          is_gene_tar: bool = False, gene_infos: list = None) -> list:
+                          is_gene_tar: bool = False, gene_infos: list = None) -> List[Path]:
 
     if is_gene_tar or is_snp_tar:
         if is_gene_tar:
@@ -107,14 +105,14 @@ def process_staar_outputs(completed_staar_files: List[str], output_prefix: str, 
         else:
             raise dxpy.AppError('Somehow output is neither GENE or SNP from STAAR!')
 
-        write_staar_csv(output_prefix + '.' + prefix + '.STAAR.stats.tsv', completed_staar_files)
-        outputs = [output_prefix + '.' + prefix + '.STAAR.stats.tsv']
+        outputs = [write_staar_csv(Path(f'{output_prefix}.{prefix}.STAAR.stats.tsv'), completed_staar_files)]
+
     else:
         # Here we are concatenating a temp file of each tsv from completed_staar_files:
-        write_staar_csv(output_prefix + '.genes.STAAR.stats.temp', completed_staar_files)
+        temp_path = write_staar_csv(Path(f'{output_prefix}.genes.STAAR.stats.temp'), completed_staar_files)
 
         # Now read in the concatenated STAAR stats file:
-        staar_table = pd.read_csv(open(output_prefix + '.genes.STAAR.stats.temp', 'r'), sep="\t")
+        staar_table = pd.read_csv(temp_path, sep="\t")
 
         # Now process the gene table into a useable format:
         # First read in the transcripts file
@@ -134,27 +132,20 @@ def process_staar_outputs(completed_staar_files: List[str], output_prefix: str, 
 
         # Now merge the transcripts table into the gene table to add annotation and the write
         staar_table = pd.merge(transcripts_table, staar_table, on='ENST', how="left")
-        with open(output_prefix + '.genes.STAAR.stats.tsv', 'w') as gene_out:
+        staar_tsv = Path(f'{output_prefix}.genes.STAAR.stats.tsv')
+        with staar_tsv.open('w') as gene_out:
 
             # Sort just in case
             staar_table = staar_table.sort_values(by=['chrom', 'start', 'end'])
-
             staar_table.to_csv(path_or_buf=gene_out, index=False, sep="\t", na_rep='NA')
-            gene_out.close()
 
             # And bgzip and tabix...
-            cmd = "bgzip /test/" + output_prefix + '.genes.STAAR.stats.tsv'
-            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-            cmd = "tabix -S 1 -s 2 -b 3 -e 4 /test/" + output_prefix + '.genes.STAAR.stats.tsv.gz'
-            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-
-        outputs = [output_prefix + '.genes.STAAR.stats.tsv.gz',
-                   output_prefix + '.genes.STAAR.stats.tsv.gz.tbi']
+        outputs = list(bgzip_and_tabix(staar_tsv, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
 
     return outputs
 
 
-def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False) -> list:
+def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False) -> List[Path]:
 
     if is_gene_tar or is_snp_tar:
         if is_gene_tar:
@@ -167,8 +158,8 @@ def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_t
         glm_table = pd.read_csv(output_prefix + '.' + prefix + '.glm.stats.tsv', sep='\t')
         staar_table = pd.read_csv(output_prefix + '.' + prefix + '.STAAR.stats.tsv', sep='\t')
 
-        # We need to pull the ENST value out of the STAAR table 'SNP' variable while
-        # trying to avoid any bugs due to file/pheno names
+        # We need to pull the ENST value out of the STAAR table 'SNP' variable while trying to avoid any bugs due to
+        # file/pheno names
         field_one = staar_table.iloc[0]
         field_one = field_one['SNP'].split("-")
         field_names = []
@@ -187,16 +178,15 @@ def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_t
 
         final_table = glm_table.merge(right=staar_table, on=['ENST', 'pheno_name'])
 
-        with open(output_prefix + '.' + prefix + '.STAAR_glm.stats.tsv', 'w') as gene_out:
-
+        gene_path = Path(f'{output_prefix}.{prefix}.STAAR_glm.stats.tsv')
+        with gene_path.open('w') as gene_out:
             final_table.to_csv(path_or_buf=gene_out, index=False, sep="\t", na_rep='NA')
-            gene_out.close()
 
-        outputs = [output_prefix + '.' + prefix + '.STAAR_glm.stats.tsv']
+        outputs = [gene_path]
 
     else:
-        glm_table = pd.read_csv(output_prefix + '.genes.glm.stats.tsv.gz', sep='\t')
-        staar_table = pd.read_csv(output_prefix + '.genes.STAAR.stats.tsv.gz', sep='\t')
+        glm_table = pd.read_csv(f'{output_prefix}.genes.glm.stats.tsv.gz', sep='\t')
+        staar_table = pd.read_csv(f'{output_prefix}.genes.STAAR.stats.tsv.gz', sep='\t')
 
         # Select STAAR columns we need to merge in/match on
         staar_table = staar_table[['ENST', 'MASK', 'MAF', 'pheno_name', 'n_var', 'relatedness.correction', 'staar.O.p',
@@ -204,21 +194,13 @@ def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_t
 
         final_table = glm_table.merge(right=staar_table, on=['ENST', 'MASK', 'MAF', 'pheno_name'])
 
-        with open(output_prefix + '.genes.STAAR_glm.stats.tsv', 'w') as gene_out:
+        gene_path = Path(f'{output_prefix}.genes.STAAR_glm.stats.tsv')
+        with gene_path.open('w') as gene_out:
 
             # Sort just in case
             final_table = final_table.sort_values(by=['chrom', 'start', 'end'])
-
             final_table.to_csv(path_or_buf=gene_out, index=False, sep="\t", na_rep='NA')
-            gene_out.close()
 
-            # And bgzip and tabix...
-            cmd = "bgzip /test/" + output_prefix + '.genes.STAAR_glm.stats.tsv'
-            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-            cmd = "tabix -S 1 -s 2 -b 3 -e 4 /test/" + output_prefix + '.genes.STAAR_glm.stats.tsv.gz'
-            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-
-        outputs = [output_prefix + '.genes.STAAR_glm.stats.tsv.gz',
-                   output_prefix + '.genes.STAAR_glm.stats.tsv.gz.tbi']
+        outputs = list(bgzip_and_tabix(gene_path, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
 
     return outputs
