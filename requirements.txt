@@ -1,3 +1,4 @@
+dxpy==0.346.0
 numpy==1.23.1
 pandas==1.5.2
 statsmodels==0.13.2
