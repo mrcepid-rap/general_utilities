@@ -2,6 +2,9 @@
 
 ## Changelog
 
+* v1.1.5
+  * Updated dxpy package to latest version due to SSH / SSL issues
+
 * v1.1.4
   * Added a new method `bgzip_and_tabix` that automatically bgzips and tabix indexes a .tsv file and returns Path-objects for both
   * Refactored all Path.rename to Path.replace to avoid OS-specific issues

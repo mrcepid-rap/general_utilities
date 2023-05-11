@@ -12,12 +12,12 @@ def load_requirements(fname: Path):
 
 setup(
     name='general_utilities',
-    version='1.1.4',
+    version='1.1.5',
     packages=find_packages(),
-    url='',
-    license='',
-    author='ejgardner',
-    author_email='',
+    url='https://github.com/mrcepid-rap/general_utilities',
+    license='MIT',
+    author='Eugene Gardner',
+    author_email='eugene.gardner@mrcepid.cam.ac.uk',
     description='',
     install_requires=load_requirements(Path("requirements.txt")),
     include_package_data=True,
