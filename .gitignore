@@ -1,3 +1,4 @@
 /build/
 /dist/
 /general_utilities.egg-info/
+/.talismanrc
