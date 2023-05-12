@@ -120,9 +120,6 @@ def linear_model_null(phenotype: str, is_binary: bool,
         # Just make sure we subset if doing phewas to save space...
         pheno_covars = pheno_covars[columns]
 
-        print('Using the following formula for GLMs: ')
-        print(form_full)
-
         # Build the null model and extract residuals:
         sm_results_null = sm.GLM.from_formula(form_null, data=pheno_covars, family=sm.families.Gaussian()).fit()
         null_table = sm_results_null.resid_response.to_frame()
