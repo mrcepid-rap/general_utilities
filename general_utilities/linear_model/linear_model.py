@@ -103,16 +103,22 @@ def linear_model_null(phenotype: str, is_binary: bool,
 
         # And finally define the formula to be used by all models:
         # Make sure to define additional covariates as requested by the user...
+        columns = [phenotype, 'sex', 'age', 'age_squared', 'wes_batch'] + ["PC%s" % x for x in range(1, 11)]
         form_null = f'{phenotype} ~ sex + age + age_squared + C(wes_batch) + ' \
                     f'{" + ".join(["PC%s" % x for x in range(1, 11)])}'
         if len(quantitative_covariates) > 0:
             for covar in quantitative_covariates:
+                columns.append(covar)
                 form_null += f' + {covar}'
         if len(categorical_covariates) > 0:
             for covar in categorical_covariates:
+                columns.append(covar)
                 form_null += f' + C({covar})'
 
         form_full = f'{form_null} + has_var'
+
+        # Just make sure we subset if doing phewas to save space...
+        pheno_covars = pheno_covars[columns]
 
         print('Using the following formula for GLMs: ')
         print(form_full)
