@@ -2,6 +2,10 @@
 
 ## Changelog
 
+* v1.1.7
+  * Null models frames now only include the phenotype for that model. Before frames just copied the larger pheno_covar.tsv
+  * Removed overly verbose model printing
+
 * v1.1.6
   * Added a skip_row parameter to bgzip_and_tabix for the -S parameter of tabix
   * Modernised process_model_output to return Paths and use bgzip_and_tabix()
