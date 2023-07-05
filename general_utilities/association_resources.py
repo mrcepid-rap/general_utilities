@@ -18,7 +18,7 @@ LOGGER = MRCLogger(__name__).get_logger()
 def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
             data_dir: str = '/home/dnanexus/', docker_mounts: List = None,
             stdout_file: Union[str, Path] = None, print_cmd: bool = False, livestream_out: bool = False,
-            dry_run: bool = False) -> None:
+            dry_run: bool = False) -> int:
 
     """Run a command in the shell either with / without Docker
 
@@ -42,6 +42,7 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
     :param print_cmd: Print `cmd` but still run the command (as opposed to dry_run). For debug purposes only.
     :param livestream_out: Livestream the output from the requested process. For debug purposes only.
     :param dry_run: Print `cmd` and exit without running. For debug purposes only.
+    :returns: The exit code of the underlying process
     """
 
     # -v here mounts a local directory on an instance (in this case the home dir) to a directory internal to the
@@ -63,6 +64,7 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
 
     if dry_run:
         LOGGER.info(cmd)
+        return 0
     else:
         if print_cmd:
             LOGGER.info(cmd)
@@ -99,6 +101,8 @@ def run_cmd(cmd: str, is_docker: bool = False, docker_image: str = None,
                 LOGGER.error("STDERR follows")
                 LOGGER.error(stderr.decode('utf-8'))
                 raise RuntimeError(f'run_cmd() failed to run requested job properly')
+
+        return proc.returncode
 
 
 def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromosome: str = None) -> List[str]:
