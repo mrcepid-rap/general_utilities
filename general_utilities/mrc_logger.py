@@ -46,12 +46,12 @@ class MRCLogger:
         :return: boolean indicating if a dxpy.DXLogHandler has already been attached to this logger
         """
 
-        found_dx_handler = False
+        found_handler = False
         for handler in self._logger.handlers:
-            if isinstance(handler, dxpy.DXLogHandler):
-                found_dx_handler = True
+            if isinstance(handler, dxpy.DXLogHandler) or isinstance(handler, logging.StreamHandler):
+                found_handler = True
 
-        return found_dx_handler
+        return found_handler
 
     def get_logger(self) -> Logger:
         """Getter for the logger built by this class
