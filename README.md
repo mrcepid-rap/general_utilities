@@ -2,6 +2,13 @@
 
 ## Changelog
 
+* v1.1.8
+  * scipy is now hard-set to v1.10.1 due to issues with development version install and python < 3.9
+  * run_cmd now returns the process exit code
+  * Fixed a bug with MRCLogger printing multiple messages when not run on DNANexus
+  * Refactored R packages for linear models as a sub-package of linear_model
+  * Initial implementation of manhattan plot workflow
+
 * v1.1.7
   * Null models frames now only include the phenotype for that model. Before frames just copied the larger pheno_covar.tsv
   * Removed overly verbose model printing
