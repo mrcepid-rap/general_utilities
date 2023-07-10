@@ -10,7 +10,7 @@ def staar_null(phenoname: str, is_binary: bool,
 
     # I have made a custom script in order to generate the STAAR Null model that is installed using pip
     # as part of the general_utilities package. We can extract the system location of this script:
-    r_script = files('general_utilities.R_resources').joinpath('runSTAAR_Null.R')
+    r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Null.R')
 
     # This script then generates an RDS output file containing the NULL model
     # See the README.md for more information on these parameters
@@ -36,7 +36,7 @@ def staar_genes(tarball_prefix: str, chromosome: str, phenoname: str, has_gene_i
 
     # I have made a custom script in order to generate STAAR per-gene models that is installed using pip
     # as part of the general_utilities package. We can extract the system location of this script:
-    r_script = files('general_utilities.R_resources').joinpath('runSTAAR_Genes.R')
+    r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Genes.R')
 
     # This generates a text output file of p.values
     # See the README.md for more information on these parameters

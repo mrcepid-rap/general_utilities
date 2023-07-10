@@ -12,7 +12,7 @@ def load_requirements(fname: Path):
 
 setup(
     name='general_utilities',
-    version='1.1.7',
+    version='1.1.8',
     packages=find_packages(),
     url='https://github.com/mrcepid-rap/general_utilities',
     license='MIT',
@@ -21,5 +21,5 @@ setup(
     description='',
     install_requires=load_requirements(Path("requirements.txt")),
     include_package_data=True,
-    package_data={'': ['R_resources/*.R']}
+    package_data={'': ['linear_model/R_resources/*.R']}
 )
