@@ -26,6 +26,10 @@ class DockerMount:
         self.remote = remote
 
     def get_docker_mount(self):
+        """Utility method to get the mount in Docker -v format.
+
+        :return: A str in the format `<self.local>:<self.remote>`
+        """
 
         return f'{self.local}:{self.remote}'
 
@@ -60,14 +64,14 @@ class CommandExecutor:
         if docker_image:
 
             cmd = f'docker image inspect {docker_image}'
-            return_code = self.run_cmd_on_local(cmd, ignore_error=True)
+            return_code = self.run_cmd(cmd, ignore_error=True)
             print(f'Code: {return_code}')
             if return_code != 0:
 
                 self._logger.info(f'Downloading Docker image {docker_image}')
 
                 cmd = f'docker pull {docker_image}'
-                self.run_cmd_on_local(cmd)
+                self.run_cmd(cmd)
 
             else:
 
