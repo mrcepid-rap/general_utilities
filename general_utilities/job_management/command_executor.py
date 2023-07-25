@@ -1,10 +1,8 @@
-import subprocess
-import sys
-
 import dxpy
+import subprocess
 
-from typing import Union, List
 from pathlib import Path
+from typing import Union, List
 
 from general_utilities.mrc_logger import MRCLogger
 
@@ -22,7 +20,7 @@ class DockerMount:
 
 
 class CommandExecutor:
-    """An object that contains the information to run system calls either with or without docker
+    """An object that contains the information to run system calls either with or without Docker
 
     :param docker_image: Docker image on some repository to run the command via. This image does not necessarily have
         to be on the image, but if in a non-public repository (e.g., AWS ECR) this will cause the command to fail.
@@ -39,16 +37,30 @@ class CommandExecutor:
         self._docker_prefix = self._construct_docker_prefix(docker_mounts)
 
     def _ingest_docker_file(self, docker_image: str) -> bool:
-        """Download the default Docker image so that we can run tools not on the DNANexus platform.
+        """Download a Docker image (if requested) so that we can run tools not on the DNANexus platform.
 
-        :return: None
+        This method does a quick check using `docker image inspect <image>` to see if the image has already been
+        downloaded to this machine to ensure that we don't waste time checking the remote repository. This is not
+        particularly important, but does save a few seconds.
+
+        :return: Boolean for if a docker image was provided to the constructor
         """
 
         if docker_image:
-            self._logger.info(f'Downloading Docker image {docker_image}')
 
-            cmd = f'docker pull {docker_image}'
-            self.run_cmd_on_local(cmd)
+            cmd = f'docker image inspect {docker_image}'
+            return_code = self.run_cmd_on_local(cmd, ignore_error=True)
+            print(f'Code: {return_code}')
+            if return_code != 0:
+
+                self._logger.info(f'Downloading Docker image {docker_image}')
+
+                cmd = f'docker pull {docker_image}'
+                self.run_cmd_on_local(cmd)
+
+            else:
+
+                self._logger.info(f'Docker image {docker_image} already downloaded...')
 
             return True
 
@@ -58,6 +70,21 @@ class CommandExecutor:
             return False
 
     def _construct_docker_prefix(self, docker_mounts: List[DockerMount]) -> Union[str, None]:
+        """Given a set of (possibly Null) docker mounts, construct the prefix for running Docker-based commands for
+        this particular object.
+
+        If a docker image was not provided at start-up, this method will return 'None' and all calls to Docker will
+        raise an exception.
+
+        Docker prefixes constructed by this method generally come with the following format:
+
+        docker run -v /path/to/local_dir_1/:/path/to/mount_1/ -v /path/to/local_dir_2/:/path/to/mount_2/
+
+        Note that the docker image itself is not added to this prefix to allow for additional mounts to be added later.
+
+        :param docker_mounts: A List of DockerMount objects
+        :return: A str representation of the docker prefix or None if no Docker image is provided.
+        """
 
         if self._docker_configured:
 
@@ -66,7 +93,7 @@ class CommandExecutor:
             # Docker. Multiple mounts can be added (via docker_mounts) to enable this code to find other specialised
             # files (e.g., some R scripts included in the associationtesting suite).
             if docker_mounts is None:
-                docker_mount_string = ' '
+                docker_mount_string = ''
             else:
                 docker_mount_string = ' '.join([f'-v {mount.get_docker_mount()}'
                                                 for mount in docker_mounts])
@@ -83,7 +110,8 @@ class CommandExecutor:
             return None
 
     def run_cmd_on_docker(self, cmd: str, stdout_file: Path = None, docker_mounts: List[DockerMount] = None,
-                          print_cmd: bool = False, livestream_out: bool = False, dry_run: bool = False) -> int:
+                          print_cmd: bool = False, livestream_out: bool = False, dry_run: bool = False,
+                          ignore_error: bool = False) -> int:
     
         """Run a command in the shell with Docker
     
@@ -93,6 +121,13 @@ class CommandExecutor:
         docker_mounts option. Also, by default, standard out is not saved, but can be modified with the 'stdout_file'
         parameter. print_cmd, livestream_out, and/or dry_run are for internal debugging purposes when testing new
         code. All options other than `cmd` are optional.
+
+        This method is a wrapper around CommandExecutor.run_cmd() and simply adds self._docker_prefix and
+        self._docker_image to the beginning of any provided command.
+
+        By default, if a command fails, the VM will print the failing process STDOUT / STDERR to the logger and raise
+        a RuntimeError; however, if ignore_error is set to 'True', this method will instead return the exit code for
+        the underlying process to allow for custom error handling.
     
         :param cmd: The command to be run.
         :param stdout_file: Capture stdout from the process into the given file
@@ -100,7 +135,9 @@ class CommandExecutor:
         :param print_cmd: Print `cmd` but still run the command (as opposed to dry_run). For debug purposes only.
         :param livestream_out: Livestream the output from the requested process. For debug purposes only.
         :param dry_run: Print `cmd` and exit without running. For debug purposes only.
-        :returns: The exit code of the underlying process
+        :param ignore_error: Should failing subprocesses be ignored [False]? Setting to True allows the method to
+            capture the returned error code and handle in a context dependent manner.
+        :return: The exit code of the underlying process
         """
 
         if self._docker_configured is False:
@@ -116,16 +153,46 @@ class CommandExecutor:
         # Use the original docker prefix created as part of the constructor with any additional mounts provided to
         # this method
         cmd = f'{self._docker_prefix} {docker_mount_string} {self._docker_image} {cmd}'
+        return self.run_cmd(cmd, stdout_file, print_cmd, livestream_out, dry_run, ignore_error)
 
-        return self._execute_cmd(cmd, stdout_file, print_cmd, livestream_out, dry_run)
+    def run_cmd(self, cmd: str, stdout_file: Path = None, print_cmd: bool = False,
+                livestream_out: bool = False, dry_run: bool = False, ignore_error: bool = False) -> int:
+        """Run a command in the shell.
 
-    def run_cmd_on_local(self, cmd: str, stdout_file: Path = None,
-                         print_cmd: bool = False, livestream_out: bool = False, dry_run: bool = False) -> int:
+        This method is the primary entrypoint to running system commands. By default, standard out is not saved,
+        but can be modified with the 'stdout_file' parameter. print_cmd, livestream_out, and/or dry_run are for
+        internal debugging purposes when testing new code. All options other than `cmd` are optional.
 
-        return self._execute_cmd(cmd, stdout_file, print_cmd, livestream_out, dry_run)
+        By default, if a command fails, the VM will print the failing process STDOUT / STDERR to the logger and raise
+        a RuntimeError; however, if ignore_error is set to 'True', this method will instead return the exit code for
+        the underlying process to allow for custom error handling.
+
+        :param cmd: The command to be run.
+        :param stdout_file: Capture stdout from the process into the given file
+        :param print_cmd: Print `cmd` but still run the command (as opposed to dry_run). For debug purposes only.
+        :param livestream_out: Livestream the output from the requested process. For debug purposes only.
+        :param dry_run: Print `cmd` and exit without running. For debug purposes only.
+        :param ignore_error: Should failing subprocesses be ignored [False]? Setting to True allows the method to
+            capture the returned error code and handle in a context dependent manner.
+        :return: The exit code of the underlying process
+        """
+
+        return self._execute_cmd(cmd, stdout_file, print_cmd, livestream_out, dry_run, ignore_error)
 
     def _execute_cmd(self, cmd: str, stdout_file: Path, print_cmd: bool, livestream_out: bool,
-                     dry_run: bool):
+                     dry_run: bool, ignore_error: bool) -> int:
+        """A private method for executing commands via the shell. See 'run_cmd' for more information on providing
+        inputs to this command.
+
+        :param cmd: The command to be run.
+        :param stdout_file: Capture stdout from the process into the given file
+        :param print_cmd: Print `cmd` but still run the command (as opposed to dry_run). For debug purposes only.
+        :param livestream_out: Livestream the output from the requested process. For debug purposes only.
+        :param dry_run: Print `cmd` and exit without running. For debug purposes only.
+        :param ignore_error: Should failing subprocesses be ignored [False]? Setting to True allows the method to
+            capture the returned error code and handle in a context dependent manner.
+        :return: The exit code of the underlying process
+        """
 
         if dry_run:
             self._logger.info(cmd)
@@ -136,35 +203,36 @@ class CommandExecutor:
     
             # Standard python calling external commands protocol
             proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if livestream_out:
-    
+
+            # Trying to do both simultaneously to make code more succinct.
+            if livestream_out or stdout_file is not None:
+
+                # If stdout is not provided convert to /dev/null
+                stdout_file = stdout_file if stdout_file else Path('/dev/null')
+
+                stdout_writer = stdout_file.open('w')
                 for line in iter(proc.stdout.readline, b""):
-                    self._logger.info(f'SUBPROCESS STDOUT: {bytes.decode(line).rstrip()}')
-    
-                proc.wait()  # Make sure the process has actually finished...
-                if proc.returncode != 0:
-                    self._logger.error("The following cmd failed:")
-                    self._logger.error(cmd)
-                    self._logger.error("STDERR follows\n")
-                    for line in iter(proc.stderr.readline, b""):
-                        sys.stdout.buffer.write(line)
-                    raise dxpy.AppError("Failed to run properly...")
-    
-            else:
-                stdout, stderr = proc.communicate()
-                if stdout_file is not None:
-                    with Path(stdout_file).open('w') as stdout_writer:
-                        stdout_writer.write(stdout.decode('utf-8'))
-                    stdout_writer.close()
-    
-                # If the command doesn't work, print the error stream and close the AWS instance out with 'dxpy.AppError'
-                if proc.returncode != 0:
-                    self._logger.error("The following cmd failed:")
-                    self._logger.error(cmd)
-                    self._logger.error("STDOUT follows")
-                    self._logger.error(stdout.decode('utf-8'))
-                    self._logger.error("STDERR follows")
-                    self._logger.error(stderr.decode('utf-8'))
+                    decoded_bytes = line.decode('utf-8')
+                    if livestream_out:
+                        self._logger.info(f'SUBPROCESS STDOUT: {decoded_bytes.rstrip()}')
+                    stdout_writer.write(decoded_bytes)
+
+            # Wait for the process to finish
+            proc_exit_code = proc.wait()
+            print(f'Internal: {proc_exit_code}')
+            # If the process has a non-zero exit code, dump information about the job. Depending on ignore_error, can
+            # either raise a RuntimeError (False) or return the exit code for another process to handle (True)
+            if proc_exit_code != 0:
+                self._logger.error("The following cmd failed:")
+                self._logger.error(cmd)
+                self._logger.error("STDOUT follows")
+                for line in iter(proc.stdout.readline, b""):
+                    self._logger.error(line)
+                self._logger.error("STDERR follows\n")
+                for line in iter(proc.stderr.readline, b""):
+                    self._logger.error(line)
+
+                if not ignore_error:
                     raise RuntimeError(f'run_cmd() failed to run requested job properly')
-    
-            return proc.returncode
+
+            return proc_exit_code
