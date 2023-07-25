@@ -498,9 +498,10 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     :param file_path: A Pathlike to a file on this platform.
     :param comment_char: A comment character to skip. MUST be a single character. Defaults to 'None'
     :param skip_row: Number of lines at the beginning of the file to skip using tabix -S parameter
-    :param sequence_row:
-    :param begin_row:
-    :param end_row:
+    :param sequence_row: Row number (in base 1) of the chromosome / sequence name column
+    :param begin_row: Row number (in base 1) of the start coordinate column
+    :param end_row: Row number (in base 1) of the end coordinate column. This value can be the same as begin row for
+        files without an end coordinate but cannot be omitted.
     :return: A Tuple consisting of the bgziped file and it's corresponding tabix index
     """
 
