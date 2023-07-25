@@ -10,6 +10,17 @@ from general_utilities.mrc_logger import MRCLogger
 class DockerMount:
 
     def __init__(self, local: Path, remote: Path):
+        """An Object containing necessary information for creating a Docker mount point.
+
+        Mount points are intended to be used as part of the -v flag within Docker. The only information supplied to
+        the constructor is the local file path to the mounted directory, and the location within the Docker image.
+        Calling the :func: get_docker_mount method will format these directories to be useable by Docker:
+
+        <self.local>:<self.remote>
+
+        :param local: A local file path to mount within a Docker image
+        :param remote: The path within the Docker image
+        """
 
         self.local = local
         self.remote = remote
