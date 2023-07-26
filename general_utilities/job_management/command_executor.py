@@ -31,25 +31,76 @@ class DockerMount:
         :return: A str in the format `<self.local>:<self.remote>`
         """
 
-        return f'{self.local}:{self.remote}'
+        return f'{self.local.resolve()}:{self.remote}'
 
 
 class CommandExecutor:
     """An object that contains the information to run system calls either with or without Docker
 
+    For future developers: Why did Eugene create this seemingly stupid piece of code? Three reasons:
+
+    1. The previous general_utilities.association_resources.run_cmd() method (that may or may not still exist) was
+    inflexible with regard to running tests / prototyping OUTSIDE DNANexus.
+
+    2. run_cmd() had to be parameterized during each use. That meant that one had to remember the exact Docker image to
+    use at each invocation and the mount points within that image.
+
+    3. Each module had to independently download a specified Docker image. While not a big deal, I wanted to modularise
+    this process and make a call-out so code wasn't duplicated.
+
     :param docker_image: Docker image on some repository to run the command via. This image does not necessarily have
         to be on the image, but if in a non-public repository (e.g., AWS ECR) this will cause the command to fail.
     :param docker_mounts: Additional Docker mounts to attach to this process via the `-v` commandline argument to
         Docker. See the documentation for Docker for more information.
+    :param authenticate_aws: Boolean indicating if AWS authentication is required to download this Docker image
     """
     
-    def __init__(self, docker_image: str = None, docker_mounts: List[DockerMount] = None):
+    def __init__(self, docker_image: str = None, docker_mounts: List[DockerMount] = None,
+                 authenticate_aws: bool = False):
 
         self._logger = MRCLogger(__name__).get_logger()
+
+        if authenticate_aws:
+            self._authenticate_aws_ecr()
 
         self._docker_image = docker_image
         self._docker_configured = self._ingest_docker_file(docker_image)
         self._docker_prefix = self._construct_docker_prefix(docker_mounts)
+
+    @staticmethod
+    def _authenticate_aws_ecr() -> None:
+        """Place files required for AWS-ECR authentication in the correct paths for Docker to find them.
+
+        This handles the credentials provided by the record given in the 'assetDepends' portion of dxapp.json This
+        asset MUST include a config.json and AWS formatted credentials file to function properly or this will throw an
+        error!
+
+        :return: None
+        """
+
+        # Make sure the config.json is in the correct place for Docker
+        docker_config = Path('~/.docker/config.json')
+        if not docker_config.expanduser().parent.exists():
+            docker_config.expanduser().parent.mkdir()
+
+        credentials_config = Path('~/.aws/credentials')
+        if not credentials_config.expanduser().parent.exists():
+            credentials_config.expanduser().parent.mkdir()
+
+        # Set initial paths for credentials as expected by the provided resource and make sure that they are actually there
+        resource_config = Path('/config.json')
+        resource_credentials = Path('/credentials')
+        if not resource_config.exists() and not resource_credentials.exists():
+            raise dxpy.AppError('AWS ECR credentials not provided properly. Please try again.')
+
+        # And then move the docker config/aws credentials file from our docker authentication resource to these new folders
+        # Where the given command-line tools (docker & amazon-ecr-credential-helper) know where to look for them
+        resource_config.replace(docker_config.expanduser())
+        resource_credentials.replace(credentials_config.expanduser())
+
+        # TODO: Make sure these actually work in the context of the ExpansionHunter repo
+        # cmd = 'docker pull 535440495128.dkr.ecr.eu-west-2.amazonaws.com/adrestia-repeatexpansion:latest'
+        # run_cmd(cmd, print_cmd=True)
 
     def _ingest_docker_file(self, docker_image: str) -> bool:
         """Download a Docker image (if requested) so that we can run tools not on the DNANexus platform.
@@ -65,7 +116,7 @@ class CommandExecutor:
 
             cmd = f'docker image inspect {docker_image}'
             return_code = self.run_cmd(cmd, ignore_error=True)
-            print(f'Code: {return_code}')
+
             if return_code != 0:
 
                 self._logger.info(f'Downloading Docker image {docker_image}')
@@ -162,8 +213,11 @@ class CommandExecutor:
         # Docker instance named /test/. This allows us to run commands on files stored on the AWS instance within
         # Docker. Multiple mounts can be added (via docker_mounts) to enable this code to find other specialised
         # files (e.g., some R scripts included in the associationtesting suite).
-        docker_mount_string = ' '.join([f'-v {mount.get_docker_mount()}'
-                                        for mount in docker_mounts])
+        if docker_mounts:
+            docker_mount_string = ' '.join([f'-v {mount.get_docker_mount()}'
+                                            for mount in docker_mounts])
+        else:
+            docker_mount_string = ''
 
         # Use the original docker prefix created as part of the constructor with any additional mounts provided to
         # this method
@@ -234,7 +288,7 @@ class CommandExecutor:
 
             # Wait for the process to finish
             proc_exit_code = proc.wait()
-            print(f'Internal: {proc_exit_code}')
+
             # If the process has a non-zero exit code, dump information about the job. Depending on ignore_error, can
             # either raise a RuntimeError (False) or return the exit code for another process to handle (True)
             if proc_exit_code != 0:
