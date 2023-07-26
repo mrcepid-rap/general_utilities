@@ -4,9 +4,9 @@ import tarfile
 import dxpy
 
 from pathlib import Path
-from typing import Union, Dict, Tuple, List
+from typing import Union, Dict, Tuple, List, TypedDict
 
-from general_utilities.association_resources import BGENInformation, download_dxfile_by_name, run_cmd
+from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
 
 
@@ -45,6 +45,76 @@ def build_default_command_executor() -> CommandExecutor:
                                    docker_mounts=default_mounts)
 
     return cmd_executor
+
+
+class BGENInformation(TypedDict):
+    """A TypedDict holding information about a chromosome's available genetic data
+
+    :cvar bgen: A .bgen file containing genetic data.
+    :cvar index: A .bgen.bgi index file for :cvar bgen:
+    :cvar sample: A .sample file containing sample information for :cvar bgen:
+    :cvar vep: The per-variant annotation for all or a filtered subset (typically on INFO / MAF) variants in :cvar bgen:
+    """
+    bgen: dxpy.DXFile
+    index: dxpy.DXFile
+    sample: dxpy.DXFile
+    vep: dxpy.DXFile
+
+
+def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, download_only: bool = False) -> None:
+    """Download and process a bgen file when requested
+
+    This method is written as a helper to classes that need to access filtered and annotated WES variants. It will
+    first download the files provided to `chrom_bgen_index`. It will then create a plink- / association
+    software-compatible sample file. Finally, if requested, the method will filter to samples from the
+    SAMPLES_Include.txt file generated after processing phenotypes / covariates.
+
+    :param chrom_bgen_index: An object of :func:`BGENInformation` containing :func:`dxpy.DXFile` objects for the bgen
+        for :param chromosome:
+    :param chromosome: Which chromosome to limit analyses to
+    :param download_only: boolean indicating whether to just download and do not do any filtering. True = do not filter
+    :return: None
+    """
+
+    # First we have to download the actual data
+    bgen_index = chrom_bgen_index['index']
+    bgen_sample = chrom_bgen_index['sample']
+    bgen = chrom_bgen_index['bgen']
+    vep = chrom_bgen_index['vep']
+    dxpy.download_dxfile(bgen_index.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
+    dxpy.download_dxfile(bgen_sample.get_id(), f'filtered_bgen/{chromosome}.filtered.sample')
+    dxpy.download_dxfile(bgen.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen')
+    dxpy.download_dxfile(vep.get_id(), f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
+
+    # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
+    with Path(f'filtered_bgen/{chromosome}.filtered.sample').open('r') as samp_file, \
+            Path(f'{chromosome}.markers.standard.sample').open('w') as fixed_samp_bolt:
+
+        for line in samp_file:
+            line = line.rstrip().split(" ")
+            if line[0] == 'ID':
+                fixed_samp_bolt.write('ID_1 ID_2 missing sex\n')
+            elif line[2] == 'D':
+                fixed_samp_bolt.write('0 0 0 D\n')
+            else:
+                fixed_samp_bolt.write(f'{line[0]} {line[0]} 0 NA\n')
+
+    # And then perform filtering if requested
+    # keep-fam is required since we are filtering on a bgen (which only keeps a single ID)
+    # Remember that sampleIDs are stored in the bgen in the format created by mrcepid-makebgen
+    if not download_only:
+        cmd_executor = build_default_command_executor()
+        cmd = f'plink2 --threads 4 --bgen /test/filtered_bgen/{chromosome}.filtered.bgen "ref-last" ' \
+              f'--double-id ' \
+              f'--export bgen-1.2 "bits="8 ' \
+              f'--out /test/{chromosome}.markers ' \
+              f'--keep-fam /test/SAMPLES_Include.txt'
+        cmd_executor.run_cmd_on_docker(cmd)
+
+        # And index the file
+        cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
+        cmd_executor.run_cmd_on_docker(cmd)
+
 
 def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
     """Download the entire filtered WES variant data set in bgen format
