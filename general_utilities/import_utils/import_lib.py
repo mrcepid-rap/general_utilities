@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Union, Dict, Tuple, List
 
 from general_utilities.association_resources import BGENInformation, download_dxfile_by_name, run_cmd
-from job_management.command_executor import CommandExecutor, DockerMount
+from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
 
 
 class DXPath:
