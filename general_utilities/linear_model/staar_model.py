@@ -3,7 +3,7 @@ from typing import List
 from importlib_resources import files
 
 from general_utilities.association_resources import run_cmd
-from general_utilities.import_utils.import_lib import build_default_command_executor
+from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.job_management.command_executor import DockerMount
 
 

@@ -298,3 +298,17 @@ class CommandExecutor:
                 raise RuntimeError(f'run_cmd() failed to run requested job properly')
 
             return proc_exit_code
+
+
+def build_default_command_executor() -> CommandExecutor:
+    """Set up the 'CommandExecutor' class, which handles downloading a Docker image, building the appropriate
+    file system mounts, and provides methods for running system calls.
+
+    :return: A CommandExecutor object
+    """
+
+    default_mounts = [DockerMount(Path('/home/dnanexus/'), Path('/test/'))]
+    cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
+                                   docker_mounts=default_mounts)
+
+    return cmd_executor

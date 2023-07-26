@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Union, Dict, Tuple, List, TypedDict
 
 from general_utilities.association_resources import download_dxfile_by_name
-from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
+from general_utilities.job_management.command_executor import build_default_command_executor
 
 
 class DXPath:
@@ -31,20 +31,6 @@ class DXPath:
             self.local = Path(f'./{self.remote.name}')
         else:
             self.local = Path(local_path)
-
-
-def build_default_command_executor() -> CommandExecutor:
-    """Set up the 'CommandExecutor' class, which handles downloading a Docker image, building the appropriate
-    file system mounts, and provides methods for running system calls.
-
-    :return: A CommandExecutor object
-    """
-
-    default_mounts = [DockerMount(Path('/home/dnanexus/'), Path('/test/'))]
-    cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
-                                   docker_mounts=default_mounts)
-
-    return cmd_executor
 
 
 class BGENInformation(TypedDict):

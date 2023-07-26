@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Union, Tuple
 
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.import_lib import build_default_command_executor
+from general_utilities.job_management.command_executor import build_default_command_executor
 
 LOGGER = MRCLogger(__name__).get_logger()
 
