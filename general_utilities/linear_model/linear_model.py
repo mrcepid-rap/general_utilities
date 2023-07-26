@@ -9,7 +9,7 @@ from typing import Tuple, List
 from importlib_resources import files
 from general_utilities.association_resources import get_chromosomes, run_cmd
 from general_utilities.mrc_logger import MRCLogger
-from job_management.command_executor import DockerMount, build_default_command_executor
+from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
 
 LOGGER = MRCLogger(__name__).get_logger()
 
