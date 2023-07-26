@@ -144,7 +144,7 @@ def linear_model_null(phenotype: str, is_binary: bool,
 def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar: bool,
                               chromosome: str = None) -> Tuple[str, pd.DataFrame]:
 
-    LOGGER.info(f'Loading tarball prefix: {tarball_prefix}\n')
+    LOGGER.info(f'Loading tarball prefix: {tarball_prefix}')
     geno_tables = []
 
     r_script = files('general_utilities.linear_model.R_resources').joinpath('sparseMatrixProcessor.R')
@@ -187,7 +187,7 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
     # Index 0 = ENST
     # Index 1 = FID
     genetic_data = pd.concat(geno_tables)
-    LOGGER.info("Finished loading tarball prefix: " + tarball_prefix)
+    LOGGER.info(f'Finished loading tarball prefix: {tarball_prefix}')
 
     return tarball_prefix, genetic_data
 
