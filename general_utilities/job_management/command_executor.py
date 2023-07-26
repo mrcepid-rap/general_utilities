@@ -276,7 +276,8 @@ class CommandExecutor:
             # Trying to do both simultaneously to make code more succinct.
             if livestream_out or stdout_file is not None:
 
-                # If stdout is not provided convert to /dev/null
+                # If stdout is not provided convert to /dev/null, so we can do livestreaming and writing to stdout at
+                # the same time
                 stdout_file = stdout_file if stdout_file else Path('/dev/null')
 
                 stdout_writer = stdout_file.open('w')
@@ -291,17 +292,15 @@ class CommandExecutor:
 
             # If the process has a non-zero exit code, dump information about the job. Depending on ignore_error, can
             # either raise a RuntimeError (False) or return the exit code for another process to handle (True)
-            if proc_exit_code != 0:
+            if proc_exit_code != 0 and ignore_error is False:
                 self._logger.error("The following cmd failed:")
                 self._logger.error(cmd)
                 self._logger.error("STDOUT follows")
                 for line in iter(proc.stdout.readline, b""):
-                    self._logger.error(line)
+                    self._logger.error(line.decode('utf-8'))
                 self._logger.error("STDERR follows\n")
                 for line in iter(proc.stderr.readline, b""):
-                    self._logger.error(line)
-
-                if not ignore_error:
-                    raise RuntimeError(f'run_cmd() failed to run requested job properly')
+                    self._logger.error(line.decode('utf-8'))
+                raise RuntimeError(f'run_cmd() failed to run requested job properly')
 
             return proc_exit_code
