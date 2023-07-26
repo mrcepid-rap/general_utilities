@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Union, Dict, Tuple, List
 
 from general_utilities.association_resources import BGENInformation, download_dxfile_by_name, run_cmd
+from job_management.command_executor import CommandExecutor, DockerMount
 
 
 class DXPath:
@@ -31,6 +32,21 @@ class DXPath:
         else:
             self.local = Path(local_path)
 
+
+def build_default_command_executor(additional_mounts: List[DockerMount] = None) -> CommandExecutor:
+    """Set up the 'CommandExecutor' class, which handles downloading a Docker image, building the appropriate
+    file system mounts, and provides methods for running system calls.
+
+    :param additional_mounts: Additional mount-points to add to this executor build
+    :return: A CommandExecutor object
+    """
+
+    default_mounts = [DockerMount(Path('/home/dnanexus/'), Path('/test/'))]
+    default_mounts.extend(additional_mounts)
+    cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
+                                   docker_mounts=default_mounts)
+
+    return cmd_executor
 
 def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
     """Download the entire filtered WES variant data set in bgen format
