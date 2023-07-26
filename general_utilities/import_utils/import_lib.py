@@ -42,7 +42,8 @@ def build_default_command_executor(additional_mounts: List[DockerMount] = None) 
     """
 
     default_mounts = [DockerMount(Path('/home/dnanexus/'), Path('/test/'))]
-    default_mounts.extend(additional_mounts)
+    if additional_mounts:
+        default_mounts.extend(additional_mounts)
     cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
                                    docker_mounts=default_mounts)
 
