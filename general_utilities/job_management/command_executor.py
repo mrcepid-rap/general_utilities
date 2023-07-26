@@ -124,10 +124,6 @@ class CommandExecutor:
                 cmd = f'docker pull {docker_image}'
                 self.run_cmd(cmd)
 
-            else:
-
-                self._logger.info(f'Docker image {docker_image} already downloaded...')
-
             return True
 
         else:
@@ -166,8 +162,6 @@ class CommandExecutor:
 
             docker_prefix = f'docker run ' \
                             f'{docker_mount_string} '
-
-            self._logger.info(f'Docker will be run with prefix \'{docker_prefix}\'')
 
             return docker_prefix
 

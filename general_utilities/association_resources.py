@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Union, TypedDict, Tuple
 
 from general_utilities.mrc_logger import MRCLogger
-
+from general_utilities.import_utils.import_lib import build_default_command_executor
 
 LOGGER = MRCLogger(__name__).get_logger()
 
@@ -221,16 +221,17 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
     # keep-fam is required since we are filtering on a bgen (which only keeps a single ID)
     # Remember that sampleIDs are stored in the bgen in the format created by mrcepid-makebgen
     if not download_only:
+        cmd_executor = build_default_command_executor()
         cmd = f'plink2 --threads 4 --bgen /test/filtered_bgen/{chromosome}.filtered.bgen "ref-last" ' \
               f'--double-id ' \
               f'--export bgen-1.2 "bits="8 ' \
               f'--out /test/{chromosome}.markers ' \
               f'--keep-fam /test/SAMPLES_Include.txt'
-        run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+        cmd_executor.run_cmd_on_docker(cmd)
 
         # And index the file
         cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
-        run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+        cmd_executor.run_cmd_on_docker(cmd)
 
 
 def build_transcript_table() -> pd.DataFrame:
@@ -326,10 +327,11 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
         chromosomes.add(str(row['chrom']))
 
     # And filter the relevant SAIGE file to just the individuals we want so we can get actual MAC
+    cmd_executor = build_default_command_executor()
     cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.txt -Ob -o /test/' \
           f'{tarball_prefix}.{file_prefix}.saige_input.bcf /test/' \
           f'{tarball_prefix}.{file_prefix}.SAIGE.bcf'
-    run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+    cmd_executor.run_cmd_on_docker(cmd)
 
     # Build a fake gene_info that can feed into the other functions in this class
     gene_info = pd.Series({'chrom': file_prefix, 'SYMBOL': file_prefix})
@@ -506,8 +508,9 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     """
 
     # Run bgzip
+    cmd_executor = build_default_command_executor()
     bgzip_cmd = f'bgzip /test/{file_path}'
-    run_cmd(bgzip_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+    cmd_executor.run_cmd_on_docker(bgzip_cmd)
 
     # Run tabix, and incorporate comment character if requested
     tabix_cmd = 'tabix '
@@ -516,7 +519,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     if skip_row:
         tabix_cmd += f'-S {skip_row} '
     tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
-    run_cmd(tabix_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+    cmd_executor.run_cmd_on_docker(tabix_cmd)
     
     return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
 

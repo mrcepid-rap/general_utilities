@@ -33,17 +33,14 @@ class DXPath:
             self.local = Path(local_path)
 
 
-def build_default_command_executor(additional_mounts: List[DockerMount] = None) -> CommandExecutor:
+def build_default_command_executor() -> CommandExecutor:
     """Set up the 'CommandExecutor' class, which handles downloading a Docker image, building the appropriate
     file system mounts, and provides methods for running system calls.
 
-    :param additional_mounts: Additional mount-points to add to this executor build
     :return: A CommandExecutor object
     """
 
     default_mounts = [DockerMount(Path('/home/dnanexus/'), Path('/test/'))]
-    if additional_mounts:
-        default_mounts.extend(additional_mounts)
     cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
                                    docker_mounts=default_mounts)
 

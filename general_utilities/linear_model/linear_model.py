@@ -8,6 +8,11 @@ from typing import Tuple, List
 
 from importlib_resources import files
 from general_utilities.association_resources import get_chromosomes, run_cmd
+from general_utilities.mrc_logger import MRCLogger
+from general_utilities.import_utils.import_lib import build_default_command_executor
+from job_management.command_executor import DockerMount
+
+LOGGER = MRCLogger(__name__).get_logger()
 
 
 class LinearModelPack:
@@ -140,8 +145,15 @@ def linear_model_null(phenotype: str, is_binary: bool,
 def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar: bool,
                               chromosome: str = None) -> Tuple[str, pd.DataFrame]:
 
-    print(f'Loading tarball prefix: {tarball_prefix}\n')
+    LOGGER.info(f'Loading tarball prefix: {tarball_prefix}\n')
     geno_tables = []
+
+    r_script = files('general_utilities.linear_model.R_resources').joinpath('sparseMatrixProcessor.R')
+
+    script_mount = DockerMount(Path(f'{r_script.parent}/'),
+                               Path('/scripts/'))
+    cmd_executor = build_default_command_executor()
+
     for chromosome in get_chromosomes(is_snp_tar, is_gene_tar, chromosome=chromosome):
         # This handles the genes that we need to test:
         tarball_path = Path(f'{tarball_prefix}.{chromosome}.STAAR.matrix.rds')
@@ -149,14 +161,13 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
             # The R script (sparseMatrixProcessor.R) just makes a sparse matrix with columns:
             # sample_id, gene name, genotype, ENST
             # All information is derived from the sparse STAAR matrix files
-            r_script = files('general_utilities.linear_model.R_resources').joinpath('sparseMatrixProcessor.R')
+
             cmd = f'Rscript /scripts/{r_script.name} ' \
                   f'/test/{tarball_prefix}.{chromosome}.STAAR.matrix.rds ' \
                   f'/test/{tarball_prefix}.{chromosome}.variants_table.STAAR.tsv ' \
                   f'{tarball_prefix} ' \
                   f'{chromosome}'
-            run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting',
-                    docker_mounts=[f'{r_script.parent}/:/scripts/'])
+            cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
 
             # And read in the resulting table
             geno_table = pd.read_csv(tarball_prefix + "." + chromosome + ".lm_sparse_matrix.tsv",
@@ -177,7 +188,7 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
     # Index 0 = ENST
     # Index 1 = FID
     genetic_data = pd.concat(geno_tables)
-    print("Finished loading tarball prefix: " + tarball_prefix)
+    LOGGER.info("Finished loading tarball prefix: " + tarball_prefix)
 
     return tarball_prefix, genetic_data
 
