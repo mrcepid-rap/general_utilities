@@ -1,12 +1,10 @@
-import csv
 import re
-from typing import Set, List
-
+import csv
 import dxpy
 
 from pathlib import Path
+from typing import Set, List
 
-from general_utilities.association_resources import run_cmd
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.job_management.command_executor import CommandExecutor
 
