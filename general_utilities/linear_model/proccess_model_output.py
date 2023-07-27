@@ -6,7 +6,7 @@ import pandas as pd
 from typing import List
 from pathlib import Path
 
-from general_utilities.association_resources import build_transcript_table, run_cmd, define_field_names_from_pandas, \
+from general_utilities.association_resources import build_transcript_table, define_field_names_from_pandas, \
     bgzip_and_tabix
 
 

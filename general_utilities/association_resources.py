@@ -6,10 +6,10 @@ import pandas as pd
 import pandas.core.series
 
 from pathlib import Path
-from typing import List, Union, TypedDict, Tuple
+from typing import List, Union, Tuple
 
 from general_utilities.mrc_logger import MRCLogger
-
+from general_utilities.job_management.command_executor import build_default_command_executor
 
 LOGGER = MRCLogger(__name__).get_logger()
 
@@ -164,75 +164,6 @@ def generate_linked_dx_file(file: Union[str, Path]) -> dxpy.DXFile:
     return linked_file
 
 
-#
-class BGENInformation(TypedDict):
-    """A TypedDict holding information about a chromosome's available genetic data
-
-    :cvar bgen: A .bgen file containing genetic data.
-    :cvar index: A .bgen.bgi index file for :cvar bgen:
-    :cvar sample: A .sample file containing sample information for :cvar bgen:
-    :cvar vep: The per-variant annotation for all or a filtered subset (typically on INFO / MAF) variants in :cvar bgen:
-    """
-    bgen: dxpy.DXFile
-    index: dxpy.DXFile
-    sample: dxpy.DXFile
-    vep: dxpy.DXFile
-
-
-def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, download_only: bool = False) -> None:
-    """Download and process a bgen file when requested
-
-    This method is written as a helper to classes that need to access filtered and annotated WES variants. It will
-    first download the files provided to `chrom_bgen_index`. It will then create a plink- / association
-    software-compatible sample file. Finally, if requested, the method will filter to samples from the
-    SAMPLES_Include.txt file generated after processing phenotypes / covariates.
-
-    :param chrom_bgen_index: An object of :func:`BGENInformation` containing :func:`dxpy.DXFile` objects for the bgen
-        for :param chromosome:
-    :param chromosome: Which chromosome to limit analyses to
-    :param download_only: boolean indicating whether to just download and do not do any filtering. True = do not filter
-    :return: None
-    """
-
-    # First we have to download the actual data
-    bgen_index = chrom_bgen_index['index']
-    bgen_sample = chrom_bgen_index['sample']
-    bgen = chrom_bgen_index['bgen']
-    vep = chrom_bgen_index['vep']
-    dxpy.download_dxfile(bgen_index.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
-    dxpy.download_dxfile(bgen_sample.get_id(), f'filtered_bgen/{chromosome}.filtered.sample')
-    dxpy.download_dxfile(bgen.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen')
-    dxpy.download_dxfile(vep.get_id(), f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
-
-    # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
-    with Path(f'filtered_bgen/{chromosome}.filtered.sample').open('r') as samp_file, \
-            Path(f'{chromosome}.markers.standard.sample').open('w') as fixed_samp_bolt:
-
-        for line in samp_file:
-            line = line.rstrip().split(" ")
-            if line[0] == 'ID':
-                fixed_samp_bolt.write('ID_1 ID_2 missing sex\n')
-            elif line[2] == 'D':
-                fixed_samp_bolt.write('0 0 0 D\n')
-            else:
-                fixed_samp_bolt.write(f'{line[0]} {line[0]} 0 NA\n')
-
-    # And then perform filtering if requested
-    # keep-fam is required since we are filtering on a bgen (which only keeps a single ID)
-    # Remember that sampleIDs are stored in the bgen in the format created by mrcepid-makebgen
-    if not download_only:
-        cmd = f'plink2 --threads 4 --bgen /test/filtered_bgen/{chromosome}.filtered.bgen "ref-last" ' \
-              f'--double-id ' \
-              f'--export bgen-1.2 "bits="8 ' \
-              f'--out /test/{chromosome}.markers ' \
-              f'--keep-fam /test/SAMPLES_Include.txt'
-        run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-
-        # And index the file
-        cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
-        run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
-
-
 def build_transcript_table() -> pd.DataFrame:
     """A wrapper around pd.read_csv to load transcripts.tsv.gz into a pd.DataFrame
 
@@ -326,10 +257,11 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
         chromosomes.add(str(row['chrom']))
 
     # And filter the relevant SAIGE file to just the individuals we want so we can get actual MAC
+    cmd_executor = build_default_command_executor()
     cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.txt -Ob -o /test/' \
           f'{tarball_prefix}.{file_prefix}.saige_input.bcf /test/' \
           f'{tarball_prefix}.{file_prefix}.SAIGE.bcf'
-    run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+    cmd_executor.run_cmd_on_docker(cmd)
 
     # Build a fake gene_info that can feed into the other functions in this class
     gene_info = pd.Series({'chrom': file_prefix, 'SYMBOL': file_prefix})
@@ -498,15 +430,17 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     :param file_path: A Pathlike to a file on this platform.
     :param comment_char: A comment character to skip. MUST be a single character. Defaults to 'None'
     :param skip_row: Number of lines at the beginning of the file to skip using tabix -S parameter
-    :param sequence_row:
-    :param begin_row:
-    :param end_row:
+    :param sequence_row: Row number (in base 1) of the chromosome / sequence name column
+    :param begin_row: Row number (in base 1) of the start coordinate column
+    :param end_row: Row number (in base 1) of the end coordinate column. This value can be the same as begin row for
+        files without an end coordinate but cannot be omitted.
     :return: A Tuple consisting of the bgziped file and it's corresponding tabix index
     """
 
     # Run bgzip
+    cmd_executor = build_default_command_executor()
     bgzip_cmd = f'bgzip /test/{file_path}'
-    run_cmd(bgzip_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+    cmd_executor.run_cmd_on_docker(bgzip_cmd)
 
     # Run tabix, and incorporate comment character if requested
     tabix_cmd = 'tabix '
@@ -515,7 +449,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     if skip_row:
         tabix_cmd += f'-S {skip_row} '
     tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
-    run_cmd(tabix_cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+    cmd_executor.run_cmd_on_docker(tabix_cmd)
     
     return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
 

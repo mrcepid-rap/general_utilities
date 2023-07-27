@@ -1,13 +1,12 @@
-import csv
 import re
-from typing import Set, List
-
+import csv
 import dxpy
 
 from pathlib import Path
+from typing import Set, List
 
-from general_utilities.association_resources import run_cmd
 from general_utilities.mrc_logger import MRCLogger
+from general_utilities.job_management.command_executor import CommandExecutor
 
 
 class GeneticsLoader:
@@ -22,13 +21,15 @@ class GeneticsLoader:
     :param fam_file: Plink .fam format file
     :param bim_file: Plink .bim format file
     :param sample_files: A List of .bgen format sample files to synchronise samples on.
+    :param cmd_executor: CommandExecutor class to run system calls through
     :param low_mac_list: An optional list of low minor allele count variants for exclusion when running BOLT
     """
 
     def __init__(self, bed_file: dxpy.DXFile, fam_file: dxpy.DXFile, bim_file: dxpy.DXFile, sample_files: List[Path],
-                 low_mac_list: dxpy.DXFile = None):
+                 cmd_executor: CommandExecutor, low_mac_list: dxpy.DXFile = None):
 
         self._logger = MRCLogger(__name__).get_logger()
+        self._cmd_executor = cmd_executor
 
         self._bed_file = bed_file
         self._fam_file = fam_file
@@ -208,13 +209,13 @@ class GeneticsLoader:
         cmd = 'plink2 ' \
               '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
               '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-        run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting')
+        self._cmd_executor.run_cmd_on_docker(cmd)
 
         # I have to do this to recover the sample information from plink
         cmd = 'plink2 ' \
               '--bfile /test/genetics/UKBB_470K_Autosomes_QCd_WBA ' \
               '--validate'
-        run_cmd(cmd, is_docker=True, docker_image='egardner413/mrcepid-burdentesting', stdout_file='plink_filtered.out')
+        self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 
         with Path('plink_filtered.out').open('r') as plink_out:
             for line in plink_out:

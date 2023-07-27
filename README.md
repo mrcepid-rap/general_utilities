@@ -2,6 +2,17 @@
 
 ## Changelog
 
+* v1.2.0
+  * Updated docstrings for several methods
+  * Implemented the CommandExecutor class
+    * This class provides a standard method for importing Docker files and running commands either via Docker or through standard system calls
+    * The original run_cmd() method still exists due to legacy code, but should be considered deprecated for future development, has been removed from all runassociationtesting modules, and is actively being removed from other applets.
+    * This was done to:
+      * Make it easier to run tests on local machines rather than via DNANexus
+      * Standardize import of Docker images across modules / applets
+      * Simplify calls to run_cmd()
+  * Refactored bgen processing to import_lib
+
 * v1.1.8
   * scipy is now hard-set to v1.10.1 due to issues with development version install and python < 3.9
   * run_cmd now returns the process exit code
