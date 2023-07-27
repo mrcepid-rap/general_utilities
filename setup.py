@@ -12,7 +12,7 @@ def load_requirements(fname: Path):
 
 setup(
     name='general_utilities',
-    version='1.1.8',
+    version='1.2.0',
     packages=find_packages(),
     url='https://github.com/mrcepid-rap/general_utilities',
     license='MIT',
