@@ -68,7 +68,6 @@ class IngestData(ABC):
                                     phenotypes=phenotypes,
                                     pheno_names=pheno_names,
                                     ignore_base_options=parsed_options.ignore_base,
-                                    additional_covariates_found=additional_covariates_found,
                                     found_categorical_covariates=found_categorical_covariates,
                                     found_quantitative_covariates=found_quantitative_covariates,
                                     add_covars=add_covars,
@@ -464,7 +463,7 @@ class IngestData(ABC):
         return found_categorical_covariates, found_quantitative_covariates, add_covars
 
     def _create_covariate_file(self, genetics_samples: Set[str], phenotypes: Dict[str, Dict[str, Any]],
-                               pheno_names: List[str], ignore_base_options: bool, additional_covariates_found: bool,
+                               pheno_names: List[str], ignore_base_options: bool,
                                found_categorical_covariates: List[str], found_quantitative_covariates: List[str],
                                add_covars: Dict[str, Dict[str, Any]], sex: int) -> None:
 
@@ -490,10 +489,6 @@ class IngestData(ABC):
         :return: None
         """
 
-        # Have to store valid base covariates in case they were requested to be removed...
-        valid_base_covars = [f'PC{PC}' for PC in range(1, 41)] + \
-                            ['age', 'age_squared', 'sex', 'wes_batch', 'array_batch']
-
         # Print some statistics about what we found in previous ingestion classes:
         self._logger.info(f'{"Phenotype(s)":{65}}: {", ".join(pheno_names)}')
 
@@ -507,7 +502,7 @@ class IngestData(ABC):
             self._logger.info(f'{" ":^{5}}{"Quantitative":{60}}: age, age^2, PC1..PC10')
             self._logger.info(f'{" ":^{5}}{"Categorical":{60}}: {"sex, WES_batch" if sex == 2 else "WES_batch"}')
 
-        if additional_covariates_found:
+        if len(found_quantitative_covariates) + len(found_categorical_covariates) > 0:
             self._logger.info(f'{"Number of individuals with non-null additional covariates":{65}}: {len(add_covars)}')
             self._logger.info(f'{"Additional covariates included in model":{65}}:')
             self._logger.info(f'{" ":^{5}}{"Quantitative":{60}}: {", ".join(found_quantitative_covariates) if len(found_quantitative_covariates) > 0 else "None"}')
@@ -597,11 +592,6 @@ class IngestData(ABC):
                             indv_written += 1
                             combo_writer.writerow(indv_writer)
                             include_samples.write(indv['eid'] + "\n")
-
-        with final_covariates_file.open('r') as covars:
-            for line in covars:
-                print(line)
-                break
 
         # Print to ensure that total number of individuals is consistent between genetic and covariate/phenotype data
         self._logger.info(f'{"Samples with covariates after include/exclude lists applied":{65}}: {num_all_samples}')
