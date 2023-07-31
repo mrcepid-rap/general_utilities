@@ -358,6 +358,11 @@ class IngestData(ABC):
         found_quantitative_covariates = []
         add_covars = {}
 
+        # The user may be ignoring the base covariates, but adding specific ones back in. So we need to make sure they
+        # are providing correct names here...
+        valid_base_covars = [f'PC{PC}' for PC in range(1,41)] + \
+                            ['age', 'age_squared', 'sex', 'wes_batch', 'array_batch']
+
         if additional_covariates_found:
 
             # Keep track of sample totals:
@@ -386,6 +391,9 @@ class IngestData(ABC):
                         if covar in field_names:
                             found_categorical_covariates.append(covar)
                             total_missing_dict[covar] = 0
+                        elif covar in valid_base_covars:
+                            found_categorical_covariates.append(covar)
+                            self._logger.info(f'Covar {covar} is a base covariate... adding back to model.')
                         else:
                             self._logger.warning(f'Provided categorical covariate {covar} not found in '
                                                  f'additional covariates file...')
@@ -395,6 +403,9 @@ class IngestData(ABC):
                         if covar in field_names:
                             found_quantitative_covariates.append(covar)
                             total_missing_dict[covar] = 0
+                        elif covar in valid_base_covars:
+                            found_quantitative_covariates.append(covar)
+                            self._logger.info(f'Covar {covar} is a base covariate... adding back to model.')
                         else:
                             self._logger.warning(f'Provided quantitative covariate {covar} not found in '
                                                  f'additional covariates file...')
@@ -412,14 +423,15 @@ class IngestData(ABC):
                     sample_dict = {}
                     total_samples += 1
                     for covar_name in (found_quantitative_covariates + found_categorical_covariates):
-                        if sample[covar_name] is None:
-                            all_covars_found = False
-                            total_missing_dict[covar_name] += 1
-                        elif sample[covar_name].lower() in ['na', 'nan', '']:
-                            all_covars_found = False
-                            total_missing_dict[covar_name] += 1
-                        else:
-                            sample_dict[covar_name] = sample[covar_name]
+                        if covar_name not in valid_base_covars:
+                            if sample[covar_name] is None:
+                                all_covars_found = False
+                                total_missing_dict[covar_name] += 1
+                            elif sample[covar_name].lower() in ['na', 'nan', '']:
+                                all_covars_found = False
+                                total_missing_dict[covar_name] += 1
+                            else:
+                                sample_dict[covar_name] = sample[covar_name]
 
                     if all_covars_found:
                         add_covars[sample['IID']] = sample_dict
@@ -429,6 +441,25 @@ class IngestData(ABC):
                     print_string = f'Add covar "{covar_name}" samples missing'
                     prop_missing = (total_missing_dict[covar_name] / total_samples) * 100
                     self._logger.info(f'{print_string:{65}}: {total_missing_dict[covar_name]} ({prop_missing:0.2f}%)')
+
+        # If an additional covariate file was provided, we need to check if we are adding the base covariates back in...
+        elif categorical_covariates or quantitative_covariates:
+            if categorical_covariates is not None:
+                for covar in categorical_covariates:
+                    if covar in valid_base_covars:
+                        found_categorical_covariates.append(covar)
+                        self._logger.info(f'Covar {covar} is a base covariate... adding back to model.')
+                    else:
+                        raise ValueError(f'Provided categorical covariate {covar} not a base covariate and '
+                                         f'additional covariates file was NOT provided...')
+            if quantitative_covariates is not None:
+                for covar in quantitative_covariates:
+                    if covar in valid_base_covars:
+                        found_quantitative_covariates.append(covar)
+                        self._logger.info(f'Covar {covar} is a base covariate... adding back to model.')
+                    else:
+                        raise ValueError(f'Provided quantitative covariate {covar} not a base covariate and '
+                                         f'additional covariates file was NOT provided...')
 
         return found_categorical_covariates, found_quantitative_covariates, add_covars
 
@@ -459,11 +490,17 @@ class IngestData(ABC):
         :return: None
         """
 
+        # Have to store valid base covariates in case they were requested to be removed...
+        valid_base_covars = [f'PC{PC}' for PC in range(1, 41)] + \
+                            ['age', 'age_squared', 'sex', 'wes_batch', 'array_batch']
+
         # Print some statistics about what we found in previous ingestion classes:
         self._logger.info(f'{"Phenotype(s)":{65}}: {", ".join(pheno_names)}')
 
         self._logger.info(f'{"Default covariates included in model":{65}}:')
         if ignore_base_options:
+            self._logger.warning('Flag --ignore_base used. No base covariates '
+                                 'included (unless specifically requested)...')
             self._logger.info(f'{" ":^{5}}{"Quantitative":{60}}:')
             self._logger.info(f'{" ":^{5}}{"Categorical":{60}}:')
         else:
@@ -482,14 +519,16 @@ class IngestData(ABC):
         final_covariates_file = Path('phenotypes_covariates.formatted.txt')
 
         with base_covariates_file.open('r') as base_covar_reader,\
-                final_covariates_file.open('w', newline='\n') as final_covariates_writer:
+                final_covariates_file.open('w', newline='\n') as final_covariates_writer,\
+                Path('SAMPLES_Include.txt').open('w') as include_samples:
 
             base_covar_csv = csv.DictReader(base_covar_reader, delimiter="\t")
 
             # Build fieldnames for final_covariates_file
             write_fields = ['FID', 'IID']
-            write_fields = write_fields + ['PC%s' % x for x in range(1, 41)]
-            write_fields = write_fields + ['age', 'age_squared', 'sex', 'wes_batch', 'array_batch']
+            if not ignore_base_options:
+                write_fields = write_fields + [f'PC{PC}' for PC in range(1, 41)]
+                write_fields = write_fields + ['age', 'age_squared', 'sex', 'wes_batch', 'array_batch']
             write_fields = write_fields + pheno_names
             # This doesn't matter to python if we didn't find additional covariates. A list of len() == 0 does not
             # lengthen the target list (e.g. 'write_fields')
@@ -505,63 +544,64 @@ class IngestData(ABC):
             indv_written = 0  # Just to count the number of samples we will analyse
             combo_writer.writeheader()
 
-            # Need a list of included individuals ONLY:
-            # We write both a file for every other tool and a file for regenie at the same time just in case
-            # the user requests a REGENIE run
-            with Path('SAMPLES_Include.txt').open('w') as include_samples:
-                num_all_samples = 0
-                for indv in base_covar_csv:
-                    # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
-                    # on sex
-                    if indv['22001-0.0'] != "NA" and indv['eid'] in genetics_samples:
-                        indv_writer = {'FID': indv['eid'],
-                                       'IID': indv['eid']}
-                        for PC in range(1, 41):
-                            old_pc = "22009-0.%s" % PC
-                            new_pc = "PC%s" % PC
-                            indv_writer[new_pc] = indv[old_pc]
-                        indv_writer['age'] = int(indv['21003-0.0'])
-                        indv_writer['age_squared'] = indv_writer['age']**2
-                        indv_writer['sex'] = int(indv['22001-0.0'])
-                        indv_writer['wes_batch'] = indv['wes.batch']
-                        indv_writer['array_batch'] = indv['22000-0.0']
-                        num_all_samples += 1
+            num_all_samples = 0
+            for indv in base_covar_csv:
+                # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
+                # on sex
+                if indv['22001-0.0'] != "NA" and indv['eid'] in genetics_samples:
+                    indv_writer = {'FID': indv['eid'],
+                                   'IID': indv['eid']}
+                    for PC in range(1, 41):
+                        old_pc = f'22009-0.{PC}'
+                        new_pc = f'PC{PC}'
+                        indv_writer[new_pc] = indv[old_pc]
+                    indv_writer['age'] = int(indv['21003-0.0'])
+                    indv_writer['age_squared'] = indv_writer['age']**2
+                    indv_writer['sex'] = int(indv['22001-0.0'])
+                    indv_writer['wes_batch'] = indv['wes.batch']
+                    indv_writer['array_batch'] = indv['22000-0.0']
+                    num_all_samples += 1
 
-                        # Check if we found additional covariates and make sure this sample has non-null values
-                        found_covars = False
-                        if len(add_covars) > 0:
-                            if indv['eid'] in add_covars:
-                                found_covars = True
-                                for covariate in add_covars[indv['eid']]:
-                                    indv_writer[covariate] = add_covars[indv['eid']][covariate]
-                        else:
+                    # Check if we found additional covariates and make sure this sample has non-null values
+                    found_covars = False
+                    if len(add_covars) > 0:
+                        if indv['eid'] in add_covars:
                             found_covars = True
+                            for covariate in add_covars[indv['eid']]:
+                                indv_writer[covariate] = add_covars[indv['eid']][covariate]
+                    else:
+                        found_covars = True
 
-                        found_phenos = False
-                        if len(pheno_names) == 1:
-                            pheno = pheno_names[0]
+                    found_phenos = False
+                    if len(pheno_names) == 1:
+                        pheno = pheno_names[0]
+                        if indv['eid'] in phenotypes[pheno]:
+                            found_phenos = True
+                            indv_writer[pheno] = phenotypes[pheno][indv['eid']]
+                    else:
+                        found_phenos = False  # As long as this individual has ONE phenotype, write them.
+                        for pheno in pheno_names:
                             if indv['eid'] in phenotypes[pheno]:
                                 found_phenos = True
                                 indv_writer[pheno] = phenotypes[pheno][indv['eid']]
-                        else:
-                            found_phenos = False  # As long as this individual has ONE phenotype, write them.
-                            for pheno in pheno_names:
-                                if indv['eid'] in phenotypes[pheno]:
-                                    found_phenos = True
-                                    indv_writer[pheno] = phenotypes[pheno][indv['eid']]
-                                else:
-                                    indv_writer[pheno] = 'NA'
+                            else:
+                                indv_writer[pheno] = 'NA'
 
-                        # exclude based on sex-specific analysis if required:
-                        if found_covars and found_phenos:
-                            if sex == 2:
-                                indv_written += 1
-                                combo_writer.writerow(indv_writer)
-                                include_samples.write(indv['eid'] + "\n")
-                            elif sex == indv_writer['sex']:
-                                indv_written += 1
-                                combo_writer.writerow(indv_writer)
-                                include_samples.write(indv['eid'] + "\n")
+                    # exclude based on sex-specific analysis if required:
+                    if found_covars and found_phenos:
+                        if sex == 2:
+                            indv_written += 1
+                            combo_writer.writerow(indv_writer)
+                            include_samples.write(indv['eid'] + "\n")
+                        elif sex == indv_writer['sex']:
+                            indv_written += 1
+                            combo_writer.writerow(indv_writer)
+                            include_samples.write(indv['eid'] + "\n")
+
+        with final_covariates_file.open('r') as covars:
+            for line in covars:
+                print(line)
+                break
 
         # Print to ensure that total number of individuals is consistent between genetic and covariate/phenotype data
         self._logger.info(f'{"Samples with covariates after include/exclude lists applied":{65}}: {num_all_samples}')
