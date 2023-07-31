@@ -79,6 +79,7 @@ class IngestData(ABC):
                                                  sex=parsed_options.sex,
                                                  threads=self._get_num_threads(),
                                                  pheno_names=pheno_names,
+                                                 ignore_base_covariates=parsed_options.ignore_base,
                                                  found_quantitative_covariates=found_quantitative_covariates,
                                                  found_categorical_covariates=found_categorical_covariates,
                                                  cmd_executor=cmd_executor)
