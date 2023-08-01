@@ -5,6 +5,7 @@ import logging
 from pathlib import Path
 from logging import Logger
 
+
 class MRCLogger:
 
     def __init__(self, name_suffix: str = None):
