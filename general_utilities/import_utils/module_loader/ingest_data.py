@@ -481,7 +481,6 @@ class IngestData(ABC):
         :param pheno_names: List of pheno_names in phenotypes
         :param ignore_base_options: Should base options be ignored when running models? Note that this only affects
             log printing at this stage, NOT covariate processing itself.
-        :param additional_covariates_found: Was an additional covariates file provided on the command-line?
         :param found_categorical_covariates: List of names of additional categorical covariates
         :param found_quantitative_covariates: List of names of additional quantitative covariates
         :param add_covars: Dictionary of additional covariates with per-individual values

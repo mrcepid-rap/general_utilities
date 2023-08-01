@@ -311,29 +311,25 @@ def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: p
 def define_covariate_string(found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
                             is_binary: bool, add_array: bool, ignore_base: bool) -> str:
 
-    suffix = ''
-    if len(found_quantitative_covariates) > 0:
-        quant_covars_join = ','.join(found_quantitative_covariates)
-        suffix = f'{suffix} --covarColList PC{1:10},age,age_squared,sex,{quant_covars_join} '
-    else:
-        suffix = suffix + '--covarColList PC{1:10},age,age_squared,sex '
+    quant_covars = [] if ignore_base else ['PC{1:10}', 'age', 'age_squared', 'sex']
+    quant_covars.extend(found_quantitative_covariates)
 
-    if len(found_categorical_covariates) > 0:
-        cat_covars_join = ','.join(found_categorical_covariates)
-        if add_array:
-            suffix = suffix + '--catCovarList wes_batch,array_batch,' + cat_covars_join + ' '
-        else:
-            suffix = suffix + '--catCovarList wes_batch,' + cat_covars_join + ' '
-    else:
-        if add_array:
-            suffix = suffix + '--catCovarList wes_batch,array_batch '
-        else:
-            suffix = suffix + '--catCovarList wes_batch '
+    cat_covars = [] if ignore_base else (['wes_batch', 'array_batch'] if add_array else ['wes_batch'])
+    cat_covars.extend(found_categorical_covariates)
+
+    covar_string = ''
+    if len(quant_covars) > 0:
+        quant_covars_join = ','.join(quant_covars)
+        covar_string += f'--covarColList {quant_covars_join} '
+
+    if len(cat_covars) > 0:
+        cat_covars_join = ','.join(cat_covars)
+        covar_string += f'--catCovarList {cat_covars_join} '
 
     if is_binary:
-        suffix = suffix + '--bt --firth --approx'
+        covar_string += '--bt --firth --approx '
 
-    return suffix
+    return covar_string
 
 
 def gt_to_float(gt: str) -> float:

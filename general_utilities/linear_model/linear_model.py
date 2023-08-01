@@ -86,8 +86,9 @@ class LinearModelResult:
 
 
 # Setup linear models:
-def linear_model_null(phenotype: str, is_binary: bool,
-                      quantitative_covariates: List[str], categorical_covariates: List[str]) -> LinearModelPack:
+def linear_model_null(phenotype: str, is_binary: bool, ignore_base: bool,
+                      found_quantitative_covariates: List[str],
+                      found_categorical_covariates: List[str]) -> LinearModelPack:
 
     # load covariates and phenotypes
     pheno_covars = pd.read_csv("phenotypes_covariates.formatted.txt",
@@ -107,18 +108,24 @@ def linear_model_null(phenotype: str, is_binary: bool,
             family = sm.families.Gaussian()
 
         # And finally define the formula to be used by all models:
-        # Make sure to define additional covariates as requested by the user...
-        columns = [phenotype, 'sex', 'age', 'age_squared', 'wes_batch'] + ["PC%s" % x for x in range(1, 11)]
-        form_null = f'{phenotype} ~ sex + age + age_squared + C(wes_batch) + ' \
-                    f'{" + ".join(["PC%s" % x for x in range(1, 11)])}'
-        if len(quantitative_covariates) > 0:
-            for covar in quantitative_covariates:
-                columns.append(covar)
-                form_null += f' + {covar}'
-        if len(categorical_covariates) > 0:
-            for covar in categorical_covariates:
-                columns.append(covar)
-                form_null += f' + C({covar})'
+        if ignore_base:
+            quant_covars = []
+            cat_covars = []
+        else:
+            quant_covars = [f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared', 'sex']
+            cat_covars = ['wes_batch']
+
+        quant_covars.extend(found_quantitative_covariates)
+        cat_covars.extend(found_categorical_covariates)
+
+        columns = [phenotype] + quant_covars + cat_covars
+        cat_covars = [f'C({covar})' for covar in cat_covars]
+
+        if len(quant_covars) + len(cat_covars) == 0:
+            form_null = f'{phenotype} ~ 1'
+        else:
+            covars = ' + '.join(quant_covars + cat_covars)
+            form_null = f'{phenotype} ~ {covars}'
 
         form_full = f'{form_null} + has_var'
 

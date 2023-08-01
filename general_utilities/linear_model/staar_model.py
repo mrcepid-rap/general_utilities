@@ -7,7 +7,7 @@ from general_utilities.job_management.command_executor import DockerMount
 
 
 # Generate the NULL model for STAAR
-def staar_null(phenoname: str, is_binary: bool,
+def staar_null(phenoname: str, is_binary: bool, sex: int, ignore_base: bool,
                found_quantitative_covariates: List[str], found_categorical_covariates: List[str]) -> None:
 
     # I have made a custom script in order to generate the STAAR Null model that is installed using pip
@@ -24,11 +24,25 @@ def staar_null(phenoname: str, is_binary: bool,
           f'/test/phenotypes_covariates.formatted.txt ' \
           f'{phenoname} ' \
           f'{is_binary} '
-    if len(found_quantitative_covariates) > 0:
+
+    # Set covariates for the model
+    if ignore_base:
+        quant_covars = []
+        cat_covars = []
+    else:
+        quant_covars = [f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared']
+        if sex == 2:
+            quant_covars.extend('sex')
+        cat_covars = ['wes_batch']
+
+    quant_covars.extend(found_quantitative_covariates)
+    cat_covars.extend(found_categorical_covariates)
+
+    if len(quant_covars) > 0:
         cmd += f'{",".join(found_quantitative_covariates)} '
     else:
         cmd += f'NULL '
-    if len(found_categorical_covariates) > 0:
+    if len(cat_covars) > 0:
         cmd += f'{",".join(found_categorical_covariates)} '
     else:
         cmd += f'NULL '
