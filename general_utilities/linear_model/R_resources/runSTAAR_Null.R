@@ -23,7 +23,7 @@ cat_covars = args[5]
 data_for_STAAR <- fread(covariates_file)
 
 # Set covariates
-data.cols <- c(pheno_name)
+data.cols <- c("FID", pheno_name)
 
 # Need to exclude NA individuals when running PheWAS data.
 data_for_STAAR <- data_for_STAAR[!is.na(get(pheno_name))]
