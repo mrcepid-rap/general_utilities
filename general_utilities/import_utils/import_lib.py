@@ -8,6 +8,9 @@ from typing import Union, Dict, Tuple, List, TypedDict
 
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor
+from general_utilities.mrc_logger import MRCLogger
+
+LOGGER = MRCLogger().get_logger()
 
 
 class DXPath:
@@ -63,6 +66,7 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
     """
 
     # First we have to download the actual data
+    LOGGER.info(f'Downloading {chromosome} bgen')
     bgen_index = chrom_bgen_index['index']
     bgen_sample = chrom_bgen_index['sample']
     bgen = chrom_bgen_index['bgen']
@@ -101,6 +105,7 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
         cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
         cmd_executor.run_cmd_on_docker(cmd)
 
+    LOGGER.info(f'Finished {chromosome} bgen')
 
 def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
     """Download the entire filtered WES variant data set in bgen format
