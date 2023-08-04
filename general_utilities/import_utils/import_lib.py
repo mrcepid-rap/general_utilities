@@ -110,6 +110,7 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
 
     LOGGER.info(f'Finished {chromosome} bgen')
 
+
 def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
     """Download the entire filtered WES variant data set in bgen format
 
