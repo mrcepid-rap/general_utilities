@@ -66,7 +66,6 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
     """
 
     # First we have to download the actual data
-    LOGGER.info(f'Downloading {chromosome} bgen')
     bgen_index = chrom_bgen_index['index']
     bgen_sample = chrom_bgen_index['sample']
     bgen = chrom_bgen_index['bgen']
@@ -75,7 +74,6 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
     dxpy.download_dxfile(bgen_sample.get_id(), f'filtered_bgen/{chromosome}.filtered.sample')
     dxpy.download_dxfile(bgen.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen')
     dxpy.download_dxfile(vep.get_id(), f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
-    LOGGER.info(f'{chromosome} downloaded')
 
     # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
     with Path(f'filtered_bgen/{chromosome}.filtered.sample').open('r') as samp_file, \
@@ -89,7 +87,6 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
                 fixed_samp_bolt.write('0 0 0 D\n')
             else:
                 fixed_samp_bolt.write(f'{line[0]} {line[0]} 0 NA\n')
-    LOGGER.info(f'{chromosome} Sample fixed')
 
     # And then perform filtering if requested
     # keep-fam is required since we are filtering on a bgen (which only keeps a single ID)
@@ -101,8 +98,10 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
               f'--export bgen-1.2 "bits="8 ' \
               f'--out /test/{chromosome}.markers ' \
               f'--keep-fam /test/SAMPLES_Include.txt'
-        cmd_executor.run_cmd_on_docker(cmd)
-        LOGGER.info(f'{chromosome} plink run')
+        if chromosome == '1':
+            cmd_executor.run_cmd_on_docker(cmd, livestream_out=True)
+        else:
+            cmd_executor.run_cmd_on_docker(cmd)
         # And index the file
         cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
         cmd_executor.run_cmd_on_docker(cmd)
