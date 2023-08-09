@@ -514,7 +514,8 @@ class IngestData(ABC):
 
         with base_covariates_file.open('r') as base_covar_reader,\
                 final_covariates_file.open('w', newline='\n') as final_covariates_writer,\
-                Path('SAMPLES_Include.txt').open('w') as include_samples:
+                Path('SAMPLES_Include.txt').open('w') as include_samples,\
+                Path('SAMPLES_Remove.txt').open('w') as remove_samples:
 
             base_covar_csv = csv.DictReader(base_covar_reader, delimiter="\t")
 
@@ -535,10 +536,11 @@ class IngestData(ABC):
                                           delimiter=' ',
                                           extrasaction='ignore',
                                           lineterminator='\n')
-            indv_written = 0  # Just to count the number of samples we will analyse
             combo_writer.writeheader()
 
             num_all_samples = 0
+            indv_written = 0  # Count the number of samples we will analyse
+            indv_exclude = 0  # Count the nunber of samples we WONT analyse
             for indv in base_covar_csv:
                 # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
                 # on sex
@@ -586,12 +588,19 @@ class IngestData(ABC):
                         if sex == 2:
                             indv_written += 1
                             combo_writer.writerow(indv_writer)
-                            include_samples.write(indv['eid'] + "\n")
+                            include_samples.write(f'{indv["eid"]}\n')
                         elif sex == indv_writer['sex']:
                             indv_written += 1
                             combo_writer.writerow(indv_writer)
-                            include_samples.write(indv['eid'] + "\n")
+                            include_samples.write(f'{indv["eid"]}\n"')
+                        else:
+                            remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                            indv_exclude += 1
+                    else:
+                        remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                        indv_exclude += 1
 
         # Print to ensure that total number of individuals is consistent between genetic and covariate/phenotype data
         self._logger.info(f'{"Samples with covariates after include/exclude lists applied":{65}}: {num_all_samples}')
-        self._logger.info(f'{"Number of individuals written to covariate/pheno file":{65}}: {indv_written}')
+        self._logger.info(f'{"Number of individuals WRITTEN to covariate/pheno file":{65}}: {indv_written}')
+        self._logger.info(f'{"Number of individuals EXCLUDED from covariate/pheno file":{65}}: {indv_exclude}')

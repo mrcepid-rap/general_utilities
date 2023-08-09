@@ -75,37 +75,36 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
     dxpy.download_dxfile(bgen.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen')
     dxpy.download_dxfile(vep.get_id(), f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
 
-    # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
-    with Path(f'filtered_bgen/{chromosome}.filtered.sample').open('r') as samp_file, \
-            Path(f'{chromosome}.markers.standard.sample').open('w') as fixed_samp_bolt:
-
-        for line in samp_file:
-            line = line.rstrip().split(" ")
-            if line[0] == 'ID':
-                fixed_samp_bolt.write('ID_1 ID_2 missing sex\n')
-            elif line[2] == 'D':
-                fixed_samp_bolt.write('0 0 0 D\n')
-            else:
-                fixed_samp_bolt.write(f'{line[0]} {line[0]} 0 NA\n')
-
-    # And then perform filtering if requested
-    # keep-fam is required since we are filtering on a bgen (which only keeps a single ID)
-    # Remember that sampleIDs are stored in the bgen in the format created by mrcepid-makebgen
-    if not download_only:
-        cmd_executor = build_default_command_executor()
-        cmd = f'plink2 --threads 4 --bgen /test/filtered_bgen/{chromosome}.filtered.bgen "ref-last" ' \
-              f'--double-id ' \
-              f'--export bgen-1.2 "bits="8 ' \
-              f'--out /test/{chromosome}.markers ' \
-              f'--keep-fam /test/SAMPLES_Include.txt'
-        if chromosome == '1':
-            cmd_executor.run_cmd_on_docker(cmd, livestream_out=True)
-        else:
-            cmd_executor.run_cmd_on_docker(cmd)
-        # And index the file
-        cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
-        cmd_executor.run_cmd_on_docker(cmd)
-        LOGGER.info(f'{chromosome} indexed')
+    # # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
+    # with Path(f'filtered_bgen/{chromosome}.filtered.sample').open('r') as samp_file, \
+    #         Path(f'{chromosome}.markers.standard.sample').open('w') as fixed_samp_bolt:
+    #
+    #     for line in samp_file:
+    #         line = line.rstrip().split(" ")
+    #         if line[0] == 'ID':
+    #             fixed_samp_bolt.write('ID_1 ID_2 missing sex\n')
+    #         elif line[2] == 'D':
+    #             fixed_samp_bolt.write('0 0 0 D\n')
+    #         else:
+    #             fixed_samp_bolt.write(f'{line[0]} {line[0]} 0 NA\n')
+    #
+    # # And then perform filtering if requested
+    # # keep-fam is required since we are filtering on a bgen (which only keeps a single ID)
+    # # Remember that sampleIDs are stored in the bgen in the format created by mrcepid-makebgen
+    # if not download_only:
+    #     cmd_executor = build_default_command_executor()
+    #     cmd = f'plink2 --threads 4 --bgen /test/filtered_bgen/{chromosome}.filtered.bgen "ref-last" ' \
+    #           f'--double-id ' \
+    #           f'--export bgen-1.2 "bits="8 ' \
+    #           f'--out /test/{chromosome}.markers ' \
+    #           f'--keep-fam /test/SAMPLES_Include.txt'
+    #     if chromosome == '1':
+    #         cmd_executor.run_cmd_on_docker(cmd, livestream_out=True)
+    #     else:
+    #         cmd_executor.run_cmd_on_docker(cmd)
+    #     # And index the file
+    #     cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
+    #     cmd_executor.run_cmd_on_docker(cmd)
 
     LOGGER.info(f'Finished {chromosome} bgen')
 
