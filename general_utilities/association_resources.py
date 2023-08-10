@@ -258,7 +258,7 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
 
     # And filter the relevant SAIGE file to just the individuals we want so we can get actual MAC
     cmd_executor = build_default_command_executor()
-    cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.txt -Ob -o /test/' \
+    cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.bcf.txt -Ob -o /test/' \
           f'{tarball_prefix}.{file_prefix}.saige_input.bcf /test/' \
           f'{tarball_prefix}.{file_prefix}.SAIGE.bcf'
     cmd_executor.run_cmd_on_docker(cmd)
@@ -450,3 +450,13 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
 
 
+def get_sample_count() -> int:
+    # Need to define separate min/max MAC files for REGENIE as it defines them slightly differently from BOLT:
+    # First we need the number of individuals that are being processed:
+    with open('SAMPLES_Include.txt') as sample_file:
+        n_samples = 0
+        for _ in sample_file:
+            n_samples += 1
+        sample_file.close()
+
+    return n_samples

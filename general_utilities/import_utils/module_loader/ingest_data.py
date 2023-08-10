@@ -515,6 +515,7 @@ class IngestData(ABC):
         with base_covariates_file.open('r') as base_covar_reader,\
                 final_covariates_file.open('w', newline='\n') as final_covariates_writer,\
                 Path('SAMPLES_Include.txt').open('w') as include_samples,\
+                Path('SAMPLES_Include.bcf.txt').open('w') as include_samples_bcf,\
                 Path('SAMPLES_Remove.txt').open('w') as remove_samples:
 
             base_covar_csv = csv.DictReader(base_covar_reader, delimiter="\t")
@@ -588,11 +589,13 @@ class IngestData(ABC):
                         if sex == 2:
                             indv_written += 1
                             combo_writer.writerow(indv_writer)
-                            include_samples.write(f'{indv["eid"]}\n')
+                            include_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                            include_samples_bcf.write(f'{indv["eid"]}\n')
                         elif sex == indv_writer['sex']:
                             indv_written += 1
                             combo_writer.writerow(indv_writer)
-                            include_samples.write(f'{indv["eid"]}\n"')
+                            include_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                            include_samples_bcf.write(f'{indv["eid"]}\n')
                         else:
                             remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
                             indv_exclude += 1
