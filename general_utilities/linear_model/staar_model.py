@@ -39,11 +39,11 @@ def staar_null(phenoname: str, is_binary: bool, sex: int, ignore_base: bool,
     cat_covars.extend(found_categorical_covariates)
 
     if len(quant_covars) > 0:
-        cmd += f'{",".join(found_quantitative_covariates)} '
+        cmd += f'{",".join(quant_covars)} '
     else:
         cmd += f'NULL '
     if len(cat_covars) > 0:
-        cmd += f'{",".join(found_categorical_covariates)} '
+        cmd += f'{",".join(cat_covars)} '
     else:
         cmd += f'NULL '
     cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
