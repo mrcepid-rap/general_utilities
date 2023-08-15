@@ -436,7 +436,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     # Run bgzip
     cmd_executor = build_default_command_executor()
     bgzip_cmd = f'bgzip /test/{file_path}'
-    cmd_executor.run_cmd_on_docker(bgzip_cmd, print_cmd=True)
+    cmd_executor.run_cmd_on_docker(bgzip_cmd)
 
     # Run tabix, and incorporate comment character if requested
     tabix_cmd = 'tabix '
@@ -445,7 +445,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     if skip_row:
         tabix_cmd += f'-S {skip_row} '
     tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
-    cmd_executor.run_cmd_on_docker(tabix_cmd, print_cmd=True)
+    cmd_executor.run_cmd_on_docker(tabix_cmd)
     
     return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
 

@@ -62,13 +62,14 @@ class Plotter(ABC):
 
     def _run_R_script(self, r_script: Traversable, options: List[Any], out_path: Path) -> Path:
 
-        options = [f'{opt}' for opt in options]
+        options = [f'{opt}' for opt in options]  # have to convert all opts to strings
+        options = " ".join(options)
         plot_cmd = f'Rscript /scripts/{r_script.name} {options}'
 
         script_mount = DockerMount(Path(f'{r_script.parent}/'),
                                    Path('/scripts/'))
-        cmd_executor = build_default_command_executor()
-        cmd_executor.run_cmd_on_docker(plot_cmd, docker_mounts=[script_mount])
+
+        self._cmd_executor.run_cmd_on_docker(plot_cmd, docker_mounts=[script_mount])
 
         return out_path
 
