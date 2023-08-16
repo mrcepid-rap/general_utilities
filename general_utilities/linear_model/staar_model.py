@@ -32,7 +32,7 @@ def staar_null(phenoname: str, is_binary: bool, sex: int, ignore_base: bool,
     else:
         quant_covars = [f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared']
         if sex == 2:
-            quant_covars.extend('sex')
+            quant_covars.append('sex')
         cat_covars = ['wes_batch']
 
     quant_covars.extend(found_quantitative_covariates)
