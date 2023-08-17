@@ -602,6 +602,9 @@ class IngestData(ABC):
                     else:
                         remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
                         indv_exclude += 1
+                else:
+                    remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                    indv_exclude += 1
 
         # Print to ensure that total number of individuals is consistent between genetic and covariate/phenotype data
         self._logger.info(f'{"Samples with covariates after include/exclude lists applied":{65}}: {num_all_samples}')
