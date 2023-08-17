@@ -2,6 +2,7 @@ import os
 import dxpy
 import logging
 
+from pathlib import Path
 from logging import Logger
 
 
@@ -26,12 +27,20 @@ class MRCLogger:
             name = '.'.join(['MRCLogger', name_suffix])
 
         self._logger = logging.getLogger(name)
+        self._log_file = Path('dx_run.log')
 
         if not self._check_previous_handlers():
             if 'DX_JOB_ID' in os.environ:
                 self._logger.addHandler(dxpy.DXLogHandler())
             else:
                 self._logger.addHandler(logging.StreamHandler())
+
+            # Also add a text log
+            file_handler = logging.FileHandler(self._log_file)
+            log_formatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
+            file_handler.setFormatter(log_formatter)
+            self._logger.addHandler(file_handler)
+
             self._logger.propagate = False
             self._logger.setLevel(logging.INFO)
 
@@ -60,3 +69,11 @@ class MRCLogger:
         """
 
         return self._logger
+
+    def get_log_file_path(self) -> Path:
+        """Return the filepath that MRCLogger is writing to
+
+        :return: A Pathlike for the file being written to
+        """
+
+        return self._log_file

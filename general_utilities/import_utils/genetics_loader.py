@@ -26,7 +26,8 @@ class GeneticsLoader:
     """
 
     def __init__(self, bed_file: dxpy.DXFile, fam_file: dxpy.DXFile, bim_file: dxpy.DXFile, sample_files: List[Path],
-                 cmd_executor: CommandExecutor, low_mac_list: dxpy.DXFile = None):
+                 cmd_executor: CommandExecutor, low_mac_list: dxpy.DXFile = None,
+                 sparse_grm: dxpy.DXFile = None, sparse_grm_sample: dxpy.DXFile = None):
 
         self._logger = MRCLogger(__name__).get_logger()
         self._cmd_executor = cmd_executor
@@ -35,8 +36,13 @@ class GeneticsLoader:
         self._fam_file = fam_file
         self._bim_file = bim_file
         self._low_mac_list = low_mac_list
+        self._sparse_grm = sparse_grm
+        self._sparse_grm_sample = sparse_grm_sample
 
         self._ingest_genetic_data()
+        if self._sparse_grm is not None:
+            self.ingest_sparse_matrix(self._sparse_grm, self._sparse_grm_sample)
+
         if len(sample_files) > 0:  # Only do this is sample file(s) are provided to synchronise on
             self._logger.info('Multiple sample data types detected, synchronising sample lists...')
             self._union_sample = self._write_union_sample(sample_files)
@@ -57,8 +63,10 @@ class GeneticsLoader:
         dxpy.download_dxfile(self._bed_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bed')
         dxpy.download_dxfile(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
         dxpy.download_dxfile(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
+
         if self._low_mac_list is not None:
             dxpy.download_dxfile(self._low_mac_list.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
+
         self._logger.info('Genetic array data downloaded...')
 
     @staticmethod
@@ -79,7 +87,7 @@ class GeneticsLoader:
         return sample_set
 
     def _write_union_sample(self, sample_paths: List[Path]) -> Path:
-        """Merge some number of  sample files into a single intersected sample file
+        """Merge some number of sample files into a single intersected sample file
 
         This method uses the :func:`_generate_sample_set` to load 'N' sample files into independent sets,
         finds the intersection of these sets and then writes that intersection to a new sample file. This file is
@@ -182,8 +190,10 @@ class GeneticsLoader:
         # Read in valid samples from the imputed data, crosscheck the valid covariate samples, and write the
         # result to a new file:
         # I am unsure if this is necessary for the dosage format, but going to do it again to be sure...
+        remove_path = Path('SAMPLES_Remove.txt')
+        new_remove_path = Path('SAMPLES_Remove.genetic_matched.txt')
         with self._union_sample.open('r') as sample_file, \
-                Path(f'remove_SAMPLES.txt').open('w') as remove_file:
+                new_remove_path.open('w') as remove_file:
 
             num_exclude = 0
             for sample in sample_file:
@@ -194,12 +204,14 @@ class GeneticsLoader:
 
             self._logger.info(f'{"Number of REMOVE samples":<65}: {num_exclude}')
 
+        new_remove_path.replace(remove_path)
+
     def _generate_filtered_genetic_data(self) -> None:
         """Generates a genetic file plink binary dataset filtered to only individuals we want to include in association
             tests
 
         This method takes the SAMPLES_Include.txt file created by ingest_data OR re-processed using methods included
-        in this class and uses it as the --keep-fam parameter in plink2 to filter the original set of ~500k individuals
+        in this class and uses it as the --keep parameter in plink2 to filter the original set of ~500k individuals
         to those individuals requested by the user. This method will also then return the number of individuals in the
         final dataset using a second plink --validate command to ensure filtering completed properly.
 
@@ -207,7 +219,7 @@ class GeneticsLoader:
         """
         # Generate a plink file to use that only has included individuals:
         cmd = 'plink2 ' \
-              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
+              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep /test/SAMPLES_Include.txt ' \
               '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
         self._cmd_executor.run_cmd_on_docker(cmd)
 
@@ -222,3 +234,25 @@ class GeneticsLoader:
                 count_matcher = re.match('(\\d+) samples \(\\d+ females, \\d+ males; \\d+ founders\) loaded from', line)
                 if count_matcher:
                     self._logger.info(f'{"Plink individuals written":{65}}: {count_matcher.group(1)}')
+
+    @staticmethod
+    def ingest_sparse_matrix(sparse_grm: dxpy.DXFile, sparse_grm_sample: dxpy.DXFile) -> None:
+        """Downloads the sparse matrix for use by GLM / STAAR
+
+        This is included as a static method within this class to allow for easier use by modules which only require
+        the sparse matrix and NOT the plink genetics files, while also keeping it in an obvious place for
+        maintainability purposes.
+
+        :param sparse_grm: A DXFile representation of the sparse genetic matrix for GLM and STAAR
+        :param sparse_grm_sample: A DXFile representation of the corresponding sample file for the sparse genetic matrix
+        :return: None
+        """
+
+        # Make the genetics dir as it might not exist
+        Path("genetics/").mkdir(exist_ok=True)
+
+        # Downloads the sparse matrix
+        dxpy.download_dxfile(sparse_grm.get_id(),
+                             'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx')
+        dxpy.download_dxfile(sparse_grm_sample.get_id(),
+                             'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx.sampleIDs.txt')

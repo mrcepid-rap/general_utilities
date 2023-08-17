@@ -258,7 +258,7 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
 
     # And filter the relevant SAIGE file to just the individuals we want so we can get actual MAC
     cmd_executor = build_default_command_executor()
-    cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.txt -Ob -o /test/' \
+    cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.bcf.txt -Ob -o /test/' \
           f'{tarball_prefix}.{file_prefix}.saige_input.bcf /test/' \
           f'{tarball_prefix}.{file_prefix}.SAIGE.bcf'
     cmd_executor.run_cmd_on_docker(cmd)
@@ -309,31 +309,27 @@ def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: p
 
 # Helper function to decide what covariates are included in the various REGENIE commands
 def define_covariate_string(found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
-                            is_binary: bool, add_array: bool) -> str:
+                            is_binary: bool, add_array: bool, ignore_base: bool) -> str:
 
-    suffix = ''
-    if len(found_quantitative_covariates) > 0:
-        quant_covars_join = ','.join(found_quantitative_covariates)
-        suffix = suffix + '--covarColList PC{1:10},age,age_squared,sex,' + quant_covars_join + ' '
-    else:
-        suffix = suffix + '--covarColList PC{1:10},age,age_squared,sex '
+    quant_covars = [] if ignore_base else ['PC{1:10}', 'age', 'age_squared', 'sex']
+    quant_covars.extend(found_quantitative_covariates)
 
-    if len(found_categorical_covariates) > 0:
-        cat_covars_join = ','.join(found_categorical_covariates)
-        if add_array:
-            suffix = suffix + '--catCovarList wes_batch,array_batch,' + cat_covars_join + ' '
-        else:
-            suffix = suffix + '--catCovarList wes_batch,' + cat_covars_join + ' '
-    else:
-        if add_array:
-            suffix = suffix + '--catCovarList wes_batch,array_batch '
-        else:
-            suffix = suffix + '--catCovarList wes_batch '
+    cat_covars = [] if ignore_base else (['wes_batch', 'array_batch'] if add_array else ['wes_batch'])
+    cat_covars.extend(found_categorical_covariates)
+
+    covar_string = ''
+    if len(quant_covars) > 0:
+        quant_covars_join = ','.join(quant_covars)
+        covar_string += f'--covarColList {quant_covars_join} '
+
+    if len(cat_covars) > 0:
+        cat_covars_join = ','.join(cat_covars)
+        covar_string += f'--catCovarList {cat_covars_join} '
 
     if is_binary:
-        suffix = suffix + '--bt --firth --approx'
+        covar_string += '--bt --firth --approx '
 
-    return suffix
+    return covar_string
 
 
 def gt_to_float(gt: str) -> float:
@@ -454,3 +450,13 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
 
 
+def get_sample_count() -> int:
+    # Need to define separate min/max MAC files for REGENIE as it defines them slightly differently from BOLT:
+    # First we need the number of individuals that are being processed:
+    with open('SAMPLES_Include.txt') as sample_file:
+        n_samples = 0
+        for _ in sample_file:
+            n_samples += 1
+        sample_file.close()
+
+    return n_samples

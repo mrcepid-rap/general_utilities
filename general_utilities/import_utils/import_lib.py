@@ -8,6 +8,9 @@ from typing import Union, Dict, Tuple, List, TypedDict
 
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor
+from general_utilities.mrc_logger import MRCLogger
+
+LOGGER = MRCLogger().get_logger()
 
 
 class DXPath:
@@ -72,9 +75,12 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
     dxpy.download_dxfile(bgen.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen')
     dxpy.download_dxfile(vep.get_id(), f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
 
+    bgen_v2 = Path(f'filtered_bgen/{chromosome}.filtered.sample')
+    bgen_v1 = Path(f'filtered_bgen/{chromosome}.filtered.v1.sample')
+
     # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
-    with Path(f'filtered_bgen/{chromosome}.filtered.sample').open('r') as samp_file, \
-            Path(f'{chromosome}.markers.standard.sample').open('w') as fixed_samp_bolt:
+    with bgen_v2.open('r') as samp_file, \
+            bgen_v1.open('w') as fixed_samp_bolt:
 
         for line in samp_file:
             line = line.rstrip().split(" ")
@@ -85,21 +91,25 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
             else:
                 fixed_samp_bolt.write(f'{line[0]} {line[0]} 0 NA\n')
 
+    bgen_v1.replace(bgen_v2)
+
     # And then perform filtering if requested
     # keep-fam is required since we are filtering on a bgen (which only keeps a single ID)
     # Remember that sampleIDs are stored in the bgen in the format created by mrcepid-makebgen
-    if not download_only:
-        cmd_executor = build_default_command_executor()
-        cmd = f'plink2 --threads 4 --bgen /test/filtered_bgen/{chromosome}.filtered.bgen "ref-last" ' \
-              f'--double-id ' \
-              f'--export bgen-1.2 "bits="8 ' \
-              f'--out /test/{chromosome}.markers ' \
-              f'--keep-fam /test/SAMPLES_Include.txt'
-        cmd_executor.run_cmd_on_docker(cmd)
-
-        # And index the file
-        cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
-        cmd_executor.run_cmd_on_docker(cmd)
+    # if not download_only:
+    #     cmd_executor = build_default_command_executor()
+    #     cmd = f'plink2 --threads 4 --bgen /test/filtered_bgen/{chromosome}.filtered.bgen "ref-last" ' \
+    #           f'--double-id ' \
+    #           f'--export bgen-1.2 "bits="8 ' \
+    #           f'--out /test/{chromosome}.markers ' \
+    #           f'--keep-fam /test/SAMPLES_Include.txt'
+    #     if chromosome == '1':
+    #         cmd_executor.run_cmd_on_docker(cmd, livestream_out=True)
+    #     else:
+    #         cmd_executor.run_cmd_on_docker(cmd)
+    #     # And index the file
+    #     cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
+    #     cmd_executor.run_cmd_on_docker(cmd)
 
 
 def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:

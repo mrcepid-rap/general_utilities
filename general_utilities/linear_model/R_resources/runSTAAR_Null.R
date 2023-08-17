@@ -23,7 +23,7 @@ cat_covars = args[5]
 data_for_STAAR <- fread(covariates_file)
 
 # Set covariates
-data.cols <- c("FID", "age", "age_squared", "wes_batch", "sex", paste0("PC", seq(1,10)), pheno_name)
+data.cols <- c("FID", pheno_name)
 
 # Need to exclude NA individuals when running PheWAS data.
 data_for_STAAR <- data_for_STAAR[!is.na(get(pheno_name))]
@@ -65,11 +65,13 @@ sparse_kinship@x <- sapply(sparse_kinship@x, function(x) ifelse(x < 0.05, 0.05, 
 
 # Fit the null model for STAAR:
 # These lines just autoformat our formula for association testing
-if (length(unique(data_for_STAAR[,sex])) == 1) {
-  covariates <- c("age", "age_squared","wes_batch",paste0("PC",seq(1,10)),quant_covars,cat_covars)
-} else {
-  covariates <- c("age", "age_squared","sex","wes_batch",paste0("PC",seq(1,10)),quant_covars,cat_covars)
+covariates <- c(quant_covars,cat_covars)
+
+# If no covariates, we have to run an empty model (with just the sparse matrix) so we can pass to the next step
+if (length(covariates) == 0) {
+  covariates <- c(1)
 }
+
 cov.string <- paste(covariates, collapse=" + ")
 formated.formula <- as.formula(paste(pheno_name, cov.string,sep=" ~ "))
 
