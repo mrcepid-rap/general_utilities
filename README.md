@@ -2,6 +2,13 @@
 
 ## Changelog
 
+* v1.2.1
+  * Large number of general changes affecting all runassociationtesting modules. Please see the [RunAssociationTesting README](https://github.com/mrcepid-rap/mrcepid-runassociationtesting/blob/main/Readme.md) for more information
+  * MRCLogger now saves a file containing all log messages printed to it
+    * This DOES NOT save log messages printed by the underlying DNANexus logger
+  * Large refactor of plot_lib
+    * A 'Plotter' interface has been created to facilitate creating classes that make individual plot types
+
 * v1.2.0
   * Updated docstrings for several methods
   * Implemented the CommandExecutor class
