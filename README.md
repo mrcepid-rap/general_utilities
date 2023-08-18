@@ -2,6 +2,9 @@
 
 ## Changelog
 
+* v1.2.1a
+  * Emergency bug fix for the SAMPLES_Exclude file
+
 * v1.2.1
   * Large number of general changes affecting all runassociationtesting modules. Please see the [RunAssociationTesting README](https://github.com/mrcepid-rap/mrcepid-runassociationtesting/blob/main/Readme.md) for more information
   * MRCLogger now saves a file containing all log messages printed to it

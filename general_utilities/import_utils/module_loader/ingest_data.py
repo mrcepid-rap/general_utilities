@@ -305,10 +305,11 @@ class IngestData(ABC):
 
         # 4. Generate A set of all possible samples to include in this analysis
         genetics_samples = set()
-
+        total_base_samples = 0
         with Path('base_covariates.covariates').open('r') as base_covariates_file:
             base_covar_reader = csv.DictReader(base_covariates_file, delimiter="\t")
             for indv in base_covar_reader:
+                total_base_samples += 1
                 eid = indv['eid']
                 genetics_status = int(indv['genetics_qc_pass'])
 
@@ -327,6 +328,7 @@ class IngestData(ABC):
                             genetics_samples.add(eid)
             base_covariates_file.close()
 
+        self._logger.info(f'{"Total samples in base_covariates file":{65}}: {total_base_samples}')
         self._logger.info(f'{"Total samples after inclusion/exclusion lists applied":{65}}: {len(genetics_samples)}')
         return genetics_samples
 
@@ -602,6 +604,9 @@ class IngestData(ABC):
                     else:
                         remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
                         indv_exclude += 1
+                else:
+                    remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                    indv_exclude += 1
 
         # Print to ensure that total number of individuals is consistent between genetic and covariate/phenotype data
         self._logger.info(f'{"Samples with covariates after include/exclude lists applied":{65}}: {num_all_samples}')

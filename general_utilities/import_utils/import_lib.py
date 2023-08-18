@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Union, Dict, Tuple, List, TypedDict
 
 from general_utilities.association_resources import download_dxfile_by_name
-from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger().get_logger()
@@ -50,7 +49,7 @@ class BGENInformation(TypedDict):
     vep: dxpy.DXFile
 
 
-def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, download_only: bool = False) -> None:
+def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> None:
     """Download and process a bgen file when requested
 
     This method is written as a helper to classes that need to access filtered and annotated WES variants. It will
@@ -92,24 +91,6 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str, downlo
                 fixed_samp_bolt.write(f'{line[0]} {line[0]} 0 NA\n')
 
     bgen_v1.replace(bgen_v2)
-
-    # And then perform filtering if requested
-    # keep-fam is required since we are filtering on a bgen (which only keeps a single ID)
-    # Remember that sampleIDs are stored in the bgen in the format created by mrcepid-makebgen
-    # if not download_only:
-    #     cmd_executor = build_default_command_executor()
-    #     cmd = f'plink2 --threads 4 --bgen /test/filtered_bgen/{chromosome}.filtered.bgen "ref-last" ' \
-    #           f'--double-id ' \
-    #           f'--export bgen-1.2 "bits="8 ' \
-    #           f'--out /test/{chromosome}.markers ' \
-    #           f'--keep-fam /test/SAMPLES_Include.txt'
-    #     if chromosome == '1':
-    #         cmd_executor.run_cmd_on_docker(cmd, livestream_out=True)
-    #     else:
-    #         cmd_executor.run_cmd_on_docker(cmd)
-    #     # And index the file
-    #     cmd = f'bgenix -index -g /test/{chromosome}.markers.bgen'
-    #     cmd_executor.run_cmd_on_docker(cmd)
 
 
 def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
