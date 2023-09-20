@@ -64,6 +64,10 @@ class GeneticsLoader:
         dxpy.download_dxfile(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
         dxpy.download_dxfile(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
 
+        print(f'bed size {Path("genetics/UKBB_470K_Autosomes_QCd.bed").stat().st_size}')
+        print(f'bim size {Path("genetics/UKBB_470K_Autosomes_QCd.bim").stat().st_size}')
+        print(f'fam size {Path("genetics/UKBB_470K_Autosomes_QCd.fam").stat().st_size}')
+
         if self._low_mac_list is not None:
             dxpy.download_dxfile(self._low_mac_list.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
 
@@ -221,13 +225,17 @@ class GeneticsLoader:
         cmd = 'plink2 ' \
               '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep /test/SAMPLES_Include.txt ' \
               '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-        self._cmd_executor.run_cmd_on_docker(cmd)
+        self._cmd_executor.run_cmd_on_docker(cmd, livestream_out=True)
+
+        print(f'bed size {Path("genetics/UKBB_470K_Autosomes_QCd_WBA.bed").stat().st_size}')
+        print(f'bim size {Path("genetics/UKBB_470K_Autosomes_QCd_WBA.bim").stat().st_size}')
+        print(f'fam size {Path("genetics/UKBB_470K_Autosomes_QCd_WBA.fam").stat().st_size}')
 
         # I have to do this to recover the sample information from plink
         cmd = 'plink2 ' \
               '--bfile /test/genetics/UKBB_470K_Autosomes_QCd_WBA ' \
               '--validate'
-        self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
+        self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'), livestream_out=True)
 
         with Path('plink_filtered.out').open('r') as plink_out:
             for line in plink_out:
