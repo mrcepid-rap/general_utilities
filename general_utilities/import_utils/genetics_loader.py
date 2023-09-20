@@ -147,12 +147,12 @@ class GeneticsLoader:
                 sample = sample.rstrip().split()
                 if sample[0] != "ID_1" and sample[0] != "0":
                     testing_samples.add(sample[1])
-            self._logger.info(f'{"Number of dosage / imputed samples":<40}: {len(testing_samples)}')
+            self._logger.info(f'{"Number of dosage / imputed samples":<65}: {len(testing_samples)}')
 
             # Genetic/covariate should be identical since we process them earlier, but just making sure here...
             genetic_samples = set()
             for sample in include_file:
-                sample = sample.rstrip()
+                sample = sample.rstrip().split()[0]
                 genetic_samples.add(sample)
 
             self._logger.info(f'{"Number of .bed samples":<65}: {len(genetic_samples)}')
@@ -225,17 +225,13 @@ class GeneticsLoader:
         cmd = 'plink2 ' \
               '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep /test/SAMPLES_Include.txt ' \
               '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-        self._cmd_executor.run_cmd_on_docker(cmd, livestream_out=True)
-
-        print(f'bed size {Path("genetics/UKBB_470K_Autosomes_QCd_WBA.bed").stat().st_size}')
-        print(f'bim size {Path("genetics/UKBB_470K_Autosomes_QCd_WBA.bim").stat().st_size}')
-        print(f'fam size {Path("genetics/UKBB_470K_Autosomes_QCd_WBA.fam").stat().st_size}')
+        self._cmd_executor.run_cmd_on_docker(cmd)
 
         # I have to do this to recover the sample information from plink
         cmd = 'plink2 ' \
               '--bfile /test/genetics/UKBB_470K_Autosomes_QCd_WBA ' \
               '--validate'
-        self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'), livestream_out=True)
+        self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 
         with Path('plink_filtered.out').open('r') as plink_out:
             for line in plink_out:
