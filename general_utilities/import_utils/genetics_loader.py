@@ -64,12 +64,6 @@ class GeneticsLoader:
         dxpy.download_dxfile(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
         dxpy.download_dxfile(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
 
-        self._cmd_executor.run_cmd('md5sum genetics/UKBB_470K_Autosomes_QCd.bed', livestream_out=True)
-        cmd = 'plink2 ' \
-              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd ' \
-              '--validate'
-        self._cmd_executor.run_cmd_on_docker(cmd, livestream_out=True)
-
         if self._low_mac_list is not None:
             dxpy.download_dxfile(self._low_mac_list.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
 
@@ -219,7 +213,7 @@ class GeneticsLoader:
         This method takes the SAMPLES_Include.txt file created by ingest_data OR re-processed using methods included
         in this class and uses it as the --keep parameter in plink2 to filter the original set of ~500k individuals
         to those individuals requested by the user. This method will also then return the number of individuals in the
-        final dataset using a second plink --validate command to ensure filtering completed properly.
+        final dataset to ensure filtering completed properly.
 
         :return: None
         """
@@ -227,17 +221,12 @@ class GeneticsLoader:
         cmd = 'plink2 ' \
               '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
               '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-        self._cmd_executor.run_cmd_on_docker(cmd)
-
-        # I have to do this to recover the sample information from plink
-        cmd = 'plink2 ' \
-              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd_WBA ' \
-              '--validate'
         self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 
+        # I have to do this to recover the sample information from plink
         with Path('plink_filtered.out').open('r') as plink_out:
             for line in plink_out:
-                count_matcher = re.match('(\\d+) samples \(\\d+ females, \\d+ males; \\d+ founders\) loaded from', line)
+                count_matcher = re.match('(\\d+) samples \(\\d+ females, \\d+ males; \\d+ founders\) remaining after', line)
                 if count_matcher:
                     self._logger.info(f'{"Plink individuals written":{65}}: {count_matcher.group(1)}')
 
