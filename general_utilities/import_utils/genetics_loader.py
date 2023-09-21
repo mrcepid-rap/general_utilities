@@ -184,7 +184,7 @@ class GeneticsLoader:
             for indv in base_covar_reader:
                 if indv['FID'] in valid_samples:
                     combo_writer.writerow(indv)
-                    new_include_file.write(f'{indv["FID"]}\n')
+                    new_include_file.write(f'{indv["FID"]} {indv["FID"]}\n')
                     indv_written += 1
 
             self._logger.info(f'{"Number of INCLUDE samples":<65}: {indv_written}')
@@ -205,7 +205,7 @@ class GeneticsLoader:
             for sample in sample_file:
                 data = sample.rstrip().split()
                 if data[1] not in valid_samples and data[0] != "ID_1" and data[0] != "0":
-                    remove_file.write(f'{data[1]}\t{data[1]}\n')
+                    remove_file.write(f'{data[1]} {data[1]}\n')
                     num_exclude += 1
 
             self._logger.info(f'{"Number of REMOVE samples":<65}: {num_exclude}')
@@ -225,7 +225,7 @@ class GeneticsLoader:
         """
         # Generate a plink file to use that only has included individuals:
         cmd = 'plink2 ' \
-              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep /test/SAMPLES_Include.txt ' \
+              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
               '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
         self._cmd_executor.run_cmd_on_docker(cmd)
 
