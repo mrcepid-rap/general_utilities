@@ -64,9 +64,11 @@ class GeneticsLoader:
         dxpy.download_dxfile(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
         dxpy.download_dxfile(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
 
-        print(f'bed size {Path("genetics/UKBB_470K_Autosomes_QCd.bed").stat().st_size}')
-        print(f'bim size {Path("genetics/UKBB_470K_Autosomes_QCd.bim").stat().st_size}')
-        print(f'fam size {Path("genetics/UKBB_470K_Autosomes_QCd.fam").stat().st_size}')
+        self._cmd_executor.run_cmd('md5sum genetics/UKBB_470K_Autosomes_QCd.bed', livestream_out=True)
+        cmd = 'plink2 ' \
+              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd ' \
+              '--validate'
+        self._cmd_executor.run_cmd_on_docker(cmd, livestream_out=True)
 
         if self._low_mac_list is not None:
             dxpy.download_dxfile(self._low_mac_list.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
