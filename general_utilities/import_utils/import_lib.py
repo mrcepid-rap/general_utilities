@@ -60,7 +60,6 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> Non
     :param chrom_bgen_index: An object of :func:`BGENInformation` containing :func:`dxpy.DXFile` objects for the bgen
         for :param chromosome:
     :param chromosome: Which chromosome to limit analyses to
-    :param download_only: boolean indicating whether to just download and do not do any filtering. True = do not filter
     :return: None
     """
 
