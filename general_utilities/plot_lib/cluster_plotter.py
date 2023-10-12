@@ -54,9 +54,9 @@ class ClusterPlotter(Plotter):
 
         # No need for more than ~10k samples to do ld calculation with.
         if len(full_samples) < 1E4:
-            subset_samples = random.sample(full_samples, 10000)
-        else:
             subset_samples = full_samples.copy()
+        else:
+            subset_samples = random.sample(full_samples, 10000)
 
         return full_samples, subset_samples
 
