@@ -185,6 +185,7 @@ class SubjobUtility:
                                   f'function: {job["function"]}\n'
                                   f'instance: {job["instance_type"]}\n')
                 dxjob = job['job_type'].value()
+                self._logger.info(type(dxjob))
                 dxjob = dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'])
                 self._logger.info('Job launch info below')
                 self._logger.info(dxjob)
