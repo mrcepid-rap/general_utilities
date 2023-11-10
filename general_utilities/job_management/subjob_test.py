@@ -38,7 +38,7 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
     LOGGER.info('Attempting to create subjobs...')
     subjob_launcher = SubjobUtility()
     for chr in range(1,23):
-        subjob_launcher.launch_job('general_utilities.subjob_test.tabix_subjob',
+        subjob_launcher.launch_job('tabix_subjob',
                                    inputs={'input_table': {'$dnanexus_link': bgzip_dxlink.get_id()}, 'chromosome': chr},
                                    outputs=['chromosome'])
 
@@ -48,11 +48,3 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
         LOGGER.info(f'This chromosome worked: {output}')
 
 
-@dxpy.entry_point('tabix_subjob')
-def run_subjob(input_table: dict, chromosome: str):
-
-    download_dxfile_by_name(input_table, print_status=True)
-
-    output = {'chromosome': chromosome}
-
-    return output
