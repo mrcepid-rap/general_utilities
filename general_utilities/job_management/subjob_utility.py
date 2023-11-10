@@ -8,6 +8,8 @@ from time import sleep
 from datetime import datetime
 from typing import TypedDict, Dict, Any, List, Iterator, Optional
 
+from general_utilities.mrc_logger import MRCLogger
+
 
 class Environment(Enum):
 
@@ -53,6 +55,8 @@ class JobStatus(Enum):
 class SubjobUtility:
 
     def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500):
+
+        self._logger = MRCLogger(__name__).get_logger()
 
         self._concurrent_job_limit = concurrent_job_limit
         self._incrementor = incrementor
@@ -133,7 +137,7 @@ class SubjobUtility:
         # Close the queue to future job submissions to save my sanity for weird edge cases
         self._queue_closed = True
 
-        print("{0:65}: {val}".format("Total number of jobs to iterate through", val=self._total_jobs))
+        self._logger.info("{0:65}: {val}".format("Total number of jobs to iterate through", val=self._total_jobs))
 
         # Keep going until we get every job submitted or finished...
         while len(self._job_queue) > 0 or len(self._job_running.keys()) > 0:
@@ -142,19 +146,19 @@ class SubjobUtility:
             sleep(60)
 
         if len(self._job_failed) > 0:
-            print('All jobs completed, printing failed jobs...')
+            self._logger.info('All jobs completed, printing failed jobs...')
             for failed_job in self._job_failed:
-                print(f'FAILED: {failed_job}')
+                self._logger.error(f'FAILED: {failed_job}')
         else:
-            print('All jobs completed, No failed jobs...')
+            self._logger.info('All jobs completed, No failed jobs...')
 
     def _print_status(self):
-        print(f'{"Jobs currently in the queue":{65}}: {len(self._job_queue)}')
-        print(f'{"Jobs currently running":{65}}: {len(self._job_running.keys())}')
-        print(f'{"Jobs failed":{65}}: {len(self._job_failed)}')
+        self._logger.info(f'{"Jobs currently in the queue":{65}}: {len(self._job_queue)}')
+        self._logger.info(f'{"Jobs currently running":{65}}: {len(self._job_running.keys())}')
+        self._logger.info(f'{"Jobs failed":{65}}: {len(self._job_failed)}')
 
         curr_time = datetime.today()
-        print(f'{curr_time.isoformat("|", "seconds"):{"-"}^{65}}')
+        self._logger.info(f'{curr_time.isoformat("|", "seconds"):{"-"}^{65}}')
 
     def _monitor_subjobs(self) -> None:
 
@@ -176,9 +180,13 @@ class SubjobUtility:
 
             if job['job_type'] == Environment.DX:
                 # A bit strange, but this enum returns a class that we can instantiate for our specific use-case
+                self._logger.info(f'Attempting to launch job with parameters:\n'
+                                  f'inputs: {job["input"]}\n'
+                                  f'function: {job["function"]}\n'
+                                  f'instance: {job["instance_type"]}\n')
                 dxjob = job['job_type'].value()
                 dxjob = dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'])
-
+                sleep(10)
             elif job['job_type'] == Environment.LOCAL:
                 dxapplet = job['job_type'].value(job['function'])
                 dxjob = dxapplet.run(applet_input=job['input'], folder=job['destination'], name=job['name'],
@@ -206,7 +214,7 @@ class SubjobUtility:
 
             self._num_completed_jobs += 1
             if math.remainder(self._num_completed_jobs, self._incrementor) == 0:
-                print(
+                self._logger.info(
                     f'{"Total number of jobs finished":{65}}: {self._num_completed_jobs} / {self._total_jobs} '
                     f'({((self._num_completed_jobs / self._total_jobs) * 100):0.2f}%)')
 
