@@ -45,7 +45,8 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
     subjob_launcher.submit_queue()
 
     for output in subjob_launcher:
-        LOGGER.info(f'This chromosome worked: {output}')
+        t = dxpy.dxlink(output)
+        LOGGER.info(f'This chromosome worked: {t.get("chromosome")}')
 
 
 @dxpy.entry_point('tabix_subjob')

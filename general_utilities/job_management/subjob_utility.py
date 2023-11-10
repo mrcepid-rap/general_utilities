@@ -180,10 +180,6 @@ class SubjobUtility:
 
             if job['job_type'] == Environment.DX:
                 # A bit strange, but this enum returns a class that we can instantiate for our specific use-case
-                self._logger.info(f'Attempting to launch job with parameters:\n'
-                                  f'inputs: {job["input"]}\n'
-                                  f'function: {job["function"]}\n'
-                                  f'instance: {job["instance_type"]}\n')
                 dxjob = job['job_type'].value()
                 dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'])
 
