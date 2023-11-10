@@ -32,18 +32,14 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
                 tabix_csv.writerow(write_dict)
     LOGGER.info('Finished processing tabix file...')
 
-    output_bgzip, output_tbi = bgzip_and_tabix(output_tsv)
-    LOGGER.info('bgzipped new tabix file')
-
-    bgzip_dxlink = generate_linked_dx_file(output_bgzip)
-    tbi_dxlink = generate_linked_dx_file(output_tbi)
-    LOGGER.info(f'Uploaded files {bgzip_dxlink} and {tbi_dxlink}')
+    bgzip_dxlink = generate_linked_dx_file(output_tsv)
+    LOGGER.info(f'Uploaded file {output_tsv}')
 
     LOGGER.info('Attempting to create subjobs...')
     subjob_launcher = SubjobUtility()
     for chr in range(1,23):
         subjob_launcher.launch_job('tabix_subjob',
-                                   inputs={'input_table': bgzip_dxlink, 'input_index': tbi_dxlink, 'chromosome': chr},
+                                   inputs={'input_table': output_tsv, 'chromosome': chr},
                                    outputs=['chromosome'])
 
     subjob_launcher.submit_queue()
@@ -53,10 +49,9 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
 
 
 @dxpy.entry_point('tabix_subjob')
-def run_subjob(input_table: dict, input_index: dict, chromosome: str):
+def run_subjob(input_table: dict, chromosome: str):
 
     download_dxfile_by_name(input_table, print_status=True)
-    download_dxfile_by_name(input_index, print_status=True)
 
     output = {'chromosome': chromosome}
 
