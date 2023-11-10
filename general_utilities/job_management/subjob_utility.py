@@ -185,10 +185,8 @@ class SubjobUtility:
                                   f'function: {job["function"]}\n'
                                   f'instance: {job["instance_type"]}\n')
                 dxjob = job['job_type'].value()
-                self._logger.info(type(dxjob))
-                dxjob = dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'])
-                self._logger.info('Job launch info below')
-                self._logger.info(dxjob)
+                dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'])
+
             elif job['job_type'] == Environment.LOCAL:
                 dxapplet = job['job_type'].value(job['function'])
                 dxjob = dxapplet.run(applet_input=job['input'], folder=job['destination'], name=job['name'],
