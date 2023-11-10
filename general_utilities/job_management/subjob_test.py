@@ -44,15 +44,19 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
 
     subjob_launcher.submit_queue()
 
+    output_files = []
+
     for output in subjob_launcher:
         for subjob_output in output:
             if 'id' in subjob_output['$dnanexus_link']:
-                download_dxfile_by_name(subjob_output)
+                output_files.append(subjob_output)
             elif 'field' in subjob_output['$dnanexus_link']:
                 link = subjob_output['$dnanexus_link']
                 field = link['field']
                 field_value = dxpy.DXJob(link['job']).describe()['output'][field]
                 LOGGER.info(f'Output for {field}: {field_value}')
+
+    return output_files
 
 
 @dxpy.entry_point('tabix_subjob')
