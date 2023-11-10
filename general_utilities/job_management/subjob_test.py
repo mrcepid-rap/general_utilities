@@ -33,13 +33,13 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
     LOGGER.info('Finished processing tabix file...')
 
     bgzip_dxlink = generate_linked_dx_file(output_tsv)
-    LOGGER.info(f'Uploaded file {output_tsv}')
+    LOGGER.info(f'Uploaded file {bgzip_dxlink}')
 
     LOGGER.info('Attempting to create subjobs...')
     subjob_launcher = SubjobUtility()
     for chr in range(1,23):
         subjob_launcher.launch_job('tabix_subjob',
-                                   inputs={'input_table': output_tsv, 'chromosome': chr},
+                                   inputs={'input_table': bgzip_dxlink, 'chromosome': chr},
                                    outputs=['chromosome'])
 
     subjob_launcher.submit_queue()
