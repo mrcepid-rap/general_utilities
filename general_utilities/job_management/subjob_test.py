@@ -40,17 +40,40 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
     for chr in range(1,23):
         subjob_launcher.launch_job(function_name='tabix_subjob',
                                    inputs={'input_table': {'$dnanexus_link': bgzip_dxlink.get_id()}, 'chromosome': chr},
-                                   outputs=['chromosome'])
+                                   outputs=['chromosome', 'subset_tsv'])
 
     subjob_launcher.submit_queue()
 
     for output in subjob_launcher:
-        LOGGER.info(f'This chromosome worked: {output}')
+        for subjob_output in output:
+            if 'id' in subjob_output['$dnanexus_link']:
+                download_dxfile_by_name(subjob_output)
+            elif 'field' in subjob_output['$dnanexus_link']:
+                link = subjob_output['$dnanexus_link']
+                field = link['field']
+                field_value = dxpy.DXJob(link['job']).describe()['output'][field]
+                LOGGER.info(f'Output for {field}: {field_value}')
 
 
 @dxpy.entry_point('tabix_subjob')
 def tabix_subjob(input_table: dict, chromosome: str):
-    download_dxfile_by_name(input_table, print_status=True)
-    output = {'chromosome': chromosome}
+    local_tab = download_dxfile_by_name(input_table, print_status=True)
+    output_tab = Path(f'chr{chromosome}.tsv')
+
+    with local_tab.open('r') as local_open,\
+        output_tab.open('w') as local_out:
+
+        local_csv = csv.DictReader(local_open, delimiter='\t')
+        output_csv = csv.DictWriter(local_out, delimiter='\t', fieldnames=local_csv.fieldnames)
+
+        output_csv.writeheader()
+
+        match_string = f'chr{chromosome}'
+
+        for row in local_csv:
+            if row['#CHROM'] == match_string:
+                output_csv.writerow(row)
+
+    output = {'chromosome': chromosome, 'subset_tsv': generate_linked_dx_file(output_tab)}
     return output
 
