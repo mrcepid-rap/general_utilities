@@ -39,7 +39,7 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
     subjob_launcher = SubjobUtility()
     for chr in range(1,23):
         subjob_launcher.launch_job('tabix_subjob',
-                                   inputs={'input_table': bgzip_dxlink, 'chromosome': chr},
+                                   inputs={'input_table': {'$dnanexus_link': bgzip_dxlink.get_id()}, 'chromosome': chr},
                                    outputs=['chromosome'])
 
     subjob_launcher.submit_queue()
