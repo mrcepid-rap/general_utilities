@@ -209,6 +209,7 @@ class SubjobUtility:
         if curr_status.value == RunningStatus.COMPLETE:
             output_list = []
             for output in job['job_info']['outputs']:
+                self._logger.info(f'Printing output: {output}')
                 output_list.append(job['job_class'].get_output_ref(output))
             self._output_array.append(output_list)
 

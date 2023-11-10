@@ -48,3 +48,9 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
         LOGGER.info(f'This chromosome worked: {output}')
 
 
+@dxpy.entry_point('tabix_subjob')
+def tabix_subjob(input_table: dict, chromosome: str):
+    download_dxfile_by_name(input_table, print_status=True)
+    output = {'chromosome': chromosome}
+    return output
+
