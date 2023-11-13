@@ -2,6 +2,15 @@
 
 ## Changelog
 
+* v1.2.2
+  * Changes to how genetic data is loaded due to format changes in the SAMPLE file
+  * Several fixes to subjob utility
+    * Added a `log_update_time` parameter to avoid printing too much information for longer-running jobs
+    * Implemented MRCLogger functionality
+    * Fixed apparent changes in how dxpy handles new subjobs as a call to the `new()` method of a DXJob object, rather than to the DXJob class
+  * Fixed a bug in cluster_plotter where subsampling for R2 calculation purposes was not handled properly
+  * Added a `project_id` parameter to download_dx_file_by_name that accepts a DNANexus project ID
+
 * v1.2.1a
   * Emergency bug fix for the SAMPLES_Exclude file
 
