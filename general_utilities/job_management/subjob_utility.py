@@ -54,12 +54,14 @@ class JobStatus(Enum):
 
 class SubjobUtility:
 
-    def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500):
+    def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
+                 log_update_time: int = 60):
 
         self._logger = MRCLogger(__name__).get_logger()
 
         self._concurrent_job_limit = concurrent_job_limit
         self._incrementor = incrementor
+        self._log_update_time = log_update_time
 
         # Make a queue for job submission and monitoring
         self._job_queue: List[DXJobInfo] = []
@@ -143,7 +145,7 @@ class SubjobUtility:
         while len(self._job_queue) > 0 or len(self._job_running.keys()) > 0:
             self._print_status()
             self._monitor_subjobs()
-            sleep(60)
+            sleep(self._log_update_time)
 
         if len(self._job_failed) > 0:
             self._logger.info('All jobs completed, printing failed jobs...')
