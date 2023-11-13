@@ -356,7 +356,8 @@ def gt_to_float(gt: str) -> float:
         return float('NaN')
 
 
-def download_dxfile_by_name(file: Union[dict, str, dxpy.DXFile], print_status: bool = True) -> Path:
+def download_dxfile_by_name(file: Union[dict, str, dxpy.DXFile], project_id: str = None,
+                            print_status: bool = True) -> Path:
     """Download a dxfile and downloads to the file 'name' as given by dxfile.describe()
 
     This method can take either:
@@ -372,6 +373,8 @@ def download_dxfile_by_name(file: Union[dict, str, dxpy.DXFile], print_status: b
     And will then download this file to the local environment using the remote name of the file.
 
     :param file: A DNANexus link / file-ID string, or dxpy.DXFile object to download
+    :param project_id: Optional project ID of the file to be downloaded. Only required if accessing bulk data or
+        downloading a file from another project.
     :param print_status: Should this method print a message indicating that the provided file is being downloaded?
     :return: A Path pointing to the file on the local filesystem
     """
@@ -387,7 +390,7 @@ def download_dxfile_by_name(file: Union[dict, str, dxpy.DXFile], print_status: b
 
     if print_status:
         LOGGER.info(f'Downloading file {curr_filename} ({file.get_id()})')
-    dxpy.download_dxfile(file.get_id(), curr_filename)
+    dxpy.download_dxfile(file.get_id(), curr_filename, project=project_id)
 
     return Path(curr_filename)
 

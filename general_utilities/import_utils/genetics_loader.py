@@ -143,12 +143,12 @@ class GeneticsLoader:
                 sample = sample.rstrip().split()
                 if sample[0] != "ID_1" and sample[0] != "0":
                     testing_samples.add(sample[1])
-            self._logger.info(f'{"Number of dosage / imputed samples":<40}: {len(testing_samples)}')
+            self._logger.info(f'{"Number of dosage / imputed samples":<65}: {len(testing_samples)}')
 
             # Genetic/covariate should be identical since we process them earlier, but just making sure here...
             genetic_samples = set()
             for sample in include_file:
-                sample = sample.rstrip()
+                sample = sample.rstrip().split()[0]
                 genetic_samples.add(sample)
 
             self._logger.info(f'{"Number of .bed samples":<65}: {len(genetic_samples)}')
@@ -178,7 +178,7 @@ class GeneticsLoader:
             for indv in base_covar_reader:
                 if indv['FID'] in valid_samples:
                     combo_writer.writerow(indv)
-                    new_include_file.write(f'{indv["FID"]}\n')
+                    new_include_file.write(f'{indv["FID"]} {indv["FID"]}\n')
                     indv_written += 1
 
             self._logger.info(f'{"Number of INCLUDE samples":<65}: {indv_written}')
@@ -199,7 +199,7 @@ class GeneticsLoader:
             for sample in sample_file:
                 data = sample.rstrip().split()
                 if data[1] not in valid_samples and data[0] != "ID_1" and data[0] != "0":
-                    remove_file.write(f'{data[1]}\t{data[1]}\n')
+                    remove_file.write(f'{data[1]} {data[1]}\n')
                     num_exclude += 1
 
             self._logger.info(f'{"Number of REMOVE samples":<65}: {num_exclude}')
@@ -213,25 +213,20 @@ class GeneticsLoader:
         This method takes the SAMPLES_Include.txt file created by ingest_data OR re-processed using methods included
         in this class and uses it as the --keep parameter in plink2 to filter the original set of ~500k individuals
         to those individuals requested by the user. This method will also then return the number of individuals in the
-        final dataset using a second plink --validate command to ensure filtering completed properly.
+        final dataset to ensure filtering completed properly.
 
         :return: None
         """
         # Generate a plink file to use that only has included individuals:
         cmd = 'plink2 ' \
-              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep /test/SAMPLES_Include.txt ' \
+              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
               '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-        self._cmd_executor.run_cmd_on_docker(cmd)
-
-        # I have to do this to recover the sample information from plink
-        cmd = 'plink2 ' \
-              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd_WBA ' \
-              '--validate'
         self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 
+        # I have to do this to recover the sample information from plink
         with Path('plink_filtered.out').open('r') as plink_out:
             for line in plink_out:
-                count_matcher = re.match('(\\d+) samples \(\\d+ females, \\d+ males; \\d+ founders\) loaded from', line)
+                count_matcher = re.match('(\\d+) samples \(\\d+ females, \\d+ males; \\d+ founders\) remaining after', line)
                 if count_matcher:
                     self._logger.info(f'{"Plink individuals written":{65}}: {count_matcher.group(1)}')
 
