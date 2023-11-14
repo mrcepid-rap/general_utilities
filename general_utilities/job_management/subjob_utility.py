@@ -6,7 +6,7 @@ import dxpy.api
 from enum import Enum, auto
 from time import sleep
 from datetime import datetime
-from typing import TypedDict, Dict, Any, List, Iterator, Optional
+from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
 from general_utilities.mrc_logger import MRCLogger
 
@@ -112,7 +112,7 @@ class SubjobUtility:
 
         self._job_queue.append(input_parameters)
 
-    def launch_job(self, function_name: str, inputs: Dict[str, Any], outputs: List[str] = None,
+    def launch_job(self, function: Callable, inputs: Dict[str, Any], outputs: List[str] = None,
                    instance_type: str = None, name: str = None) -> None:
 
         if self._queue_closed is True:
@@ -123,7 +123,7 @@ class SubjobUtility:
         if outputs is None:
             outputs: List[str] = []
 
-        input_parameters: DXJobInfo = {'function': function_name,
+        input_parameters: DXJobInfo = {'function': function.__name__,
                                        'input': inputs,
                                        'outputs': outputs,
                                        'job_type': Environment.DX,
