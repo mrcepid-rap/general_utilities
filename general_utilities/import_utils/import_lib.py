@@ -68,6 +68,7 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> Non
     bgen_sample = chrom_bgen_index['sample']
     bgen = chrom_bgen_index['bgen']
     vep = chrom_bgen_index['vep']
+
     dxpy.download_dxfile(bgen_index.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
     dxpy.download_dxfile(bgen_sample.get_id(), f'filtered_bgen/{chromosome}.filtered.sample')
     dxpy.download_dxfile(bgen.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen')
