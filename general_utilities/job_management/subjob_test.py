@@ -4,7 +4,6 @@ import dxpy
 import gzip
 from pathlib import Path
 from general_utilities.job_management.subjob_utility import SubjobUtility
-from general_utilities.job_management.subjob_subpackage.subjob_test import tabix_subjob
 from general_utilities.association_resources import download_dxfile_by_name, generate_linked_dx_file
 from general_utilities.mrc_logger import MRCLogger
 
@@ -39,7 +38,7 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
     LOGGER.info('Attempting to create subjobs...')
     subjob_launcher = SubjobUtility()
     for chr in range(1,23):
-        subjob_launcher.launch_job(function_name='tabix_subjob',
+        subjob_launcher.launch_job(function_name='general_utilities.job_management.subjob_subpackage.subjob_test.tabix_subjob',
                                    inputs={'input_table': {'$dnanexus_link': bgzip_dxlink.get_id()}, 'chromosome': chr},
                                    outputs=['chromosome', 'subset_tsv'])
 
