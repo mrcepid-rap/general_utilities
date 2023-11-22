@@ -7,32 +7,10 @@ from pathlib import Path
 from typing import Union, Dict, Tuple, List, TypedDict
 
 from general_utilities.association_resources import download_dxfile_by_name
+from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger().get_logger()
-
-
-class DXPath:
-    """A simple helper class the stores both remote DX and local file Path objects
-
-    This is technically a wrapper around Path that stores an additional Pathlike describing the location of the
-    file on the DNANexus platform. .local and .remote access the local and remote Paths, respectively.
-
-    :param remote_path: Path on the DNANexus filesystem
-    :param local_path: Path on the local AWS instance, if not provided, will be placed in the root directory with the
-        name given by :func:`remote.name`
-
-    :ivar remote: Path on the DNANexus filesystem
-    :ivar local: Path on the local AWS instance
-    """
-
-    def __init__(self, remote_path: Union[str, Path], local_path: Union[str, Path] = None):
-
-        self.remote = Path(remote_path)
-        if local_path is None:
-            self.local = Path(f'./{self.remote.name}')
-        else:
-            self.local = Path(local_path)
 
 
 class BGENInformation(TypedDict):
@@ -42,11 +20,13 @@ class BGENInformation(TypedDict):
     :cvar index: A .bgen.bgi index file for :cvar bgen:
     :cvar sample: A .sample file containing sample information for :cvar bgen:
     :cvar vep: The per-variant annotation for all or a filtered subset (typically on INFO / MAF) variants in :cvar bgen:
+    :cvar vepidx: The index for the per-variant VEP annotation
     """
-    bgen: dxpy.DXFile
-    index: dxpy.DXFile
-    sample: dxpy.DXFile
-    vep: dxpy.DXFile
+    bgen: dict
+    index: dict
+    sample: dict
+    vep: dict
+    vepidx: dict
 
 
 def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> None:
@@ -69,10 +49,10 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> Non
     bgen = chrom_bgen_index['bgen']
     vep = chrom_bgen_index['vep']
 
-    dxpy.download_dxfile(bgen_index.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
-    dxpy.download_dxfile(bgen_sample.get_id(), f'filtered_bgen/{chromosome}.filtered.sample')
-    dxpy.download_dxfile(bgen.get_id(), f'filtered_bgen/{chromosome}.filtered.bgen')
-    dxpy.download_dxfile(vep.get_id(), f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
+    dxpy.download_dxfile(bgen_index, f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
+    dxpy.download_dxfile(bgen_sample, f'filtered_bgen/{chromosome}.filtered.sample')
+    dxpy.download_dxfile(bgen, f'filtered_bgen/{chromosome}.filtered.bgen')
+    dxpy.download_dxfile(vep, f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
 
     bgen_v2 = Path(f'filtered_bgen/{chromosome}.filtered.sample')
     bgen_v1 = Path(f'filtered_bgen/{chromosome}.filtered.v1.sample')
@@ -114,10 +94,12 @@ def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
         bgen_index_csv = csv.DictReader(bgen_index, delimiter='\t')
         bgen_dict: Dict[str, BGENInformation] = dict()
         for line in bgen_index_csv:
-            bgen_dict[line['chrom']] = {'index': dxpy.DXFile(line['bgen_index_dxid']),
-                                        'sample': dxpy.DXFile(line['sample_dxid']),
-                                        'bgen': dxpy.DXFile(line['bgen_dxid']),
-                                        'vep': dxpy.DXFile(line['vep_dxid'])}
+            bgen_info: BGENInformation = {'index': dxpy.dxlink(line['bgen_index_dxid']),
+                                          'sample': dxpy.dxlink(line['sample_dxid']),
+                                          'bgen': dxpy.dxlink(line['bgen_dxid']),
+                                          'vep': dxpy.dxlink(line['vep_dxid']),
+                                          'vepidx': dxpy.dxlink(line['vep_index_dxid'])}
+            bgen_dict[line['chrom']] = bgen_info
 
     return bgen_dict
 
@@ -201,3 +183,18 @@ def process_regenie_step_one(regenie_run_location: dxpy.DXFile) -> bool:
             tar = tarfile.open(tarball_path, 'r:gz')
             tar.extractall()
         return True
+
+
+def initialise_stream(cmd_executor: CommandExecutor, current_project_id: str) -> None:
+
+    LOGGER.info('Establishing stream for .bgen files from imputed data...')
+
+    # Download DXFuse so we can mount the filesystem locally
+    cmd = 'wget https://github.com/dnanexus/dxfuse/releases/download/v0.21/dxfuse-linux'
+    cmd_executor.run_cmd(cmd)
+    Path('dxfuse-linux').chmod(0o557)
+
+    # And then mount the project directory
+    Path('mount/').mkdir()
+    cmd = f'./dxfuse-linux mount/ {current_project_id}'
+    cmd_executor.run_cmd(cmd)

@@ -453,13 +453,17 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
 
 
-def get_sample_count() -> int:
-    # Need to define separate min/max MAC files for REGENIE as it defines them slightly differently from BOLT:
-    # First we need the number of individuals that are being processed:
-    with open('SAMPLES_Include.txt') as sample_file:
-        n_samples = 0
-        for _ in sample_file:
-            n_samples += 1
-        sample_file.close()
+def get_include_sample_ids() -> List[str]:
+    """Get the sample IDs from the SAMPLES_Include.txt file and return them as a List[str]
 
-    return n_samples
+    :return: A List[str] of all sample IDs in the SAMPLES_Include.txt file created by
+        general_utilities.import_utils.module_loader.ingest_data.py
+    """
+
+    with Path('SAMPLES_Include.txt').open('r') as include:
+        samples_list = []
+        for samp in include:
+            samp_id = samp.rstrip().split()[0]  # Have to do this as the file follows plink IID\tFID convention.
+            samples_list.append(samp_id)
+
+    return samples_list

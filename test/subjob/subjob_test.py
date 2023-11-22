@@ -4,7 +4,7 @@ import dxpy
 import gzip
 from pathlib import Path
 from general_utilities.job_management.subjob_utility import SubjobUtility
-from general_utilities.job_management.subjob_subpackage.subjob_test import tabix_subjob
+from subjob.subjob_subpackage.subjob_test import tabix_subjob
 from general_utilities.association_resources import download_dxfile_by_name, generate_linked_dx_file
 from general_utilities.mrc_logger import MRCLogger
 

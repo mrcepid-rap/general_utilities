@@ -5,14 +5,15 @@ from typing import Tuple, List, Dict
 
 import pandas as pd
 
-from adrestia_utilities.import_utils.imputation_loader import GeneticData
+from general_utilities.association_resources import get_include_sample_ids
+from general_utilities.import_utils.import_lib import BGENInformation
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.plot_lib.plotter import Plotter
 
 
 class ClusterPlotter(Plotter):
 
-    def __init__(self, cmd_executor: CommandExecutor, results_table: pd.DataFrame, genetic_data: Dict[str, GeneticData],
+    def __init__(self, cmd_executor: CommandExecutor, results_table: pd.DataFrame, genetic_data: Dict[str, BGENInformation],
                  chrom_column: str, pos_column: str, alt_column: str, id_column: str, p_column: str, csq_column: str,
                  maf_column: str, gene_symbol_column: str, test_name: str = None, sig_threshold: float = 1E-6,
                  clumping_distance=250000):
@@ -46,11 +47,8 @@ class ClusterPlotter(Plotter):
 
     def _define_samples(self) -> Tuple[List[str], List[str]]:
 
-        full_samples = []
-        with Path('SAMPLES_Include.txt').open('r') as sample_file:
-            for sample in sample_file:
-                samp_id = sample.rstrip().split()[0]
-                full_samples.append(samp_id)
+        # Get the full list of samples
+        full_samples = get_include_sample_ids()
 
         # No need for more than ~10k samples to do ld calculation with.
         if len(full_samples) < 1E4:

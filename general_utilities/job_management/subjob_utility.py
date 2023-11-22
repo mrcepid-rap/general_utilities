@@ -123,6 +123,13 @@ class SubjobUtility:
         if outputs is None:
             outputs: List[str] = []
 
+        # For future reference, there is an entire logic for why we pass the function to the method rather than the
+        # string representation of the method's name.
+        # 1. To be able to 'see' the methods of other files / packages decorated with dxpy.entry_point(), the class has
+        #    to be imported into the calling file (e.g. 'import from'). Using the string representation makes the python
+        #    interpreter / pycharm think that the import isn't used, so we use the actual function.
+        # 2. We then convert to the string representation below because the DNANexus DXJob call requires a string
+        #    representation.
         input_parameters: DXJobInfo = {'function': function.__name__,
                                        'input': inputs,
                                        'outputs': outputs,

@@ -36,7 +36,7 @@ class Plotter(ABC):
     class inputs as it is very specific and should be unlikely to change.
 
     :param results_table: A table from _some_ genetic association pipeline, typically from imputed markers.
-    :param genetic_data: A dictionary of chromosome keys and GeneticData values pointing to the location of the
+    :param genetic_data: A dictionary of chromosome keys and BGENInformation values pointing to the location of the
         underlying genetic data – MUST be .bgen
     :param chrom_column: The name of the chromosome column in `results_table`
     :param pos_column: The name of the position column in `results_table`
