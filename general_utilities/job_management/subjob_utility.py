@@ -1,5 +1,7 @@
 import math
 import os
+from importlib import import_module
+
 import dxpy
 import inspect
 
@@ -246,3 +248,20 @@ class SubjobUtility:
                     self._job_queue.append(job)
                 else:
                     self._job_failed.append(job)
+
+
+def check_subjob_decorator() -> Optional[str]:
+
+    loaded_module = None
+    job = dxpy.DXJob(dxpy.JOB_ID)
+    if 'module' in job.describe()['properties']:
+        loaded_module = job.describe()['properties']['module']
+        try:
+            import_module(loaded_module)
+        except ModuleNotFoundError:
+            raise
+
+    return loaded_module
+
+
+
