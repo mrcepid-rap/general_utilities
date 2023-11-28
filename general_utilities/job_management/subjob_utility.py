@@ -8,6 +8,8 @@ from time import sleep
 from datetime import datetime
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
+from pandas._libs import properties
+
 from general_utilities.mrc_logger import MRCLogger
 
 
@@ -193,7 +195,8 @@ class SubjobUtility:
             if job['job_type'] == Environment.DX:
                 # A bit strange, but this enum returns a class that we can instantiate for our specific use-case
                 dxjob = job['job_type'].value()
-                dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'])
+                dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'],
+                          properties=job['properties'])
 
             elif job['job_type'] == Environment.LOCAL:
                 dxapplet = job['job_type'].value(job['function'])
