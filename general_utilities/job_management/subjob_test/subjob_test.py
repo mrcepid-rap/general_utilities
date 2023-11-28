@@ -13,9 +13,9 @@ LOGGER = MRCLogger(__name__).get_logger()
 
 def test_subjob(tabix_dxfile: dxpy.DXFile):
 
-    print('----------ENTRY POINT TABLE----------')
-    print(dxpy.utils.exec_utils.ENTRY_POINT_TABLE)
-    print('----------ENTRY POINT TABLE----------')
+    LOGGER.info('----------ENTRY POINT TABLE----------')
+    LOGGER.info(dxpy.utils.exec_utils.ENTRY_POINT_TABLE)
+    LOGGER.info('----------ENTRY POINT TABLE----------')
 
     tabix_downloaded = download_dxfile_by_name(tabix_dxfile, print_status=True)
     output_tsv = Path('column_stripped.tsv')
