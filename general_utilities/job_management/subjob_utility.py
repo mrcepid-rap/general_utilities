@@ -112,7 +112,7 @@ class SubjobUtility:
 
         self._job_queue.append(input_parameters)
 
-    def launch_job(self, function: str, inputs: Dict[str, Any], outputs: List[str] = None,
+    def launch_job(self, function: Callable, inputs: Dict[str, Any], outputs: List[str] = None,
                    instance_type: str = None, name: str = None) -> None:
 
         if self._queue_closed is True:
@@ -130,7 +130,7 @@ class SubjobUtility:
         #    interpreter / pycharm think that the import isn't used, so we use the actual function.
         # 2. We then convert to the string representation below because the DNANexus DXJob call requires a string
         #    representation.
-        input_parameters: DXJobInfo = {'function': function,
+        input_parameters: DXJobInfo = {'function': function.__name__,
                                        'input': inputs,
                                        'outputs': outputs,
                                        'job_type': Environment.DX,
