@@ -60,6 +60,7 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
 
     return output_files
 
+
 @dxpy.entry_point('tabix_subjob')
 def tabix_subjob(input_table: dict, chromosome: str):
     local_tab = download_dxfile_by_name(input_table, print_status=True)

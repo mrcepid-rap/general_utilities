@@ -1,7 +1,7 @@
 import math
 import os
 import dxpy
-import dxpy.api
+import inspect
 
 from enum import Enum, auto
 from time import sleep
@@ -19,6 +19,7 @@ class Environment(Enum):
 
 class DXJobInfo(TypedDict):
     function: str
+    properties: Dict[str, str]
     input: Dict[str, Any]
     outputs: List[str]
     job_type: Environment
@@ -102,6 +103,7 @@ class SubjobUtility:
             outputs: List[str] = []
 
         input_parameters: DXJobInfo = {'function': applet_hash,
+                                       'properties': {},
                                        'input': inputs,
                                        'outputs': outputs,
                                        'job_type': Environment.LOCAL,
@@ -131,6 +133,7 @@ class SubjobUtility:
         # 2. We then convert to the string representation below because the DNANexus DXJob call requires a string
         #    representation.
         input_parameters: DXJobInfo = {'function': function.__name__,
+                                       'properties': {'module': inspect.getmodule(function).__name__},
                                        'input': inputs,
                                        'outputs': outputs,
                                        'job_type': Environment.DX,
