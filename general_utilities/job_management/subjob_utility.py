@@ -10,8 +10,6 @@ from time import sleep
 from datetime import datetime
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
-from pandas._libs import properties
-
 from general_utilities.mrc_logger import MRCLogger
 
 
@@ -58,27 +56,94 @@ class JobStatus(Enum):
 
 
 class SubjobUtility:
+    """A class that contains information on, launches, and monitors subjobs on the DNANexus platform.
+
+    This class functions in two ways, depending on the methods used to queue jobs:
+
+    1. If run from a local machine (e.g., a macbook) via :func:launch_applet() – Will launch new jobs that are
+    not dependent on any current running job
+
+    2. If run from a currently running DNANexus job via :func:launch_job() – Will launch subjobs that are
+    dependent on the current job to be run via the DXJob class
+
+    See individual method documentation for more information, but briefly, the workflow for using this class is
+    the following:
+
+    1. Queue jobs using either the :func:launch_applet() or :func:launch_job(). Do NOT use both with the same
+    constructor (there are checks to prevent this)!
+
+    2. Submit jobs that have been queued with :func:submit_queue(). After calling this method, the queue closes
+    and new jobs can no longer be added to prevent iteration errors when collecting job output.
+
+    3. Collect jobs using the built-in iterator (specified by the :func:__iter__() dunder method).
+
+    A brief example follows::
+
+        # Call this class with the default constructor
+        subjob_utility = SubjobUtility()
+
+        # Add jobs to the queue
+        phenotype = 'cardiac_arrest'
+        for chromosome in range(1,23):
+            subjob_utility.launch_job(function=burden_interaction,
+                                      inputs={'chromosome': chromosome,
+                                              'pheno_name': phenotype},
+                                      outputs=['outfile'],
+                                      instance_type='mem3_ssd1_v2_x8',
+                                      name=f'{chromosome}_{phenotype}_subjob')
+
+        # Launch jobs on DNANexus
+        subjob_utility.submit_queue()
+
+        # Collect outputs:
+        outputs = []
+        for output in subjob_utility:
+            # Each output is stored as dxpy.dxlink() dict in a separate item within the 'output' list
+            for subjob_output in output:
+                link = subjob_output['$dnanexus_link']
+                field = link['field']
+                field_value = dxpy.DXJob(link['job']).describe()['output'][field]
+                print(f'Output for {field}: {field_value}')
+                outputs.append(field_value)
+
+    :param concurrent_job_limit: Number of jobs that can be run at once. Default of 100 is the actual limit for
+        concurrent jobs on the DNANexus platform. It is also wishful in that you will rarely be able to have 100
+        jobs simultaneously running. [100]
+    :param retries: Number of times to retry a job before marking it as a fail. Default is intended to let jobs
+        interrupted by the cloud provider to restart, NOT to fix broken code. [1]
+    :param incrementor: This class will print a status method for every :param:incrementor jobs completed with a
+        percentage of total jobs completed. [500]
+    :param log_update_time: How often should the log of current jobs be printed in seconds. [60]
+    """
 
     def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
                  log_update_time: int = 60):
 
         self._logger = MRCLogger(__name__).get_logger()
 
+        # Dereference class parameters
         self._concurrent_job_limit = concurrent_job_limit
         self._incrementor = incrementor
         self._log_update_time = log_update_time
 
-        # Make a queue for job submission and monitoring
+        # We define three difference queues for use during runtime:
+        # job_queue   – jobs waiting to be submitted
+        # job_running – jobs currently running, with a dict keyed on the DX job-id and with a value of DXJobDict class
+        #   which contains the job class from instantiation and information about the job
+        #   and information about the job
+        # job_failed  – A list of jobs which failed during runtime which, if the job has additional retries, can
+        #   be resubmitted
         self._job_queue: List[DXJobInfo] = []
         self._job_running: Dict[str, DXJobDict] = dict()
         self._job_failed: List[DXJobInfo] = []
 
-        # Job count monitoring
+        # Job type & count monitoring
+        self._queue_type: Optional[Environment] = None
         self._queue_closed = False
         self._total_jobs = 0
         self._num_completed_jobs = 0
 
-        # Set default job parameters
+        # Set default job instance type
         self._retries = retries
         if 'DX_JOB_ID' in os.environ:
             parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
@@ -89,17 +154,61 @@ class SubjobUtility:
         # Manage returned outputs
         self._output_array = []
 
-    def __iter__(self) -> Iterator:
+    def __iter__(self) -> Iterator[List[dict]]:
+        """Return an iterator over the outputs collected when jobs finish.
+
+        Outputs returned by the class are a list of dictionaries formatted like dxpy.dxlinks:
+
+        output = {'$dnanexus_link': {'field': output_name}}
+
+        The only way to recover the ACTUAL output is to use something like::
+
+            output = dxpy.DXJob(link['job']).describe()['output'][output['$dnanexus_link']['field']
+
+        This will query the job for the actual output. This is not my fault...
+
+        :return: An iterator of output references
+        """
         return iter(self._output_array)
 
-    def __len__(self):
+    def __len__(self) -> int:
+        """Returns the number of outputs currently in the output queue
+
+        :return: The number of outputs currently in the output queue
+        """
         return len(self._output_array)
 
     def launch_applet(self, applet_hash: str, inputs: Dict[str, Any], outputs: List[str] = None,
-                      destination: str = None, instance_type: str = None, name: str = None):
+                      destination: str = None, instance_type: str = None, name: str = None) -> None:
+        """Launch a DNANexus job with the given parameters from a LOCAL machine.
 
+        The only required parameters for this function are :param:applet_hash and :param:inputs. This method will add
+        a job with input parameters provided by this method call to the class :param:self._job_queue.
+
+        DO NOT use this method if operating within a current DNANexus job. There may be unforeseen consequences...
+
+        :param applet_hash: The applet hash for the applet that should be run (e.g., applet-1234567890ABCDEFGabcdefg)
+        :param inputs: The function inputs. These must include all default inputs and be identical to those defined
+            in the dxapp.json inputs section.
+        :param outputs: The function outputs. These must include all default outputs and be identical to those defined
+            in the dxapp.json outputs section. May be 'None' if there are no defined outputs from the given
+            applet. [None]
+        :param destination: Where should outputs be placed on the DNANexus platform. Default places outputs in the root
+            level directory for the executing project (e.g., '/'). [None]
+        :param instance_type: What instance type should be used? Default sets the instance type based on the
+            'instance_type' specification in the dxapp.json. [None]
+        :param name: Name of the job. Default names the job after the executing applet name. [None]
+        """
+
+        # Check if the queue has been closed by submit_queue()
         if self._queue_closed is True:
             raise dxpy.AppError('Cannot submit new subjobs after calling monitor_subjobs()!')
+
+        # Make sure only identical job types have been launched
+        if self._queue_type is Environment.DX:
+            raise dxpy.AppError('Cannot mix jobtypes between launch_applet() and launch_job()!')
+        elif self._queue_type is None:
+            self._queue_type = Environment.LOCAL
 
         self._total_jobs += 1
 
@@ -114,15 +223,37 @@ class SubjobUtility:
                                        'retries': 0,
                                        'destination': f'/{destination}',
                                        'name': f'subjob_{self._total_jobs}' if name is None else None,
-                                       'instance_type': self._default_instance_type if instance_type is None else instance_type}
+                                       'instance_type': instance_type if instance_type else self._default_instance_type}
 
         self._job_queue.append(input_parameters)
 
     def launch_job(self, function: Callable, inputs: Dict[str, Any], outputs: List[str] = None,
                    instance_type: str = None, name: str = None) -> None:
+        """Launch a DNANexus job with the given parameters from a REMOTE machine.
 
+        The only required parameters for this function are :param:applet_hash and :param:inputs. This method will add
+        a job with input parameters provided by this method call to the class :param:self._job_queue.
+
+        DO NOT use this method if operating within a current DNANexus job. There may be unforeseen consequences...
+
+
+        :param function:
+        :param inputs:
+        :param outputs:
+        :param instance_type:
+        :param name:
+        :return:
+        """
+
+        # Check if the queue has been closed by submit_queue()
         if self._queue_closed is True:
             raise dxpy.AppError('Cannot submit new subjobs after calling monitor_subjobs()!')
+
+        # Make sure only identical job types have been launched
+        if self._queue_type is Environment.LOCAL:
+            raise dxpy.AppError('Cannot mix jobtypes between launch_applet() and launch_job()!')
+        elif self._queue_type is None:
+            self._queue_type = Environment.DX
 
         self._total_jobs += 1
 
@@ -144,7 +275,7 @@ class SubjobUtility:
                                        'retries': 0,
                                        'destination': None,
                                        'name': None if name is None else name,
-                                       'instance_type': self._default_instance_type if instance_type is None else instance_type}
+                                       'instance_type': instance_type if instance_type else self._default_instance_type}
 
         self._job_queue.append(input_parameters)
 
@@ -159,7 +290,8 @@ class SubjobUtility:
         while len(self._job_queue) > 0 or len(self._job_running.keys()) > 0:
             self._print_status()
             self._monitor_subjobs()
-            sleep(self._log_update_time)
+            if len(self._job_running.keys()) > 0:
+                sleep(self._log_update_time)
 
         if len(self._job_failed) > 0:
             self._logger.info('All jobs completed, printing failed jobs...')
@@ -198,7 +330,7 @@ class SubjobUtility:
                 # A bit strange, but this enum returns a class that we can instantiate for our specific use-case
                 dxjob = job['job_type'].value()
                 dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'],
-                          properties=job['properties'])
+                          properties=job['properties'], name=job['name'])
 
             elif job['job_type'] == Environment.LOCAL:
                 dxapplet = job['job_type'].value(job['function'])
@@ -251,6 +383,24 @@ class SubjobUtility:
 
 
 def check_subjob_decorator() -> Optional[str]:
+    """This class checks to see if the dx Applet is actually a subjob being run on the DNANexus platform.
+
+    To be able to run subjobs on DNANexus, the class / method MUST be imported using standard python imports (e.g.,
+    import ... from ...) by the instantiating file that contains the dxpy.entry_point('main') decorator. This means
+    that modules (e.g., 'burden') that are dynamically loaded WILL NOT be found in the python classpath prior to
+    DNANexus attempting to launch the subjob with the indicated dxpy.entry_point() decorator. To solve this, we do two
+    things:
+
+    1. For all subjobs being launched, we add a property to the job indicating where this method
+    (check_subjob_decorator) should look for the decorated method (see DXJobInfo in this file for more information).
+
+    2. When the new subjob is launched, we then run this method before dxpy.run() is called to make sure that the
+    decorated method is properly included in the dxpy.utils.exec_utils.ENTRY_POINT_TABLE dict that tells the DNANexus
+    job handler what function to run at startup. This approach uses the import_module function from importlib to
+    dynamically load the requested methods into the python classpath
+
+    :return: The name of the identified module that was loaded by this method or None if no module was loaded
+    """
 
     loaded_module = None
     job = dxpy.DXJob(dxpy.JOB_ID)
