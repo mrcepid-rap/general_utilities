@@ -4,7 +4,7 @@ import dxpy
 import gzip
 from pathlib import Path
 
-from general_utilities.job_management.subjob_test.subjob_subpackage.subjob_test import tabix_subjob
+from general_utilities.job_management.subjob_test.subjob_subpackage.tabix_subjob_testing import tabix_subjob
 from general_utilities.job_management.subjob_utility import SubjobUtility
 from general_utilities.association_resources import download_dxfile_by_name, generate_linked_dx_file
 from general_utilities.mrc_logger import MRCLogger
@@ -13,7 +13,7 @@ from general_utilities.mrc_logger import MRCLogger
 LOGGER = MRCLogger(__name__).get_logger()
 
 
-def test_subjob(tabix_dxfile: dxpy.DXFile):
+def subjob_testing(tabix_dxfile: dxpy.DXFile):
 
     tabix_downloaded = download_dxfile_by_name(tabix_dxfile, print_status=True)
     output_tsv = Path('column_stripped.tsv')

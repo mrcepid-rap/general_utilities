@@ -8,8 +8,12 @@ from pathlib import Path
 test_folder = Path(os.getenv('TEST_DIR'))
 cwd = Path(os.getcwd())
 
-# We have to do this to get the subjob test modules to run properly on DNANexus
-from general_utilities.job_management.subjob_test.subjob_test import test_subjob
+# A big note to users of this test: We have to do this to get the subjob test modules to run properly on DNANexus.
+# The actual methods called by this test are located in the general_utilities package. This is because there is no
+# way ( as far as I can tell) to load a module not instantiated at startup (e.g., with github like for actual
+# modules) when running subjobs. This means if something breaks in this 'test' it is likely part of the github repo
+# and NOT part of this testing directory.
+from general_utilities.job_management.subjob_test.subjob_test import subjob_testing
 
 
 @pytest.mark.parametrize(
@@ -20,7 +24,7 @@ def test_subjob_build(tabix_file):
 
     tabix_dxfile = dxpy.DXFile(dxid=tabix_file)
 
-    output_files = test_subjob(tabix_dxfile)
+    output_files = subjob_testing(tabix_dxfile)
 
     assert len(output_files) == 22
 
