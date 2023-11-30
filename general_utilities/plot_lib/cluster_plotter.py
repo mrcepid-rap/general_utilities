@@ -13,7 +13,7 @@ from general_utilities.plot_lib.plotter import Plotter
 
 class ClusterPlotter(Plotter):
 
-    def __init__(self, cmd_executor: CommandExecutor, results_table: pd.DataFrame, genetic_data: Dict[str, BGENInformation],
+    def __init__(self, cmd_executor: CommandExecutor, results_table: pd.DataFrame, genetic_data: Dict[str, Dict[str, Path]],
                  chrom_column: str, pos_column: str, alt_column: str, id_column: str, p_column: str, csq_column: str,
                  maf_column: str, gene_symbol_column: str, test_name: str = None, sig_threshold: float = 1E-6,
                  clumping_distance=250000):
