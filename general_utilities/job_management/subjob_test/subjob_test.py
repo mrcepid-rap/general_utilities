@@ -38,7 +38,7 @@ def subjob_testing(tabix_dxfile: dxpy.DXFile):
     LOGGER.info(f'Uploaded file {bgzip_dxlink}')
 
     LOGGER.info('Attempting to create subjobs...')
-    subjob_launcher = SubjobUtility()
+    subjob_launcher = SubjobUtility(dereference_outputs=True)
     for chr in range(1, 23):
         subjob_launcher.launch_job(function=tabix_subjob,
                                    inputs={'input_table': {'$dnanexus_link': bgzip_dxlink.get_id()}, 'chromosome': chr},
@@ -50,14 +50,9 @@ def subjob_testing(tabix_dxfile: dxpy.DXFile):
 
     output_files = []
 
-    for output in subjob_launcher:
-        for subjob_output in output:
-            if 'field' in subjob_output['$dnanexus_link']:
-                link = subjob_output['$dnanexus_link']
-                field = link['field']
-                field_value = dxpy.DXJob(link['job']).describe()['output'][field]
-                LOGGER.info(f'Output for {field}: {field_value}')
-                if field == 'subset_tsv':
-                    output_files.append(field_value)
+    for subjob_output in subjob_launcher:
+        LOGGER.info(f'Output for subset_tsv: {subjob_output["subset_tsv"]}')
+        LOGGER.info(f'Output for chromosome: {subjob_output["chromosome"]}')
+        output_files.append(subjob_output['subset_tsv'])
 
     return output_files

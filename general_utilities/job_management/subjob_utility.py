@@ -10,6 +10,8 @@ from time import sleep
 from datetime import datetime
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
+from general_utilities.association_resources import download_dxfile_by_name
+from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
 
 
@@ -149,10 +151,14 @@ class SubjobUtility:
     :param incrementor: This class will print a status method for every :param:incrementor jobs completed with a
         percentage of total jobs completed. [500]
     :param log_update_time: How often should the log of current jobs be printed in seconds. [60]
+    :param dereference_outputs: Should ALL dxpy.DXJob references be dereference on subjob completion? Setting this
+        option to 'True' will do two things: 1. It will convert output references (via
+        :func:`dxpy.DXJob.get_output_ref()`) to the actual output and 2. if this output is a file, download it to the
+        current instance. [False]
     """
 
     def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
-                 log_update_time: int = 60):
+                 log_update_time: int = 60, dereference_outputs: bool = False):
 
         self._logger = MRCLogger(__name__).get_logger()
 
@@ -160,6 +166,7 @@ class SubjobUtility:
         self._concurrent_job_limit = concurrent_job_limit
         self._incrementor = incrementor
         self._log_update_time = log_update_time
+        self._dereference_outputs = dereference_outputs
 
         # We define three difference queues for use during runtime:
         # job_queue   – jobs waiting to be submitted
@@ -189,12 +196,34 @@ class SubjobUtility:
         # Manage returned outputs
         self._output_array = []
 
-    def __iter__(self) -> Iterator[List[dict]]:
+    def __iter__(self) -> Iterator[Dict[str, Any]]:
         """Return an iterator over the outputs collected when jobs finish.
 
-        Outputs returned by the class are a list of dictionaries formatted like dxpy.dxlinks:
+        Outputs returned by the class are a list of dictionaries formatted like::
 
-        output = {'$dnanexus_link': {'field': output_name}}
+            # Top-level list
+            [
+                # Per-job output lists
+                [
+                    # output dictionaries
+                    {
+                    'output1': link,
+                    'output2': link
+                    }
+                ],
+                [
+                    {
+                    'output1': link,
+                    'output2': link
+                    }
+                ]
+            ]
+
+        where output 'links' are either dxpy.dxlinks like::
+
+            output = {'$dnanexus_link': {'field': output_name}}
+
+        or direct references to the output itself if self._dereference_outputs is True.
 
         The only way to recover the ACTUAL output is to use something like::
 
@@ -436,6 +465,8 @@ class SubjobUtility:
         we use the DXJobDict-defined outputs to retrieve :func:dxpy.dxlink() for those outputs and add them to
         self._output_array.
 
+        if self._download_on_complete is True, we also download all files directly to
+
         To be clear, this method could be contained within :func:self._monitor_submitted(), but was easier to follow
         when abstracted into a separate method.
 
@@ -446,10 +477,52 @@ class SubjobUtility:
         description = job['job_class'].describe(fields={'state': True})
         curr_status = JobStatus[description['state'].rstrip().upper()]
         if curr_status.value == RunningStatus.COMPLETE:
-            output_list = []
-            for output in job['job_info']['outputs']:
-                output_list.append(job['job_class'].get_output_ref(output))
-            self._output_array.append(output_list)
+            output_dict = {}
+            if len(job['job_info']['outputs']) > 0:
+                # Do a describe() call here, so we only have to do it once to save time
+                output_values = job['job_class'].describe()['output']
+                for output in job['job_info']['outputs']:
+                    if self._dereference_outputs:
+                        output_ref = job['job_class'].get_output_ref(output)
+                        output_key = output_ref['$dnanexus_link']['field']
+                        output_value = output_values[output_key]
+
+                        # Need to check if they are files...
+                        # This is if the output is a list
+                        if type(output_value) is list:
+                            new_values = []
+                            for value in output_value:
+                                # This is possibly (likely) a file
+                                if '$dnanexus_link' in value:
+                                    if value['$dnanexus_link'].startswith('file-'):
+                                        new_values.append(download_dxfile_by_name(value))
+                                    else:
+                                        new_values.append(value)
+
+                                # This is unlikely to be a file
+                                else:
+                                    new_values.append(value)
+
+                            output_dict[output_key] = new_values
+
+                        # This is if the output is just a single value
+                        else:
+                            # This is possibly (likely) a file
+                            if '$dnanexus_link' in output_value:
+                                # This is still likely a file...
+                                if output_value['$dnanexus_link'].startswith('file-'):
+                                    output_dict[output_key] = download_dxfile_by_name(output_value)
+                                # This is something else that I don't think actually exists in DNANexus...
+                                else:
+                                    output_dict[output_key] = output_value
+                            # This is unlikely to be a file
+                            else:
+                                output_dict[output_key] = output_value
+
+                    else:
+                        output_dict[output] = job['job_class'].get_output_ref(output)
+
+            self._output_array.append(output_dict)
 
             self._num_completed_jobs += 1
             if math.remainder(self._num_completed_jobs, self._incrementor) == 0:
@@ -519,5 +592,20 @@ def check_subjob_decorator() -> Optional[str]:
 
     return loaded_module
 
+
+def prep_current_image(required_files: List[dict]) -> CommandExecutor:
+    """A helper function for launched subjobs that automatically downloads the required Docker image and downloads
+    any requisite files
+
+    :param required_files: A list of :func:`dxpy.dxlink()` dictionaries of files to download
+    :return: The CommandExecutor for running jobs on the instance
+    """
+
+    cmd_executor = build_default_command_executor()
+
+    for file in required_files:
+        download_dxfile_by_name(file, print_status=False)
+
+    return cmd_executor
 
 
