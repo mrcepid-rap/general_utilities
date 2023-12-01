@@ -148,8 +148,12 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
 def generate_linked_dx_file(file: Union[str, Path]) -> dxpy.DXFile:
     """A helper function to upload a local file to the DNANexus platform and then remove it from the instance.
 
-     A simple wrapper artound :func:`dxpy.upload_local_file` with additional functionality to remove the file from
+     A simple wrapper around :func:`dxpy.upload_local_file()` with additional functionality to remove the file from
      the local instance storage system.
+
+     This will generate a dict with the format::
+
+        {'$dnanexus_link': 'file-1234567890ABCDEFGabcdefg'}
 
     :param file: Either a str or Path representation of the file to upload.
     :return: A :func:`dxpy.DXFile` instance of the remote file.
