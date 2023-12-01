@@ -145,7 +145,7 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
     return chromosomes
 
 
-def generate_linked_dx_file(file: Union[str, Path]) -> dxpy.DXFile:
+def generate_linked_dx_file(file: Union[str, Path], delete_on_upload: bool = True) -> dxpy.DXFile:
     """A helper function to upload a local file to the DNANexus platform and then remove it from the instance.
 
      A simple wrapper around :func:`dxpy.upload_local_file()` with additional functionality to remove the file from
@@ -155,16 +155,22 @@ def generate_linked_dx_file(file: Union[str, Path]) -> dxpy.DXFile:
 
         {'$dnanexus_link': 'file-1234567890ABCDEFGabcdefg'}
 
+    With default input this method also deletes the uploaded file on upload. This functionality can be changed by
+    setting :param delete_on_upload: to False.
+
     :param file: Either a str or Path representation of the file to upload.
+    :param delete_on_upload: Delete this file on upload? [True]
     :return: A :func:`dxpy.DXFile` instance of the remote file.
     """
 
     if type(file) == str:
         linked_file = dxpy.upload_local_file(filename=file)
-        Path(file).unlink()
+        if delete_on_upload:
+            Path(file).unlink()
     else:
         linked_file = dxpy.upload_local_file(file=file.open('rb'))
-        file.unlink()
+        if delete_on_upload:
+            file.unlink()
     return linked_file
 
 

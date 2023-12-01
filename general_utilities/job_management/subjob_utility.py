@@ -495,7 +495,7 @@ class SubjobUtility:
                                 # This is possibly (likely) a file
                                 if '$dnanexus_link' in value:
                                     if value['$dnanexus_link'].startswith('file-'):
-                                        new_values.append(download_dxfile_by_name(value))
+                                        new_values.append(download_dxfile_by_name(value, print_status=False))
                                     else:
                                         new_values.append(value)
 
@@ -511,7 +511,7 @@ class SubjobUtility:
                             if '$dnanexus_link' in output_value:
                                 # This is still likely a file...
                                 if output_value['$dnanexus_link'].startswith('file-'):
-                                    output_dict[output_key] = download_dxfile_by_name(output_value)
+                                    output_dict[output_key] = download_dxfile_by_name(output_value, print_status=False)
                                 # This is something else that I don't think actually exists in DNANexus...
                                 else:
                                     output_dict[output_key] = output_value
