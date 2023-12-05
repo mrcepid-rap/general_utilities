@@ -1,54 +1,24 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Tuple, Any
+from typing import List, Any
 
 from importlib_resources.abc import Traversable
 
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.job_management.command_executor import CommandExecutor, DockerMount, \
-    build_default_command_executor
+from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
 
 
 class Plotter(ABC):
-    """A class to generate summary plots for genetic markers.
+    """An Interface for classes that generate plots via R's ggplot2 library.
 
-    This class automates the process of clumping genetic variants. This class proceeds in four main steps:
+    This interface ensures that implementing classes always:
 
-    1. Clustering – Identify clusters of significant variants using `bedtools cluster` at distance set by
-        `clumping_distance`
+    1. Plot something via the :func:`plot()` method
 
-    2. LD Calculation – Calculate r^2 between the identified index variant and all variants ± `clumping_distance`.
-        Clumping is performed simply by some distance (specifically, the `clumping_distance` parameter) and selects the
-        variant with the highest p. value, independent of any LD structure. This leans heavily on the BGENReader class
-        to enable rapid extracting of variant genotypes.
+    2. Have a built-in method to run R-scripts without having to re-implement the same rough functionality via the
+    :func:`self._run_R_script()` method.
 
-    3. Plot – Create locus zoom plots for each index variant. These plots show log10 p. value ~ genomic coordinate,
-        with points colour coded by r^2 (based on Pearson's CC) to the index variant, and shaped based on if they have a
-        consequence of missense, PTV, or 'other'.
-
-    Input to this class is a pandas DataFrame, typically from one of the major tools (e.g. BOLT / REGENIE). This table
-    MUST have columns indicating:
-
-    Chromosome, Position, alt, ref, some ID, p. value, and consequence
-
-    These names for these columns in the underlying data can all be set when the class is instantiated. There is an
-    optional column, 'TEST', that can be provided to further subset variants. This column name is not changeable via
-    class inputs as it is very specific and should be unlikely to change.
-
-    :param results_table: A table from _some_ genetic association pipeline, typically from imputed markers.
-    :param genetic_data: A dictionary of chromosome keys and BGENInformation values pointing to the location of the
-        underlying genetic data – MUST be .bgen
-    :param chrom_column: The name of the chromosome column in `results_table`
-    :param pos_column: The name of the position column in `results_table`
-    :param alt_column: The name of the alt column in `results_table`
-    :param id_column: The name of the ID column in `results_table`
-    :param p_column: The name of the p. value column in `results_table`
-    :param csq_column: The name of the consequence annotation column in `results_table`
-    :param maf_column: The name of the MAF annotation column in `results_table`
-    :param gene_symbol_column: The name of the gene name annotation column in `results_table`
-    :param test_name: A specific test to subset from the 'TEST' columns. Relevant to REGENIE outputs
-    :param sig_threshold: Significance threshold to cluster variants at. Defaults to 1E-6
-    :param clumping_distance: Distance to clump variants at. Defaults to 250kbp
+    :param cmd_executor: A CommandExecutor to run commands via the command line or provided Docker image
     """
 
     def __init__(self, cmd_executor: CommandExecutor):
@@ -57,15 +27,42 @@ class Plotter(ABC):
         self._cmd_executor = cmd_executor
 
     @abstractmethod
-    def plot(self) -> Tuple[List[Path], List[Path]]:
+    def plot(self) -> List[Path]:
+        """Abstract method to implement some form of plotting.
+
+        :return: A list of Paths of plots.
+        """
+        pass
+
+    @abstractmethod
+    def get_data(self) -> List[Path]:
+        """Abstract method to return some sort of data.
+
+        :return: A list of Paths of data tables.
+        """
         pass
 
     def _run_R_script(self, r_script: Traversable, options: List[Any], out_path: Path) -> Path:
+        """Run an R script, typically an R script that generates some sort of plot.
+
+        This method python-izes the required inputs to run an R-script via Docker. It takes an R script as a
+        Traversable object.
+
+        :param r_script: An Rscript as a Traversable object. This is done as the Rscript should be within a python
+            package implemented as part of some plotter and is thus found via the importlib_resources package RATHER
+            than through the typical pathlib functionality.
+        :param options: A List of Input options for the script.
+        :param out_path: The location of the resulting SINGLE output from this script. This parameter has no effect on
+            running the script and is provided as a convenience for running. i.e., this output must be set somewhere
+            independently in the scripts I/O.
+        :return: out_path
+        """
 
         options = [f'{opt}' for opt in options]  # have to convert all opts to strings
         options = " ".join(options)
         plot_cmd = f'Rscript /scripts/{r_script.name} {options}'
 
+        # If editing in pycharm, the .parent parameter does exist, so ignore the error
         script_mount = DockerMount(Path(f'{r_script.parent}/'),
                                    Path('/scripts/'))
 

@@ -1,7 +1,7 @@
 import random
-from abc import abstractmethod
+from abc import ABC
 from pathlib import Path
-from typing import Tuple, List, Dict
+from typing import Tuple, List
 
 import pandas as pd
 
@@ -10,17 +10,45 @@ from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.plot_lib.plotter import Plotter
 
 
-class ClusterPlotter(Plotter):
+class ClusterPlotter(Plotter, ABC):
+    """This class is an interface for all plot-types that need to determine 'index' variants for plotting purposes.
 
-    def __init__(self, cmd_executor: CommandExecutor, results_table: pd.DataFrame, genetic_data: Dict[str, Dict[str, Path]],
+    ClusterPlotter is itself an implementation of :func:`Plotter()`. The only additional functionality of this class
+    is to do variant clumping. Clumping is performed by distance (specified via the `clumping_distance` parameter)
+    and selects the variant with the highest p. value, independent of any LD structure.
+
+    Input to this class is a pandas DataFrame, typically from one of the major tools (e.g. BOLT / REGENIE). This table
+    MUST have columns indicating:
+
+    Chromosome, Position, alt, ref, some ID, p. value, and consequence
+
+    These names for these columns in the underlying data can all be set when the class is instantiated. There is an
+    optional column, 'TEST', that can be provided to further subset variants. This column name is not changeable via
+    class inputs as it is very specific and should be unlikely to change.
+
+    :param cmd_executor: A CommandExecutor to run commands via the command line or provided Docker image
+    :param results_table: A table from _some_ genetic association pipeline, typically from imputed markers.
+    :param chrom_column: The name of the chromosome column in `results_table`
+    :param pos_column: The name of the position column in `results_table`
+    :param alt_column: The name of the alt column in `results_table`
+    :param id_column: The name of the ID column in `results_table`
+    :param p_column: The name of the p. value column in `results_table`
+    :param csq_column: The name of the consequence annotation column in `results_table`
+    :param maf_column: The name of the MAF annotation column in `results_table`
+    :param gene_symbol_column: The name of the gene name annotation column in `results_table`
+    :param test_name: A specific test to subset from the 'TEST' columns. Relevant to REGENIE outputs
+    :param sig_threshold: Significance threshold to cluster variants at. Defaults to 1E-6
+    :param clumping_distance: Distance to clump variants at. Defaults to 250kbp
+    """
+
+    def __init__(self, cmd_executor: CommandExecutor, results_table: pd.DataFrame,
                  chrom_column: str, pos_column: str, alt_column: str, id_column: str, p_column: str, csq_column: str,
                  maf_column: str, gene_symbol_column: str, test_name: str = None, sig_threshold: float = 1E-6,
-                 clumping_distance=250000):
+                 clumping_distance: int = 250000):
 
         super().__init__(cmd_executor)
 
         self._results_table = results_table
-        self._genetic_data = genetic_data
 
         # Query variables
         self._test_name = test_name
@@ -38,24 +66,10 @@ class ClusterPlotter(Plotter):
         self._gene_symbol_column = gene_symbol_column
 
         # Get index variants by distance (no LD clumping done)
-        self._full_samples, self._subset_samples = self._define_samples()
         self._index_variants = self._cluster_variants()
 
     def get_index_variant_table(self) -> pd.DataFrame:
         return self._index_variants
-
-    def _define_samples(self) -> Tuple[List[str], List[str]]:
-
-        # Get the full list of samples
-        full_samples = get_include_sample_ids()
-
-        # No need for more than ~10k samples to do ld calculation with.
-        if len(full_samples) < 1E4:
-            subset_samples = full_samples.copy()
-        else:
-            subset_samples = random.sample(full_samples, 10000)
-
-        return full_samples, subset_samples
 
     def _cluster_variants(self) -> pd.DataFrame:
 
@@ -100,7 +114,3 @@ class ClusterPlotter(Plotter):
                               f'results file.')
 
         return index_vars
-
-    @abstractmethod
-    def plot(self) -> Tuple[List[Path], List[Path]]:
-        pass

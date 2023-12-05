@@ -191,6 +191,14 @@ def build_transcript_table() -> pd.DataFrame:
     transcripts_table = transcripts_table[['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
                                            'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']]
 
+    # Also generate a table of mean chromosome positions for plotting
+    mean_chr_pos = transcripts_table[['chrom', 'manh.pos']].groupby('chrom').mean()
+
+    # Important that this file is sorted by chromosome to ensure proper plotting order...
+    chrom_dict = dict(zip([str(x) for x in range(1, 23)] + ["X", "Y"], range(1, 25)))
+    mean_chr_pos.sort_index(key=lambda x: x.map(chrom_dict), inplace=True)
+    mean_chr_pos.to_csv('mean_chr_pos.tsv', sep='\t')
+
     return transcripts_table
 
 
