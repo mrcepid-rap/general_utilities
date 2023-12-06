@@ -34,13 +34,9 @@ class ManhattanPlotter(ClusterPlotter):
         :param clumping_distance: Distance to clump variants at. Defaults to 250kbp
         """
 
-        # Need to decide which threshold to use for clumping if both sig and sugg are provided
-        # Future Eugene – max() is correct since we are dealing with decimal numbers, not log10(p)...
-        cluster_threshold = sig_threshold if suggestive_threshold is None else max(sig_threshold, suggestive_threshold)
-
         super().__init__(cmd_executor, results_table, chrom_column, pos_column, alt_column, id_column,
-                         p_column, csq_column, maf_column, gene_symbol_column, test_name, cluster_threshold,
-                         clumping_distance)
+                         p_column, csq_column, maf_column, gene_symbol_column, test_name,
+                         sig_threshold, suggestive_threshold, clumping_distance)
 
         self._maf_cutoff = maf_cutoff
         self._suggestive_threshold = suggestive_threshold

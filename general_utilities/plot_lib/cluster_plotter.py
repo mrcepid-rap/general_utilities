@@ -43,8 +43,8 @@ class ClusterPlotter(Plotter, ABC):
 
     def __init__(self, cmd_executor: CommandExecutor, results_table: pd.DataFrame,
                  chrom_column: str, pos_column: str, alt_column: str, id_column: str, p_column: str, csq_column: str,
-                 maf_column: str, gene_symbol_column: str, test_name: str = None, sig_threshold: float = 1E-6,
-                 clumping_distance: int = 250000):
+                 maf_column: str, gene_symbol_column: str, test_name: str = None,
+                 sig_threshold: float = 1E-6, sugg_threshold: float = None, clumping_distance: int = 250000):
 
         super().__init__(cmd_executor)
 
@@ -52,7 +52,10 @@ class ClusterPlotter(Plotter, ABC):
 
         # Query variables
         self._test_name = test_name
+        # Need to decide which threshold to use for clumping if both sig and sugg are provided
+        # Future Eugene – max() is correct since we are dealing with decimal numbers, not log10(p)...
         self._sig_threshold = sig_threshold
+        self._sugg_threshold = sugg_threshold
         self._clumping_distance = clumping_distance
 
         # Set column name variables
@@ -73,10 +76,13 @@ class ClusterPlotter(Plotter, ABC):
 
     def _cluster_variants(self) -> pd.DataFrame:
 
+        cluster_threshold = self._sig_threshold if self._sugg_threshold is None else max(self._sig_threshold,
+                                                                                         self._sugg_threshold)
+
         if self._test_name is None:
-            query = f'{self._p_column} < {self._sig_threshold}'
+            query = f'{self._p_column} < {cluster_threshold}'
         else:
-            query = f'TEST == "{self._test_name}" & {self._p_column} < {self._sig_threshold}'
+            query = f'TEST == "{self._test_name}" & {self._p_column} < {cluster_threshold}'
 
         candidate_vars = self._results_table.query(query)
 

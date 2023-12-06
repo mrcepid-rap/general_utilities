@@ -143,8 +143,6 @@ plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers
 
 }
 
-args <- commandArgs(trailingOnly = T)
-
 # Inputs are:
 # 1: summary_table
 # 2: label data
@@ -152,6 +150,7 @@ args <- commandArgs(trailingOnly = T)
 # 4: plot name
 # 5: p.sig
 # 6: p.sugg
+args <- commandArgs(trailingOnly = T)
 mean_chr_pos <- fread('/test/mean_chr_pos.tsv')
 
 manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], as.numeric(args[5]), as.numeric(args[6]))
