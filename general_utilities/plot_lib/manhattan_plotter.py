@@ -15,8 +15,8 @@ class ManhattanPlotter(ClusterPlotter):
 
     def __init__(self, cmd_executor: CommandExecutor, results_table: pd.DataFrame,
                  chrom_column: str, pos_column: str, alt_column: str, id_column: str, p_column: str, csq_column: str,
-                 maf_column: str, gene_symbol_column: str, test_name: str = None, sig_threshold: float = 1E-6,
-                 clumping_distance: int = 250000, maf_cutoff: float = 0.001):
+                 maf_column: str, gene_symbol_column: str, test_name: str = None, sig_threshold: float = 1E-8,
+                 clumping_distance: int = 250000, maf_cutoff: float = 0.001, suggestive_threshold: float = None):
         """Plot a Manhattan plot of some genetic result.
 
         :param cmd_executor: A CommandExecutor to run commands via the command line or provided Docker image
@@ -33,11 +33,17 @@ class ManhattanPlotter(ClusterPlotter):
         :param sig_threshold: Significance threshold to cluster variants at. Defaults to 1E-6
         :param clumping_distance: Distance to clump variants at. Defaults to 250kbp
         """
+
+        # Need to decide which threshold to use for clumping if both sig and sugg are provided
+        # Future Eugene – max() is correct since we are dealing with decimal numbers, not log10(p)...
+        cluster_threshold = sig_threshold if suggestive_threshold is None else max(sig_threshold, suggestive_threshold)
+
         super().__init__(cmd_executor, results_table, chrom_column, pos_column, alt_column, id_column,
-                         p_column, csq_column, maf_column, gene_symbol_column, test_name, sig_threshold,
+                         p_column, csq_column, maf_column, gene_symbol_column, test_name, cluster_threshold,
                          clumping_distance)
 
         self._maf_cutoff = maf_cutoff
+        self._suggestive_threshold = suggestive_threshold
         self._write_plot_table()
         self._write_index_variant_table()
 
@@ -72,8 +78,8 @@ class ManhattanPlotter(ClusterPlotter):
         # Add something to invert the plot... if (curr_test == paste0('ADD-INT_', interaction_var)) {
 
         # Do plotting
-        options = [f'/test/{self._plot_table_path}', f'/test/{self._index_table_path}', f'/test/mean_chr_pos.tsv',
-                   self._p_column]
+        options = [f'/test/{self._plot_table_path}', f'/test/{self._index_table_path}', self._p_column, self._test_name,
+                   self._sig_threshold, self._suggestive_threshold]
         final_plots.append(self._run_R_script(r_script, options, Path('manhattan_plot.png')))
 
         return final_plots

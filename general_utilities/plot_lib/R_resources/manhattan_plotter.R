@@ -33,7 +33,7 @@ standardize_table <- function(table_path, p_val_col) {
 
 }
 
-load_and_plot_data <- function(result_path, label_path, p_val_col, p_sig=1E-6, p_sugg=NA, label_qq = T) {
+load_and_plot_data <- function(result_path, label_path, p_val_col, plot_header, p_sig, p_sugg, label_qq = T) {
 
   # Read in and standardize tables
   result_table <- standardize_table(result_path, p_val_col)
@@ -52,9 +52,19 @@ load_and_plot_data <- function(result_path, label_path, p_val_col, p_sig=1E-6, p
                          label_data = label_table)
   qq.plot <- plot_qq(result_table[!is.infinite(log_p)], ymax=ymax, label.markers = label_qq)
 
+  # Decide header
+  if (plot_header != 'None') {
+    annotation <- plot_annotation(title = plot_header, theme = theme(plot.title=element_text(size=18,face="bold",colour="black")))
+  } else {
+    annotation <- plot_annotation(theme = theme(plot.title=element_text(size=18,face="bold",colour="black")))
+  }
+
   comb.plot <- manh.plot + qq.plot +
-    plot_layout(ncol = 2, nrow = 1, widths = c(3,1.3)) +
-    plot_annotation(theme = theme(plot.title=element_text(size=18,face="bold",colour="black")))
+    plot_layout(ncol = 2, nrow = 1, widths = c(3,1.3)) + annotation
+
+
+  comb.plot <- comb.plot
+
 
   return(comb.plot)
 
@@ -138,10 +148,12 @@ args <- commandArgs(trailingOnly = T)
 # Inputs are:
 # 1: summary_table
 # 2: label data
-# 3: mean_chr_pos
-# 4: p_val column
-mean_chr_pos <- fread(args[3])
+# 3: p_val column
+# 4: plot name
+# 5: p.sig
+# 6: p.sugg
+mean_chr_pos <- fread('/test/mean_chr_pos.tsv')
 
-manh_plot <- load_and_plot_data(args[1], args[2], args[4], p_sugg = 1E-6, p_sig = 1E-8)
+manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], as.numeric(args[5]), as.numeric(args[6]), p_sugg = 1E-6, p_sig = 1E-8)
 
 ggsave('/test/manhattan_plot.png', manh_plot, units='in', width = 15, height = 6)
