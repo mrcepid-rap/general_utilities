@@ -16,7 +16,7 @@ class ManhattanPlotter(ClusterPlotter):
     def __init__(self, cmd_executor: CommandExecutor, results_table: pd.DataFrame,
                  chrom_column: str, pos_column: str, alt_column: str, id_column: str, p_column: str, csq_column: str,
                  maf_column: str, gene_symbol_column: str, test_name: str = None, sig_threshold: float = 1E-8,
-                 clumping_distance: int = 250000, maf_cutoff: float = 0.001, suggestive_threshold: float = None):
+                 suggestive_threshold: float = None, clumping_distance: int = 250000, maf_cutoff: float = 0.001):
         """Plot a Manhattan plot of some genetic result.
 
         :param cmd_executor: A CommandExecutor to run commands via the command line or provided Docker image

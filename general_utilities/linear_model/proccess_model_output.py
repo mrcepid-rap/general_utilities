@@ -8,9 +8,12 @@ from pathlib import Path
 
 from general_utilities.association_resources import build_transcript_table, define_field_names_from_pandas, \
     bgzip_and_tabix
+from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
+from general_utilities.plot_lib.manhattan_plotter import ManhattanPlotter
 
 
-def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False,
+def process_linear_model_outputs(output_prefix: str, cmd_executor: CommandExecutor,
+                                 is_snp_tar: bool = False, is_gene_tar: bool = False,
                                  gene_infos: list = None) -> List[Path]:
 
     if gene_infos is not None:
@@ -40,6 +43,9 @@ def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, i
         if valid_genes is not None:
             transcripts_table = transcripts_table.loc[valid_genes]
 
+        # Add a frequency column
+        glm_table['maf'] = glm_table['n_car'] / glm_table['n_model'].multiply(2)
+
         # Test what columns we have in the 'SNP' field so we can name them...
         field_one = glm_table.iloc[0]
         field_one = field_one['maskname'].split("-")
@@ -67,8 +73,31 @@ def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, i
 
             glm_table.to_csv(path_or_buf=gene_out, index=False, sep="\t", na_rep='NA')
 
+        plot_dir = Path(f'{output_prefix}_plots/')  # Path to store plots
+        plot_dir.mkdir()
+
+        # Generate manhattan plots:
+        for mask in glm_table['MASK'].value_counts().index:
+
+            for maf in glm_table['MAF'].value_counts().index:
+                # To note on the below: I use SYMBOL for the id_column parameter below because ENST is the
+                # index and I don't currently have a way to pass the index through to the Plotter methods...
+                manhattan_plotter = ManhattanPlotter(cmd_executor,
+                                                     glm_table.query(f'MASK == "{mask}" & MAF == "{maf}"'),
+                                                     chrom_column='chrom', pos_column='start',
+                                                     alt_column=None,
+                                                     id_column='SYMBOL', p_column='p_val_init',
+                                                     csq_column='MASK',
+                                                     maf_column='maf', gene_symbol_column='SYMBOL',
+                                                     clumping_distance=1,
+                                                     maf_cutoff=30 / (glm_table['n_model'].max() * 2),
+                                                     sig_threshold=1E-6)
+
+                manhattan_plotter.plot()[0].rename(plot_dir / f'{mask}.{maf}.genes.GLM.stats.png')
+
         # And bgzip and tabix...
         outputs = list(bgzip_and_tabix(gene_tsv, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
+        outputs.append(plot_dir)
 
     return outputs
 
