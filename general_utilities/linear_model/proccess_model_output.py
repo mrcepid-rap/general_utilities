@@ -63,9 +63,6 @@ def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, i
         # Now merge the transcripts table into the gene table to add annotation and write
         glm_table = pd.merge(transcripts_table, glm_table, on='ENST', how="left")
 
-        # Add a frequency column
-        glm_table['var_maf'] = glm_table['n_car'] / glm_table['n_model'].multiply(2)
-
         # Sort just in case
         glm_table = glm_table.sort_values(by=['chrom', 'start', 'end'])
 
