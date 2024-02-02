@@ -81,10 +81,10 @@ class CommandExecutor:
         """
 
         # The config.json file is NOT provided by the user and is generated here.
-        docker_config = Path('~/.docker/config.json')
+        docker_config = Path('~/.test/config.json')
         if not docker_config.expanduser().parent.exists():
             docker_config.expanduser().parent.mkdir()
-        with docker_config.open('w') as config_writer:
+        with docker_config.expanduser().open('w') as config_writer:
             config_writer.write('{"credsStore": "ecr-login"}')
 
         # The credentials file is provided as part of DNANexus input. Here we need to move the file provided on the

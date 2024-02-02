@@ -151,7 +151,7 @@ class SubjobUtility:
     :param incrementor: This class will print a status method for every :param:incrementor jobs completed with a
         percentage of total jobs completed. [500]
     :param log_update_time: How often should the log of current jobs be printed in seconds. [60]
-    :param dereference_outputs: Should ALL dxpy.DXJob references be dereference on subjob completion? Setting this
+    :param dereference_outputs: Should ALL dxpy.DXJob references be dereferenced on subjob completion? Setting this
         option to 'True' will do two things: 1. It will convert output references (via
         :func:`dxpy.DXJob.get_output_ref()`) to the actual output and 2. if this output is a file, download it to the
         current instance. [False]
