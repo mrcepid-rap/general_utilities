@@ -13,7 +13,7 @@ from general_utilities.mrc_logger import MRCLogger
 LOGGER = MRCLogger(__name__).get_logger()
 
 
-def subjob_testing(tabix_dxfile: dxpy.DXFile):
+def subjob_testing(tabix_dxfile: dxpy.DXFile, dereference_outputs: bool):
 
     tabix_downloaded = download_dxfile_by_name(tabix_dxfile, print_status=True)
     output_tsv = Path('column_stripped.tsv')
@@ -38,7 +38,7 @@ def subjob_testing(tabix_dxfile: dxpy.DXFile):
     LOGGER.info(f'Uploaded file {bgzip_dxlink}')
 
     LOGGER.info('Attempting to create subjobs...')
-    subjob_launcher = SubjobUtility(dereference_outputs=True)
+    subjob_launcher = SubjobUtility(dereference_outputs=dereference_outputs)
     for chr in range(1, 23):
         subjob_launcher.launch_job(function=tabix_subjob,
                                    inputs={'input_table': {'$dnanexus_link': bgzip_dxlink.get_id()}, 'chromosome': chr},

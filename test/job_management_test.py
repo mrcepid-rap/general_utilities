@@ -17,29 +17,34 @@ from general_utilities.job_management.subjob_test.subjob_test import subjob_test
 
 
 @pytest.mark.parametrize(
-    argnames=['tabix_file'],
-    argvalues=zip(['file-GZzx098J0zVxY2JXgBk5B16X'])
+    argnames=['tabix_file', 'dereference_outputs'],
+    argvalues=zip(['file-GZzx098J0zVxY2JXgBk5B16X'], [True, False])
 )
-def test_subjob_build(tabix_file):
+def test_subjob_build(tabix_file, dereference_outputs):
 
     tabix_dxfile = dxpy.DXFile(dxid=tabix_file)
 
-    output_files = subjob_testing(tabix_dxfile)
+    output_files = subjob_testing(tabix_dxfile, dereference_outputs)
 
     assert len(output_files) == 22
 
     found_chromosomes = []
 
-    for output_file in output_files:
+    if dereference_outputs:
+        for output_file in output_files:
 
-        curr_file = dxpy.DXFile(output_file)
-        file_name = curr_file.describe()['name']
-        name_match = re.match('chr(\\d+).tsv', file_name)
+            curr_file = dxpy.DXFile(output_file)
+            file_name = curr_file.describe()['name']
+            name_match = re.match('chr(\\d+).tsv', file_name)
 
-        assert name_match
+            assert name_match
 
-        if name_match:
-            found_chromosomes.append(name_match.group(1))
+            if name_match:
+                found_chromosomes.append(name_match.group(1))
+    else:
+
+        for output_files in output_files:
+            print(output_files)
 
     for chrom in range(1,23):
         assert str(chrom) in found_chromosomes
