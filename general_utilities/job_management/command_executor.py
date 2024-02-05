@@ -61,14 +61,14 @@ class CommandExecutor:
         self._logger = MRCLogger(__name__).get_logger()
 
         if aws_credentials:
+            self._logger.info('Authenticating to AWS ECR')
             self._authenticate_aws_ecr(aws_credentials)
 
         self._docker_image = docker_image
         self._docker_configured = self._ingest_docker_file(docker_image)
         self._docker_prefix = self._construct_docker_prefix(docker_mounts)
 
-    @staticmethod
-    def _authenticate_aws_ecr(aws_credentials: Path) -> None:
+    def _authenticate_aws_ecr(self, aws_credentials: Path) -> None:
         """Place files required for AWS-ECR authentication in the correct paths for Docker to find them.
 
         This handles the credentials provided by the record given in the 'assetDepends' portion of dxapp.json This
@@ -81,9 +81,11 @@ class CommandExecutor:
         """
 
         # The config.json file is NOT provided by the user and is generated here.
-        docker_config = Path('~/.test/config.json')
+        docker_config = Path('~/.docker/config.json')
         if not docker_config.expanduser().parent.exists():
             docker_config.expanduser().parent.mkdir()
+        else:
+            self._logger.warning('Docker config already exists. Overwriting!')
         with docker_config.expanduser().open('w') as config_writer:
             config_writer.write('{"credsStore": "ecr-login"}')
 
