@@ -1,13 +1,12 @@
-import math
 import os
-from importlib import import_module
-
+import math
 import dxpy
 import inspect
 
 from enum import Enum, auto
-from time import sleep
+from time import sleep, time
 from datetime import datetime
+from importlib import import_module
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
 from general_utilities.association_resources import download_dxfile_by_name
@@ -377,11 +376,21 @@ class SubjobUtility:
         self._logger.info("{0:65}: {val}".format("Total number of jobs to iterate through", val=self._total_jobs))
 
         # Keep going until we get every job submitted or finished...
+        # Get current time in seconds
+        last_time = time()
+        last_log_time = 0
         while len(self._job_queue) > 0 or len(self._job_running.keys()) > 0:
-            self._print_status()  # Print the log
+            self._logger.info('Checking for jobs...')
+            current_time = time()
+            last_log_time += current_time - last_time
+            last_time = current_time
+            if last_log_time >= self._log_update_time:
+                last_log_time = 0
+                self._print_status()
+
             self._monitor_subjobs()  # Iterate through all jobs in the queue or currently running
             if len(self._job_running.keys()) > 0:
-                sleep(self._log_update_time)
+                sleep(30)
 
         if len(self._job_failed) > 0:
             self._logger.info('All jobs completed, printing failed jobs...')
