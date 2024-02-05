@@ -222,13 +222,13 @@ class SubjobUtility:
 
             output = {'$dnanexus_link': {'field': output_name}}
 
-        or direct references to the output itself if self._dereference_outputs is True.
-
         The only way to recover the ACTUAL output is to use something like::
 
             output = dxpy.DXJob(link['job']).describe()['output'][output['$dnanexus_link']['field']
 
         This will query the job for the actual output. This is not my fault...
+
+        or direct pathlib.Path(s) to the locally downloaded output itself if self._dereference_outputs is True.
 
         :return: An iterator of output references
         """
@@ -375,12 +375,17 @@ class SubjobUtility:
 
         self._logger.info("{0:65}: {val}".format("Total number of jobs to iterate through", val=self._total_jobs))
 
-        # Keep going until we get every job submitted or finished...
-        # Get current time in seconds
+        # These variables are used to keep track of time so that we can print a job log at the requested interval,
+        # independently of the time it takes to monitor jobs.
         last_time = time()
         last_log_time = 0
+
+        # Keep going until we get every job submitted or finished...
         while len(self._job_queue) > 0 or len(self._job_running.keys()) > 0:
-            self._logger.info('Checking for jobs...')
+
+            # We only want to print the status when the log_update_time has passed. To do this we keep track of the time
+            # passed since the last iteration and add it to last_log_time. If last_log_time is greater than
+            # self._log_update_time, then we print the log and reset last_log_time to 0.
             current_time = time()
             last_log_time += current_time - last_time
             last_time = current_time
