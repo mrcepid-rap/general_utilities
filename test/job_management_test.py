@@ -18,7 +18,8 @@ from general_utilities.job_management.subjob_test.subjob_test import subjob_test
 
 @pytest.mark.parametrize(
     argnames=['tabix_file', 'dereference_outputs'],
-    argvalues=zip(['file-GZzx098J0zVxY2JXgBk5B16X'], [True, False])
+    argvalues=zip(['file-GZzx098J0zVxY2JXgBk5B16X', 'file-GZzx098J0zVxY2JXgBk5B16X'],
+                  [True, False])
 )
 def test_subjob_build(tabix_file, dereference_outputs):
 

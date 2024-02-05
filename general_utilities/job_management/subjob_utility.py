@@ -516,12 +516,18 @@ class SubjobUtility:
 
                         # This is if the output is just a single value
                         else:
-                            # This is possibly (likely) a file
-                            if '$dnanexus_link' in output_value:
-                                # This is still likely a file...
-                                if output_value['$dnanexus_link'].startswith('file-'):
-                                    output_dict[output_key] = download_dxfile_by_name(output_value, print_status=False)
-                                # This is something else that I don't think actually exists in DNANexus...
+                            # This is possibly (likely) a file.
+                            # In fact – I don't think dictionaries can happen here unless they are files, but adding
+                            # else statements just to make sure.
+                            if type(output_value) is dict:
+                                if '$dnanexus_link' in output_value:
+                                    # This is still likely a file...
+                                    if output_value['$dnanexus_link'].startswith('file-'):
+                                        output_dict[output_key] = download_dxfile_by_name(output_value,
+                                                                                          print_status=False)
+                                    # This is something else that I don't think actually exists in DNANexus...
+                                    else:
+                                        output_dict[output_key] = output_value
                                 else:
                                     output_dict[output_key] = output_value
                             # This is unlikely to be a file
