@@ -134,11 +134,10 @@ class SubjobUtility:
         # Collect outputs:
         outputs = []
         for output in subjob_utility:
-            # Each output is stored as dxpy.dxlink() dict in a separate item within the 'output' list
-            for subjob_output in output:
-                link = subjob_output['$dnanexus_link']
-                field = link['field']
-                field_value = dxpy.DXJob(link['job']).describe()['output'][field]
+            # Each output is either the actual value, or if a file, a dxpy.DXLink() reference to a file OR a
+            # pathlib.Path to that file on the local file system if self._download_oncomplete is True
+            for output_key, output_value in output.items():
+
                 print(f'Output for {field}: {field_value}')
                 outputs.append(field_value)
 
@@ -157,7 +156,7 @@ class SubjobUtility:
     """
 
     def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
-                 log_update_time: int = 60, dereference_outputs: bool = False):
+                 log_update_time: int = 60, download_on_complete: bool = False):
 
         self._logger = MRCLogger(__name__).get_logger()
 
@@ -165,7 +164,7 @@ class SubjobUtility:
         self._concurrent_job_limit = concurrent_job_limit
         self._incrementor = incrementor
         self._log_update_time = log_update_time
-        self._dereference_outputs = dereference_outputs
+        self._download_on_complete = download_on_complete
 
         # We define three difference queues for use during runtime:
         # job_queue   – jobs waiting to be submitted
@@ -203,32 +202,24 @@ class SubjobUtility:
             # Top-level list
             [
                 # Per-job output lists
-                [
+                [  # job1
                     # output dictionaries
                     {
-                    'output1': link,
-                    'output2': link
+                    'output1': output_value,
+                    'output2': output_value
                     }
                 ],
-                [
+                [  # job2
                     {
-                    'output1': link,
-                    'output2': link
+                    'output1': output_value,
+                    'output2': output_value
                     }
                 ]
             ]
 
-        where output 'links' are either dxpy.dxlinks like::
-
-            output = {'$dnanexus_link': {'field': output_name}}
-
-        The only way to recover the ACTUAL output is to use something like::
-
-            output = dxpy.DXJob(link['job']).describe()['output'][output['$dnanexus_link']['field']
-
-        This will query the job for the actual output. This is not my fault...
-
-        or direct pathlib.Path(s) to the locally downloaded output itself if self._dereference_outputs is True.
+        where 'output_value' is either the actual output, if NOT a file, or if a file, a dxpy.DXLink() reference to a
+        file on the remote file system, OR direct pathlib.Path(s) to the locally downloaded output itself if
+        self._download_oncomplete is True.
 
         :return: An iterator of output references
         """
@@ -496,51 +487,53 @@ class SubjobUtility:
                 # Do a describe() call here, so we only have to do it once to save time
                 output_values = job['job_class'].describe()['output']
                 for output in job['job_info']['outputs']:
-                    if self._dereference_outputs:
-                        output_ref = job['job_class'].get_output_ref(output)
-                        output_key = output_ref['$dnanexus_link']['field']
-                        output_value = output_values[output_key]
 
-                        # Need to check if they are files...
-                        # This is if the output is a list
-                        if type(output_value) is list:
-                            new_values = []
-                            for value in output_value:
-                                # This is possibly (likely) a file
-                                if '$dnanexus_link' in value:
-                                    if value['$dnanexus_link'].startswith('file-'):
+                    output_ref = job['job_class'].get_output_ref(output)
+                    output_key = output_ref['$dnanexus_link']['field']
+                    output_value = output_values[output_key]
+
+                    # Need to check if they are files...
+                    # This is if the output is a list
+                    if type(output_value) is list:
+                        new_values = []
+                        for value in output_value:
+                            # This is possibly (likely) a file
+                            if '$dnanexus_link' in value:
+                                if value['$dnanexus_link'].startswith('file-'):
+                                    if self._download_on_complete:  # Download the file if the user wants it locally
                                         new_values.append(download_dxfile_by_name(value, print_status=False))
                                     else:
                                         new_values.append(value)
-
-                                # This is unlikely to be a file
                                 else:
                                     new_values.append(value)
 
-                            output_dict[output_key] = new_values
-
-                        # This is if the output is just a single value
-                        else:
-                            # This is possibly (likely) a file.
-                            # In fact – I don't think dictionaries can happen here unless they are files, but adding
-                            # else statements just to make sure.
-                            if type(output_value) is dict:
-                                if '$dnanexus_link' in output_value:
-                                    # This is still likely a file...
-                                    if output_value['$dnanexus_link'].startswith('file-'):
-                                        output_dict[output_key] = download_dxfile_by_name(output_value,
-                                                                                          print_status=False)
-                                    # This is something else that I don't think actually exists in DNANexus...
-                                    else:
-                                        output_dict[output_key] = output_value
-                                else:
-                                    output_dict[output_key] = output_value
                             # This is unlikely to be a file
                             else:
-                                output_dict[output_key] = output_value
+                                new_values.append(value)
 
+                        output_dict[output_key] = new_values
+
+                    # This is if the output is just a single value
                     else:
-                        output_dict[output] = job['job_class'].get_output_ref(output)
+                        # Dictionaries are possibly (likely) a file.
+                        # In fact – I don't think dictionaries can happen here unless they are files, but adding
+                        # else statements just to make sure.
+                        if type(output_value) is dict:
+                            if '$dnanexus_link' in output_value:
+                                # This is still likely a file...
+                                if output_value['$dnanexus_link'].startswith('file-'):
+                                    if self._download_on_complete:  # Download the file if the user wants it locally
+                                        output_dict[output_key] = download_dxfile_by_name(output_value,
+                                                                                          print_status=False)
+                                    else:
+                                        output_dict[output_key] = output_value
+                                else:  # This is something else that I don't think actually exists in DNANexus...
+                                    output_dict[output_key] = output_value
+                            else:  # I don't think this else can happen, but adding it just to be sure
+                                output_dict[output_key] = output_value
+                        # This is unlikely to be a file
+                        else:
+                            output_dict[output_key] = output_value
 
             self._output_array.append(output_dict)
 

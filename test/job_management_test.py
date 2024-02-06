@@ -31,21 +31,18 @@ def test_subjob_build(tabix_file, dereference_outputs):
 
     found_chromosomes = []
 
-    if dereference_outputs:
-        for output_file in output_files:
+    for output_file in output_files:
 
-            curr_file = dxpy.DXFile(output_file)
-            file_name = curr_file.describe()['name']
-            name_match = re.match('chr(\\d+).tsv', file_name)
+        if dereference_outputs:
+            file_name = output_file.name
+        else:
+            file_name = dxpy.DXFile(output_file).describe()['name']
 
-            assert name_match
+        name_match = re.match('chr(\\d+).tsv', file_name)
+        assert name_match
 
-            if name_match:
-                found_chromosomes.append(name_match.group(1))
-    else:
-
-        for output_files in output_files:
-            print(output_files)
+        if name_match:
+            found_chromosomes.append(name_match.group(1))
 
     for chrom in range(1,23):
         assert str(chrom) in found_chromosomes
