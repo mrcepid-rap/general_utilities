@@ -17,15 +17,15 @@ from general_utilities.job_management.subjob_test.subjob_test import subjob_test
 
 
 @pytest.mark.parametrize(
-    argnames=['tabix_file', 'dereference_outputs'],
+    argnames=['tabix_file', 'download_on_complete'],
     argvalues=zip(['file-GZzx098J0zVxY2JXgBk5B16X', 'file-GZzx098J0zVxY2JXgBk5B16X'],
                   [True, False])
 )
-def test_subjob_build(tabix_file, dereference_outputs):
+def test_subjob_build(tabix_file, download_on_complete):
 
     tabix_dxfile = dxpy.DXFile(dxid=tabix_file)
 
-    output_files = subjob_testing(tabix_dxfile, dereference_outputs)
+    output_files = subjob_testing(tabix_dxfile, download_on_complete)
 
     assert len(output_files) == 22
 
@@ -33,9 +33,11 @@ def test_subjob_build(tabix_file, dereference_outputs):
 
     for output_file in output_files:
 
-        if dereference_outputs:
+        if download_on_complete:
+            assert type(output_file) is Path
             file_name = output_file.name
         else:
+            assert type(output_file) is dict
             file_name = dxpy.DXFile(output_file).describe()['name']
 
         name_match = re.match('chr(\\d+).tsv', file_name)
