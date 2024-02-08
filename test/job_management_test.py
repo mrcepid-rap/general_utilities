@@ -3,7 +3,7 @@ import re
 import dxpy
 import pytest
 
-from pathlib import Path
+from pathlib import Path, PosixPath
 
 test_folder = Path(os.getenv('TEST_DIR'))
 cwd = Path(os.getcwd())
@@ -34,7 +34,7 @@ def test_subjob_build(tabix_file, download_on_complete):
     for output_file in output_files:
 
         if download_on_complete:
-            assert type(output_file) is Path
+            assert type(output_file) is PosixPath
             file_name = output_file.name
         else:
             assert type(output_file) is dict

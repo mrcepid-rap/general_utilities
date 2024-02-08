@@ -124,7 +124,7 @@ class SubjobUtility:
             subjob_utility.launch_job(function=burden_interaction,
                                       inputs={'chromosome': chromosome,
                                               'pheno_name': phenotype},
-                                      outputs=['outfile'],
+                                      outputs=['outfile', 'outname'],
                                       instance_type='mem3_ssd1_v2_x8',
                                       name=f'{chromosome}_{phenotype}_subjob')
 
@@ -133,13 +133,19 @@ class SubjobUtility:
 
         # Collect outputs:
         outputs = []
+        # 1st for-loop iterates over individual jobs
         for output in subjob_utility:
             # Each output is either the actual value, or if a file, a dxpy.DXLink() reference to a file OR a
             # pathlib.Path to that file on the local file system if self._download_oncomplete is True
-            for output_key, output_value in output.items():
 
-                print(f'Output for {field}: {field_value}')
-                outputs.append(field_value)
+            # 2nd for-loop iterates over outputs
+            for output_key, output_value in output.items():
+                print(f'Output for {output_key}: {output_value}')
+                outputs.append(output_value)
+
+            # Or, the user can also directly query the output using the name given to the launch_job method
+            # outputs param:
+            print(f'output for the outname value is: {output["outname"]})
 
     :param concurrent_job_limit: Number of jobs that can be run at once. Default of 100 is the actual limit for
         concurrent jobs on the DNANexus platform. It is also wishful in that you will rarely be able to have 100
@@ -149,10 +155,9 @@ class SubjobUtility:
     :param incrementor: This class will print a status method for every :param:incrementor jobs completed with a
         percentage of total jobs completed. [500]
     :param log_update_time: How often should the log of current jobs be printed in seconds. [60]
-    :param dereference_outputs: Should ALL dxpy.DXJob references be dereferenced on subjob completion? Setting this
-        option to 'True' will do two things: 1. It will convert output references (via
-        :func:`dxpy.DXJob.get_output_ref()`) to the actual output and 2. if this output is a file, download it to the
-        current instance. [False]
+    :param download_on_complete: Should ALL file outputs be downloaded on subjob completion? Setting this
+        option to 'True' will download all files to the current instance and provide a :func:Path. If 'False'
+        (default), the value in the output dictionary will be a :func:dxpy.dxlink(). [False]
     """
 
     def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
@@ -206,20 +211,23 @@ class SubjobUtility:
                     # output dictionaries
                     {
                     'output1': output_value,
-                    'output2': output_value
+                    'output2': output_value,
+                    'outputN': output_value
                     }
                 ],
                 [  # job2
                     {
                     'output1': output_value,
-                    'output2': output_value
+                    'output2': output_value,
+                    'outputN': output_value
                     }
                 ]
             ]
 
-        where 'output_value' is either the actual output, if NOT a file, or if a file, a dxpy.DXLink() reference to a
-        file on the remote file system, OR direct pathlib.Path(s) to the locally downloaded output itself if
-        self._download_oncomplete is True.
+        where dict keys are identical to those passed to the :func:`launch_applet()` / :func:`launch_job()` 'outputs'
+        parameter and where 'output_value' is either the actual output (e.g., str, int, boolean), if NOT a file,
+        or if a file, a dxpy.DXLink() reference to a file on the remote file system, OR pathlib.Path(s) to the
+        locally downloaded output itself if download_on_complete is True.
 
         :return: An iterator of output references
         """
