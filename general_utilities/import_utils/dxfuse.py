@@ -29,7 +29,7 @@ def mount_dx_project(data_project: str = None) -> Path:
     LOGGER.info('Mounting DNANexus project data...')
 
     # Download DXFuse so we can mount the filesystem locally
-    dxfuse_url = 'wget https://github.com/dnanexus/dxfuse/releases/download/v1.2.0/dxfuse-linux'
+    dxfuse_url = 'https://github.com/dnanexus/dxfuse/releases/download/v1.2.0/dxfuse-linux'
     dxfuse_path = Path('./dxfuse-linux')
     request.urlretrieve(dxfuse_url, dxfuse_path)
     dxfuse_path.chmod(0o557)
