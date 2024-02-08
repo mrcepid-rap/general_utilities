@@ -48,11 +48,11 @@ def mount_dx_project(data_project: str = None) -> Path:
     current_project_name = dxpy.describe(current_project)['name']
     CommandExecutor().run_cmd(f'{dxfuse_path.resolve()} {mount_dir.resolve()} {current_project}')
 
-    mount_path = Path(f'mount/Bulk/{current_project_name}')
+    mount_path = Path(f'mount/{current_project_name}')
 
     if mount_path.exists() and mount_path.is_dir():
         LOGGER.info(f'dxfuse mounted successfully at {mount_path}...')
     else:
-        raise FileNotFoundError('Mount point does not exist or is not a directory...')
+        raise FileNotFoundError(f'Mount point ({mount_path}) does not exist or is not a directory...')
 
     return mount_path
