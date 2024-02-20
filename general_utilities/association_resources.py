@@ -145,22 +145,32 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
     return chromosomes
 
 
-def generate_linked_dx_file(file: Union[str, Path]) -> dxpy.DXFile:
+def generate_linked_dx_file(file: Union[str, Path], delete_on_upload: bool = True) -> dxpy.DXFile:
     """A helper function to upload a local file to the DNANexus platform and then remove it from the instance.
 
-     A simple wrapper artound :func:`dxpy.upload_local_file` with additional functionality to remove the file from
+     A simple wrapper around :func:`dxpy.upload_local_file()` with additional functionality to remove the file from
      the local instance storage system.
 
+     This will generate a dict with the format::
+
+        {'$dnanexus_link': 'file-1234567890ABCDEFGabcdefg'}
+
+    With default input this method also deletes the uploaded file on upload. This functionality can be changed by
+    setting :param delete_on_upload: to False.
+
     :param file: Either a str or Path representation of the file to upload.
+    :param delete_on_upload: Delete this file on upload? [True]
     :return: A :func:`dxpy.DXFile` instance of the remote file.
     """
 
     if type(file) == str:
         linked_file = dxpy.upload_local_file(filename=file)
-        Path(file).unlink()
+        if delete_on_upload:
+            Path(file).unlink()
     else:
         linked_file = dxpy.upload_local_file(file=file.open('rb'))
-        file.unlink()
+        if delete_on_upload:
+            file.unlink()
     return linked_file
 
 
@@ -180,6 +190,14 @@ def build_transcript_table() -> pd.DataFrame:
     # ensure columns are in the expected order:
     transcripts_table = transcripts_table[['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
                                            'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']]
+
+    # Also generate a table of mean chromosome positions for plotting
+    mean_chr_pos = transcripts_table[['chrom', 'manh.pos']].groupby('chrom').mean()
+
+    # Important that this file is sorted by chromosome to ensure proper plotting order...
+    chrom_dict = dict(zip([str(x) for x in range(1, 23)] + ["X", "Y"], range(1, 25)))
+    mean_chr_pos.sort_index(key=lambda x: x.map(chrom_dict), inplace=True)
+    mean_chr_pos.to_csv('mean_chr_pos.tsv', sep='\t')
 
     return transcripts_table
 
@@ -402,7 +420,7 @@ def find_index(parent_file: dxpy.DXFile, index_suffix: str) -> dxpy.DXFile:
     file_description = parent_file.describe(fields={'folder': True, 'name': True, 'project': True})
 
     # First set the likely details of the corresponding index:
-    project_id = dxpy.PROJECT_CONTEXT_ID
+    project_id = file_description['project']
     index_folder = file_description['folder']
     index_name = file_description['name'] + '.' + index_suffix
 
@@ -453,13 +471,17 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
 
 
-def get_sample_count() -> int:
-    # Need to define separate min/max MAC files for REGENIE as it defines them slightly differently from BOLT:
-    # First we need the number of individuals that are being processed:
-    with open('SAMPLES_Include.txt') as sample_file:
-        n_samples = 0
-        for _ in sample_file:
-            n_samples += 1
-        sample_file.close()
+def get_include_sample_ids() -> List[str]:
+    """Get the sample IDs from the SAMPLES_Include.txt file and return them as a List[str]
 
-    return n_samples
+    :return: A List[str] of all sample IDs in the SAMPLES_Include.txt file created by
+        general_utilities.import_utils.module_loader.ingest_data.py
+    """
+
+    with Path('SAMPLES_Include.txt').open('r') as include:
+        samples_list = []
+        for samp in include:
+            samp_id = samp.rstrip().split()[0]  # Have to do this as the file follows plink IID\tFID convention.
+            samples_list.append(samp_id)
+
+    return samples_list

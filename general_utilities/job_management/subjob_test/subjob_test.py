@@ -3,6 +3,8 @@ import csv
 import dxpy
 import gzip
 from pathlib import Path
+
+from general_utilities.job_management.subjob_test.subjob_subpackage.tabix_subjob_testing import tabix_subjob
 from general_utilities.job_management.subjob_utility import SubjobUtility
 from general_utilities.association_resources import download_dxfile_by_name, generate_linked_dx_file
 from general_utilities.mrc_logger import MRCLogger
@@ -11,7 +13,7 @@ from general_utilities.mrc_logger import MRCLogger
 LOGGER = MRCLogger(__name__).get_logger()
 
 
-def test_subjob(tabix_dxfile: dxpy.DXFile):
+def subjob_testing(tabix_dxfile: dxpy.DXFile, download_on_complete: bool):
 
     tabix_downloaded = download_dxfile_by_name(tabix_dxfile, print_status=True)
     output_tsv = Path('column_stripped.tsv')
@@ -36,48 +38,21 @@ def test_subjob(tabix_dxfile: dxpy.DXFile):
     LOGGER.info(f'Uploaded file {bgzip_dxlink}')
 
     LOGGER.info('Attempting to create subjobs...')
-    subjob_launcher = SubjobUtility()
-    for chr in range(1,23):
-        subjob_launcher.launch_job(function_name='tabix_subjob',
+    subjob_launcher = SubjobUtility(download_on_complete=download_on_complete)
+    for chr in range(1, 23):
+        subjob_launcher.launch_job(function=tabix_subjob,
                                    inputs={'input_table': {'$dnanexus_link': bgzip_dxlink.get_id()}, 'chromosome': chr},
-                                   outputs=['chromosome', 'subset_tsv'])
+                                   outputs=['chromosome', 'subset_tsv'],
+                                   instance_type='mem1_ssd1_v2_x2',
+                                   name=f'{chr}_tabix_test')
 
     subjob_launcher.submit_queue()
 
     output_files = []
 
-    for output in subjob_launcher:
-        for subjob_output in output:
-            if 'field' in subjob_output['$dnanexus_link']:
-                link = subjob_output['$dnanexus_link']
-                field = link['field']
-                field_value = dxpy.DXJob(link['job']).describe()['output'][field]
-                LOGGER.info(f'Output for {field}: {field_value}')
-                if field == 'subset_tsv':
-                    output_files.append(subjob_output)
+    for subjob_output in subjob_launcher:
+        LOGGER.info(f'Output for subset_tsv: {subjob_output["subset_tsv"]}')
+        LOGGER.info(f'Output for chromosome: {subjob_output["chromosome"]}')
+        output_files.append(subjob_output['subset_tsv'])
 
     return output_files
-
-
-@dxpy.entry_point('tabix_subjob')
-def tabix_subjob(input_table: dict, chromosome: str):
-    local_tab = download_dxfile_by_name(input_table, print_status=True)
-    output_tab = Path(f'chr{chromosome}.tsv')
-
-    with local_tab.open('r') as local_open,\
-        output_tab.open('w') as local_out:
-
-        local_csv = csv.DictReader(local_open, delimiter='\t')
-        output_csv = csv.DictWriter(local_out, delimiter='\t', fieldnames=local_csv.fieldnames)
-
-        output_csv.writeheader()
-
-        match_string = f'chr{chromosome}'
-
-        for row in local_csv:
-            if row['#CHROM'] == match_string:
-                output_csv.writerow(row)
-
-    output = {'chromosome': chromosome, 'subset_tsv': generate_linked_dx_file(output_tab)}
-    return output
-

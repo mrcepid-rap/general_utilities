@@ -20,17 +20,20 @@ def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, i
     else:
         valid_genes = None
 
+    tmp_output = Path(f'{output_prefix}.lm_stats.tmp')
+    outputs = []
+
     if is_snp_tar:
-        os.rename(output_prefix + '.lm_stats.tmp',
-                  output_prefix + '.SNP.glm.stats.tsv')
-        outputs = [Path(f'{output_prefix}.SNP.glm.stats.tsv')]
+        snp_output = Path(f'{output_prefix}.SNP.glm.stats.tsv')
+        tmp_output.rename(snp_output)
+        outputs.append(snp_output)
     elif is_gene_tar:
-        os.rename(output_prefix + '.lm_stats.tmp',
-                  output_prefix + '.GENE.glm.stats.tsv')
-        outputs = [Path(f'{output_prefix}.GENE.glm.stats.tsv')]
+        gene_output = Path(f'{output_prefix}.GENE.glm.stats.tsv')
+        tmp_output.rename(gene_output)
+        outputs.append(gene_output)
     else:
         # read in the GLM stats file:
-        glm_table = pd.read_csv(open(output_prefix + ".lm_stats.tmp", 'r'), sep="\t")
+        glm_table = pd.read_csv(tmp_output, sep="\t")
 
         # Now process the gene table into a useable format:
         # First read in the transcripts file
@@ -59,16 +62,15 @@ def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, i
 
         # Now merge the transcripts table into the gene table to add annotation and write
         glm_table = pd.merge(transcripts_table, glm_table, on='ENST', how="left")
-        gene_tsv = Path(f'{output_prefix}.genes.glm.stats.tsv')
-        with gene_tsv.open('w') as gene_out:
 
-            # Sort just in case
-            glm_table = glm_table.sort_values(by=['chrom', 'start', 'end'])
+        # Sort just in case
+        glm_table = glm_table.sort_values(by=['chrom', 'start', 'end'])
 
-            glm_table.to_csv(path_or_buf=gene_out, index=False, sep="\t", na_rep='NA')
+        glm_tsv = Path(f'{output_prefix}.genes.glm.stats.tsv')
+        with glm_tsv.open('w') as glm_out:
+            glm_table.to_csv(path_or_buf=glm_out, index=False, sep="\t", na_rep='NA')
 
-        # And bgzip and tabix...
-        outputs = list(bgzip_and_tabix(gene_tsv, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
+        outputs.extend(bgzip_and_tabix(glm_tsv, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
 
     return outputs
 

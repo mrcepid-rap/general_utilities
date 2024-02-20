@@ -52,55 +52,49 @@ class CommandExecutor:
         to be on the image, but if in a non-public repository (e.g., AWS ECR) this will cause the command to fail.
     :param docker_mounts: Additional Docker mounts to attach to this process via the `-v` commandline argument to
         Docker. See the documentation for Docker for more information.
-    :param authenticate_aws: Boolean indicating if AWS authentication is required to download this Docker image
+    :param aws_credentials: Path to AWS credentials to authenticate to AWS ECR for purposes of pulling a Docker image.
     """
     
     def __init__(self, docker_image: str = None, docker_mounts: List[DockerMount] = None,
-                 authenticate_aws: bool = False):
+                 aws_credentials: Path = None):
 
         self._logger = MRCLogger(__name__).get_logger()
 
-        if authenticate_aws:
-            self._authenticate_aws_ecr()
+        if aws_credentials:
+            self._logger.info('Authenticating to AWS ECR')
+            self._authenticate_aws_ecr(aws_credentials)
 
         self._docker_image = docker_image
         self._docker_configured = self._ingest_docker_file(docker_image)
         self._docker_prefix = self._construct_docker_prefix(docker_mounts)
 
-    @staticmethod
-    def _authenticate_aws_ecr() -> None:
+    def _authenticate_aws_ecr(self, aws_credentials: Path) -> None:
         """Place files required for AWS-ECR authentication in the correct paths for Docker to find them.
 
         This handles the credentials provided by the record given in the 'assetDepends' portion of dxapp.json This
         asset MUST include a config.json and AWS formatted credentials file to function properly or this will throw an
         error!
 
+        :param aws_credentials: Path to AWS credentials to authenticate to AWS ECR for purposes of pulling a Docker
+            image.
         :return: None
         """
 
-        # Make sure the config.json is in the correct place for Docker
+        # The config.json file is NOT provided by the user and is generated here.
         docker_config = Path('~/.docker/config.json')
         if not docker_config.expanduser().parent.exists():
             docker_config.expanduser().parent.mkdir()
+        else:
+            self._logger.warning('Docker config already exists. Overwriting!')
+        with docker_config.expanduser().open('w') as config_writer:
+            config_writer.write('{"credsStore": "ecr-login"}')
 
+        # The credentials file is provided as part of DNANexus input. Here we need to move the file provided on the
+        # command line (aws_credentials) to the correct PATH for Docker to find it.
         credentials_config = Path('~/.aws/credentials')
         if not credentials_config.expanduser().parent.exists():
             credentials_config.expanduser().parent.mkdir()
-
-        # Set initial paths for credentials as expected by the provided resource and make sure that they are actually there
-        resource_config = Path('/config.json')
-        resource_credentials = Path('/credentials')
-        if not resource_config.exists() and not resource_credentials.exists():
-            raise dxpy.AppError('AWS ECR credentials not provided properly. Please try again.')
-
-        # And then move the docker config/aws credentials file from our docker authentication resource to these new folders
-        # Where the given command-line tools (docker & amazon-ecr-credential-helper) know where to look for them
-        resource_config.replace(docker_config.expanduser())
-        resource_credentials.replace(credentials_config.expanduser())
-
-        # TODO: Make sure these actually work in the context of the ExpansionHunter repo
-        # cmd = 'docker pull 535440495128.dkr.ecr.eu-west-2.amazonaws.com/adrestia-repeatexpansion:latest'
-        # run_cmd(cmd, print_cmd=True)
+        aws_credentials.replace(credentials_config.expanduser())
 
     def _ingest_docker_file(self, docker_image: str) -> bool:
         """Download a Docker image (if requested) so that we can run tools not on the DNANexus platform.

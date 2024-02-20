@@ -2,6 +2,23 @@
 
 ## Changelog
 
+* v1.3.0
+  * Large number of changes to the SubjobUtility class:
+    * Changed the parameter dereference_files to download_on_complete to better reflect what the parameter does
+    * Unlinked log_update_time from how often the class checks for completed jobs to ensure that jobs aren't waiting for too long. Class now always checks every 60s for finished jobs.
+    * Rebuilt how outputs are processed when jobs complete. All outputs are now dereferenced by dxpy.describe() so this does not have to be done by implementing classes. 
+    * Fixed a bug where provided instance type wasn't actually used
+    * Added doc strings for all methods / classes
+    * Added / modified tests for new functionality
+  * Added a 'delete_on_upload' parameter to the `generate_linked_dx_file` method in association_resources as an optional parameter. Default behaviour is as before, which is to delete the file on upload (default = True).
+  * The 'build_transcripts_table' method now also creates the mean_chr_pos.tsv file for use during plotting of Manhattan plots.
+  * Changed the 'get_sample_count' method to 'get_include_sample_ids'. This method now returns a list of sample IDs that are included in the analysis. To get the number of samples included, use the `len()` function on the returned list.
+  * Added a 'dxfuse' package, which wraps the [dxfuse](https://github.com/dnanexus/dxfuse) command-line tool to mount a DXProject remote file system on an AWS node.
+  * Removed the 'DXPath' class in import_utils. The class was causing confusion due to similarities with how DXLinks were used. All DXPath objects are now just dicts.
+  * Updated the aws_credentials functionality of CommandExecutor to use a provided credentials file, rather than a DX resource provided to the applet .json.
+  * Slightly changed how glm outputs are processed to use Path instead of os.
+  * Added manhattan plotter methods to the plot_lib package
+
 * v1.2.2
   * Changes to how genetic data is loaded due to format changes in the SAMPLE file
   * Several fixes to subjob utility
