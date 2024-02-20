@@ -183,18 +183,3 @@ def process_regenie_step_one(regenie_run_location: dxpy.DXFile) -> bool:
             tar = tarfile.open(tarball_path, 'r:gz')
             tar.extractall()
         return True
-
-
-def initialise_stream(cmd_executor: CommandExecutor, current_project_id: str) -> None:
-
-    LOGGER.info('Establishing stream for .bgen files from imputed data...')
-
-    # Download DXFuse so we can mount the filesystem locally
-    cmd = 'wget https://github.com/dnanexus/dxfuse/releases/download/v0.21/dxfuse-linux'
-    cmd_executor.run_cmd(cmd)
-    Path('dxfuse-linux').chmod(0o557)
-
-    # And then mount the project directory
-    Path('mount/').mkdir()
-    cmd = f'./dxfuse-linux mount/ {current_project_id}'
-    cmd_executor.run_cmd(cmd)
