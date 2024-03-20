@@ -423,7 +423,7 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
     file_description = parent_file.describe(fields={'folder': True, 'name': True, 'project': True})
 
     # First set the likely details of the corresponding index:
-    project_id = file_description['project']
+    project_id = dxpy.PROJECT_CONTEXT_ID
     index_folder = file_description['folder']
     index_name = file_description['name'] + '.' + index_suffix
 
