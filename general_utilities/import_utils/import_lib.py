@@ -4,7 +4,7 @@ import tarfile
 import dxpy
 
 from pathlib import Path
-from typing import Union, Dict, Tuple, List, TypedDict
+from typing import Union, Dict, Tuple, List, TypedDict, Optional
 
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.job_management.command_executor import CommandExecutor
@@ -25,8 +25,8 @@ class BGENInformation(TypedDict):
     bgen: dict
     index: dict
     sample: dict
-    vep: dict
-    vepidx: dict
+    vep: Optional[dict]
+    vepidx: Optional[dict]
 
 
 def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> None:
