@@ -1,12 +1,13 @@
 import csv
-import sys
+import gzip
 import dxpy
-import subprocess
 import pandas as pd
 import pandas.core.series
 
 from pathlib import Path
-from typing import List, Union, Tuple
+from typing import List, Union, Tuple, IO
+
+from dxpy import DXSearchError
 
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.job_management.command_executor import build_default_command_executor
@@ -348,6 +349,27 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
     return found_index
 
 
+def find_dxlink(name: str, folder: str) -> dict:
+    """This method is a simple wrapper for dxpy.find_one_data_object() for ease of repetitive use
+
+    :param name: EXACT name of the file to be searched for (without path information)
+    :param folder: EXACT name of the folder where this should be found
+    :return: A dxpy.dxlink() representation of the file
+    """
+
+    try:
+        dxlink = dxpy.dxlink(dxpy.find_one_data_object(name=name,
+                                                       classname='file',
+                                                       folder=folder,
+                                                       project=dxpy.PROJECT_CONTEXT_ID,
+                                                       name_mode='exact',
+                                                       zero_ok=False))
+    except DXSearchError:
+        raise FileNotFoundError(f'File – {folder}/{name} – not found during imputation data search!')
+
+    return dxlink
+
+
 def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = None,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
     """BGZIP and TABIX a provided file path
@@ -397,3 +419,15 @@ def get_include_sample_ids() -> List[str]:
             samples_list.append(samp_id)
 
     return samples_list
+
+
+def check_gzipped(file_path: Path) -> IO:
+    """Check if a file is gzipped and return the appropriate file handle via the appropriate open method'
+
+    :param file_path: A PosixPath representation of a possible .tsv / .txt file
+    :return: An IO handle for that file with either gzip or path open methods
+    """
+    if file_path.suffixes[-1] == '.gz':
+        return gzip.open(file_path, 'rt')
+    else:
+        return file_path.open('r')
