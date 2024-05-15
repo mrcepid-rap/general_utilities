@@ -2,6 +2,15 @@
 
 ## Changelog
 
+* v1.4.0
+  * Changed expected python version from ~3.8 to ^3.8 in poetry
+  * Added a fix for how indicies are found in the `find_index` method in `association_resources`
+  * Removed the `run_cmd()` method from `association_resources` as it is now handled by the `CommandExecutor` class
+  * Modified the `ingest_tarballs` method in `association_resources` to no longer accept a 'named tarball' to search for. This was done to remove complexity from the method.
+  * Added new methods to `association_resources` :
+    * `find_dxlink`: Searches for a dxlink in a project and returns the file. This is a simple wrapper around `dxpy.find_one_data_object`.
+    * `check_gzipped`: Checks if a file is gzipped and returns an open file-handle using the appropriate method; `gzip.open()` for gzip, `Path.open()` for non-gzipped files.
+
 * v1.3.0
   * Large number of changes to the SubjobUtility class:
     * Changed the parameter dereference_files to download_on_complete to better reflect what the parameter does
