@@ -454,9 +454,12 @@ def fix_plink_bgen_sample_sex(sample_file: Path) -> Path:
         fix_sample_writer = csv.DictWriter(fix_sample_file, delimiter=' ', fieldnames=sample_reader.fieldnames)
         fix_sample_writer.writeheader()
 
+        # sample-v1 and sample-v2 have slightly different headers
+        id_header = 'ID_1' if 'ID_1' in sample_reader.fieldnames else 'ID'
+
         # Write sex to 'fix' sample file
         for sample in sample_reader:
-            if sample['ID_1'] == '0':
+            if sample[id_header] == '0':
                 fix_sample_writer.writerow(sample)
             else:
                 sample['sex'] = '2'
