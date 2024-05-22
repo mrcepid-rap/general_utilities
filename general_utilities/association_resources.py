@@ -431,3 +431,35 @@ def check_gzipped(file_path: Path) -> IO:
         return gzip.open(file_path, 'rt')
     else:
         return file_path.open('r')
+
+
+def fix_plink_bgen_sample_sex(sample_file: Path) -> Path:
+    """A simple wrapper to write a fake sex to a .bgen sample file to allow processing via plink2
+
+    plink2 has introduced an issue with chrX processing. Briefly, plink2 now requires sex to be encoded in the sample
+    file so that hemizygous state in males can be correctly encoded. We cannot use this, as BOLT does not allow for
+    hemizygous ploidy when doing association tests with .bgen inputs. Thus, we encode all individuals in a given .sample
+    file to be female. One must also ensure that the --split-par hg38 flag is used when running plink2 to ensure that
+    these settings work.
+
+    :param sample_file: A .sample file for .bgen format genotypes
+    :return: A sample file with fake sex. We DO NOT replace the old sample file!
+    """
+
+    fixed_sample = sample_file.with_suffix('.fix.sample')
+    with sample_file.open('r') as sample_file, \
+            fixed_sample.open('w') as fix_sample_file:
+
+        sample_reader = csv.DictReader(sample_file, delimiter=' ')
+        fix_sample_writer = csv.DictWriter(fix_sample_file, delimiter=' ', fieldnames=sample_reader.fieldnames)
+        fix_sample_writer.writeheader()
+
+        # Write sex to 'fix' sample file
+        for sample in sample_reader:
+            if sample['ID_1'] == '0':
+                fix_sample_writer.writerow(sample)
+            else:
+                sample['sex'] = '2'
+                fix_sample_writer.writerow(sample)
+
+    return fixed_sample
