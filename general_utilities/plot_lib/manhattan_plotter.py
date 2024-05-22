@@ -80,7 +80,7 @@ class ManhattanPlotter(ClusterPlotter):
         # Do plotting
         options = [f'/test/{self._plot_table_path}', f'/test/{self._index_table_path}', self._p_column, self._test_name,
                    self._sig_threshold, self._suggestive_threshold, self._label_qq]
-        final_plots.append(self._run_R_script(r_script, options, Path('manhattan_plot.svg')))
+        final_plots.append(self._run_R_script(r_script, options, Path('manhattan_plot.png')))
 
         return final_plots
 
