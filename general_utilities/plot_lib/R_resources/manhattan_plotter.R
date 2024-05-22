@@ -33,7 +33,7 @@ standardize_table <- function(table_path, p_val_col) {
 
 }
 
-load_and_plot_data <- function(result_path, label_path, p_val_col, plot_header, p_sig, p_sugg, label_qq = T) {
+load_and_plot_data <- function(result_path, label_path, p_val_col, plot_header, p_sig, p_sugg, label_qq) {
 
   # Read in and standardize tables
   result_table <- standardize_table(result_path, p_val_col)
@@ -85,7 +85,7 @@ plot_manh <- function(stats, ymax, p_sig, p_sugg, label_data) {
     geom_hline(yintercept = sig.lines, colour = sig.colours, linetype = 2) +
     scale_x_continuous(name = "Chromosome", label = mean_chr_pos[,chrom], breaks = mean_chr_pos[,manh.pos]) +
     scale_y_continuous(name = expression(bold(-log[10](italic(p)))), limits = c(0,ymax)) +
-    scale_colour_manual(values = rep(c("#53878D","#7AC6CC"),12)[1:23], breaks = c(as.character(1:22),"X")) +
+    scale_colour_manual(values = rep(c("#93328E","#0047BB"),12)[1:23], breaks = c(as.character(1:22),"X")) +
     coord_capped_cart(bottom="both",left="both") + # Comes from the "lemon" package
     theme + theme(panel.grid.major = element_blank())
 
@@ -150,9 +150,10 @@ plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers
 # 4: plot name
 # 5: p.sig
 # 6: p.sugg
+# 7: label qq plots
 args <- commandArgs(trailingOnly = T)
 mean_chr_pos <- fread('/test/mean_chr_pos.tsv')
 
-manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], as.numeric(args[5]), as.numeric(args[6]))
+manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], as.numeric(args[5]), as.numeric(args[6]), as.logical(args[7]))
 
 ggsave('/test/manhattan_plot.png', manh_plot, units='in', width = 15, height = 6)
