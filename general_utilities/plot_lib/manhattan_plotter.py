@@ -64,10 +64,11 @@ class ManhattanPlotter(ClusterPlotter):
 
         if self._test_name:
             self._index_table_path = Path(f'current_index.{self._test_name}.tsv.gz')
-            self.get_index_variant_table().to_csv(self._index_table_path, sep='\t', index=False)
         else:
             self._index_table_path = Path(f'current_index.tsv.gz')
-            self.get_index_variant_table().to_csv(self._index_table_path, sep='\t', index=False)
+
+        query = f'{self._maf_column} >= {self._maf_cutoff}'
+        self.get_index_variant_table().query(query).to_csv(self._index_table_path, sep='\t', index=False)
 
     def plot(self) -> List[Path]:
 
