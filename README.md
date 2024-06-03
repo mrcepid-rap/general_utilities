@@ -2,6 +2,15 @@
 
 ## Changelog
 
+* v1.5.0
+  * Changes to support newer versions of plink2 that require sex to be in the sample file:
+    * Added a new method `fix_plink_bgen_sample_sex` to `association_resources` that makes a plink2 compatible sample file
+        * **NOTE**: This sample file codes all individuals as female! This is to ensure that a given .bgen can be processed by plink2. Please ensure that this does not create erroneous data when performing association tests!
+    * Added a new method `sample_v2_to_v1` to `import_lib` for converting a v2 sample file to a v1 sample file
+  * Small modifications to plot_lib to make plots clearer in some circumstances:
+    * qq plots now should not label all markers for imputed data
+    * Index variant text labels should now also be filtered by MAF
+
 * v1.4.0
   * Changed expected python version from ~3.8 to ^3.8 in poetry
   * Added a fix for how indicies are found in the `find_index` method in `association_resources`
