@@ -54,23 +54,55 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> Non
     dxpy.download_dxfile(bgen, f'filtered_bgen/{chromosome}.filtered.bgen')
     dxpy.download_dxfile(vep, f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
 
-    bgen_v2 = Path(f'filtered_bgen/{chromosome}.filtered.sample')
-    bgen_v1 = Path(f'filtered_bgen/{chromosome}.filtered.v1.sample')
-
     # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
+    sample_v2_to_v1(Path(f'filtered_bgen/{chromosome}.filtered.sample'))
+
+
+def sample_v2_to_v1(bgen_v2: Path) -> Path:
+    """Helper method to convert a bgenix / qctool v2 sample file to a plink-compatible v1 sample file
+
+    This method converts the following sample file with three column header:
+
+        ID missing sex
+        0 0 D
+
+    OR
+
+        ID_1 ID_2 missing
+        0 0 0
+
+    To:
+
+        ID_1 ID_2 missing sex
+        0 0 0
+
+    :param bgen_v2: A Path object pointing to a bgenix / qctool v2 sample file.
+    :return: A Path object pointing to the newly created plink-compatible v1 sample file.
+    """
+
+    bgen_v1 = bgen_v2.with_suffix('.v1.sample')
+
     with bgen_v2.open('r') as samp_file, \
-            bgen_v1.open('w') as fixed_samp_bolt:
+            bgen_v1.open('w') as fixed_samp:
+
+        found_header_1 = False
+        found_header_2 = False
 
         for line in samp_file:
             line = line.rstrip().split(" ")
-            if line[0] == 'ID':
-                fixed_samp_bolt.write('ID_1 ID_2 missing sex\n')
-            elif line[2] == 'D':
-                fixed_samp_bolt.write('0 0 0 D\n')
+            if line[0].startswith('ID'):
+                found_header_1 = True
+                fixed_samp.write('ID_1 ID_2 missing sex\n')
+            elif line[0] == '0':
+                found_header_2 = True
+                fixed_samp.write('0 0 0 D\n')
             else:
-                fixed_samp_bolt.write(f'{line[0]} {line[0]} 0 NA\n')
+                fixed_samp.write(f'{line[0]} {line[0]} 0 NA\n')
 
-    bgen_v1.replace(bgen_v2)
+        if not found_header_1 or not found_header_2:
+            raise dxpy.AppError(f'Provided bgen sample file ({bgen_v2}) is not in v2 format')
+
+    return bgen_v1.replace(bgen_v2)
 
 
 def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
