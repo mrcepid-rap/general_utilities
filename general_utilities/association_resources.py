@@ -466,3 +466,20 @@ def fix_plink_bgen_sample_sex(sample_file: Path) -> Path:
                 fix_sample_writer.writerow(sample)
 
     return fixed_sample
+
+
+def replace_multi_suffix(original_path: Path, new_suffix: str) -> Path:
+    """A helper function to replace a path on a file with multiple suffixes (e.g., .tsv.gz)
+
+    This function just loops through the path and recursively removes the string after '.'. Once there are no more
+    full stops it then adds the requested :param: new_suffix.
+
+    :param original_path: The original filepath
+    :param new_suffix: The new suffix to add
+    :return: A Pathlike to the new file
+    """
+
+    while original_path.suffix:
+        original_path = original_path.with_suffix('')
+
+    return original_path.with_suffix(new_suffix)
