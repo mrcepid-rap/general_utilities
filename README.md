@@ -2,6 +2,9 @@
 
 ## Changelog
 
+* v1.5.1
+  * Added a helper function to `association_resources` that will replace a multi-suffix file.
+
 * v1.5.0
   * Changes to support newer versions of plink2 that require sex to be in the sample file:
     * Added a new method `fix_plink_bgen_sample_sex` to `association_resources` that makes a plink2 compatible sample file
