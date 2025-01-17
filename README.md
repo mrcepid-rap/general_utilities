@@ -2,6 +2,10 @@
 
 ## Changelog
 
+* v1.5.2
+  * Updated python version to `~3.12`. This also involved updating all package dependencies to the latest versions (as of this release – 2025-01-17)
+  * Cleaned up some imports
+
 * v1.5.1
   * Added a helper function to `association_resources` that will replace a multi-suffix file.
 
