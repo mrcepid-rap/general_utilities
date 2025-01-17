@@ -4,10 +4,9 @@ import tarfile
 import dxpy
 
 from pathlib import Path
-from typing import Union, Dict, Tuple, List, TypedDict, Optional
+from typing import Dict, Tuple, List, TypedDict, Optional
 
 from general_utilities.association_resources import download_dxfile_by_name
-from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger().get_logger()
