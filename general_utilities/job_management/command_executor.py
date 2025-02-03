@@ -294,15 +294,22 @@ class CommandExecutor:
             return proc_exit_code
 
 
-def build_default_command_executor() -> CommandExecutor:
+def build_default_command_executor(dna_nexus_run: bool = True) -> CommandExecutor:
     """Set up the 'CommandExecutor' class, which handles downloading a Docker image, building the appropriate
     file system mounts, and provides methods for running system calls.
 
     :return: A CommandExecutor object
     """
 
-    default_mounts = [DockerMount(Path('/home/dnanexus/'), Path('/test/'))]
-    cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
-                                   docker_mounts=default_mounts)
+    if dna_nexus_run:
+        default_mounts = [DockerMount(Path('/home/dnanexus/'), Path('/test/'))]
+        cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
+                                       docker_mounts=default_mounts)
+
+    else:
+
+        test_mount = DockerMount(Path(os.getcwd()), Path('/test/'))
+        cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
+                                   docker_mounts=[test_mount])
 
     return cmd_executor

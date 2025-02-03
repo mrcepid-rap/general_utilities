@@ -3,3 +3,5 @@
 /general_utilities.egg-info/
 /.talismanrc
 /sub_package.toml
+poetry.lock
+.idea/
