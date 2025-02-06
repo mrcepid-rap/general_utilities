@@ -1,18 +1,20 @@
 import csv
 import gzip
-import dxpy
-import pandas as pd
-import pandas.core.series
-
 from pathlib import Path
 from typing import List, Union, Tuple, IO
 
+import dxpy
+import pandas as pd
+import pandas.core.series
 from dxpy import DXSearchError
-
-from general_utilities.mrc_logger import MRCLogger
 from general_utilities.job_management.command_executor import build_default_command_executor
+from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger(__name__).get_logger()
+
+# Small note to explain logic – When CMD EXEC is passed to functions, it is to enable functional testing rather than
+# end-to-end testing outside the DNANexus environment. During 'normal' execution the global CMD_EXEC is used.
+CMD_EXEC = build_default_command_executor()
 
 
 def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromosome: str = None) -> List[str]:
@@ -161,7 +163,6 @@ def get_gene_id(gene_id: str, transcripts_table: pandas.DataFrame) -> pandas.cor
 
 
 def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
-
     if is_snp_tar:
         LOGGER.info("Running in SNP mode...")
         file_prefix = 'SNP'
@@ -200,7 +201,6 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
 
 # These two methods help the different tools in defining the correct field names to include in outputs
 def define_field_names_from_pandas(field_one: pd.Series) -> List[str]:
-
     # Test what columns we have in the 'SNP' field, so we can name them...
     field_one = field_one['SNP'].split("-")
     field_names = ['ENST']
@@ -238,7 +238,6 @@ def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: p
 # Helper function to decide what covariates are included in the various REGENIE commands
 def define_covariate_string(found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
                             is_binary: bool, add_array: bool, ignore_base: bool) -> str:
-
     quant_covars = [] if ignore_base else ['PC{1:10}', 'age', 'age_squared', 'sex']
     quant_covars.extend(found_quantitative_covariates)
 
@@ -325,7 +324,6 @@ def download_dxfile_by_name(file: Union[dict, str, dxpy.DXFile], project_id: str
 
 # This function will locate an associated tbi/csi index:
 def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy.DXFile:
-
     if type(parent_file) == dict:
         parent_file = dxpy.DXFile(parent_file['$dnanexus_link'])
 
@@ -371,7 +369,8 @@ def find_dxlink(name: str, folder: str) -> dict:
 
 
 def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = None,
-                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
+                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3,
+                    dna_nexus_run: bool = True, cmd_exec: CommandExecutor = CMD_EXEC) -> Tuple[Path, Path]:
     """BGZIP and TABIX a provided file path
 
     This is a wrapper for bgzip and tabix. In its simplest form will take a filepath and run bgzip and tabix,
@@ -389,7 +388,10 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     """
 
     # Run bgzip
-    cmd_executor = build_default_command_executor()
+    if not dna_nexus_run:
+        cmd_executor = cmd_exec
+    else:
+        cmd_executor = build_default_command_executor()
     bgzip_cmd = f'bgzip /test/{file_path}'
     cmd_executor.run_cmd_on_docker(bgzip_cmd)
 
@@ -401,7 +403,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
         tabix_cmd += f'-S {skip_row} '
     tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
     cmd_executor.run_cmd_on_docker(tabix_cmd)
-    
+
     return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
 
 
