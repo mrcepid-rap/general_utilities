@@ -6,7 +6,7 @@ import statsmodels.api as sm
 from pathlib import Path
 from typing import Tuple, List
 
-from importlib_resources import files
+from importlib.resources import files
 
 from general_utilities.association_resources import get_chromosomes
 from general_utilities.mrc_logger import MRCLogger
@@ -157,7 +157,7 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
 
     r_script = files('general_utilities.linear_model.R_resources').joinpath('sparseMatrixProcessor.R')
 
-    script_mount = DockerMount(Path(f'{r_script.parent}/'),
+    script_mount = DockerMount(r_script.parent,
                                Path('/scripts/'))
     cmd_executor = build_default_command_executor()
 
