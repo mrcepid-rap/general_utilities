@@ -370,7 +370,7 @@ def find_dxlink(name: str, folder: str) -> dict:
 
 def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = None,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3,
-                    dna_nexus_run: bool = True, cmd_exec: CommandExecutor = CMD_EXEC) -> Tuple[Path, Path]:
+                    cmd_exec: CommandExecutor = CMD_EXEC) -> Tuple[Path, Path]:
     """BGZIP and TABIX a provided file path
 
     This is a wrapper for bgzip and tabix. In its simplest form will take a filepath and run bgzip and tabix,
@@ -388,10 +388,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     """
 
     # Run bgzip
-    if not dna_nexus_run:
-        cmd_executor = cmd_exec
-    else:
-        cmd_executor = build_default_command_executor()
+    cmd_executor = cmd_exec
     bgzip_cmd = f'bgzip /test/{file_path}'
     cmd_executor.run_cmd_on_docker(bgzip_cmd)
 
