@@ -4,3 +4,4 @@
 /.talismanrc
 /sub_package.toml
 poetry.lock
+.idea/

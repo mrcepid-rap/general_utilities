@@ -54,7 +54,7 @@ class CommandExecutor:
         Docker. See the documentation for Docker for more information.
     :param aws_credentials: Path to AWS credentials to authenticate to AWS ECR for purposes of pulling a Docker image.
     """
-    
+
     def __init__(self, docker_image: str = None, docker_mounts: List[DockerMount] = None,
                  aws_credentials: Path = None):
 
@@ -112,7 +112,6 @@ class CommandExecutor:
             return_code = self.run_cmd(cmd, ignore_error=True)
 
             if return_code != 0:
-
                 self._logger.info(f'Downloading Docker image {docker_image}')
 
                 cmd = f'docker pull {docker_image}'
@@ -166,9 +165,9 @@ class CommandExecutor:
     def run_cmd_on_docker(self, cmd: str, stdout_file: Path = None, docker_mounts: List[DockerMount] = None,
                           print_cmd: bool = False, livestream_out: bool = False, dry_run: bool = False,
                           ignore_error: bool = False) -> int:
-    
+
         """Run a command in the shell with Docker
-    
+
         This function runs a command on an instance via the subprocess module with a Docker instance we downloaded;
         This command will return an error if a valid Docker image was not provided. Docker images are run in headless
         mode, which cannot be modified. Additional mount points inside the VM can be provided at runtime via the
@@ -182,7 +181,7 @@ class CommandExecutor:
         By default, if a command fails, the VM will print the failing process STDOUT / STDERR to the logger and raise
         a RuntimeError; however, if ignore_error is set to 'True', this method will instead return the exit code for
         the underlying process to allow for custom error handling.
-    
+
         :param cmd: The command to be run.
         :param stdout_file: Capture stdout from the process into the given file
         :param docker_mounts: A List of additional docker mounts (as DockerMount objects) to add to this command.
@@ -257,7 +256,7 @@ class CommandExecutor:
         else:
             if print_cmd:
                 self._logger.info(cmd)
-    
+
             # Standard python calling external commands protocol
             proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
