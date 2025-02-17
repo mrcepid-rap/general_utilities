@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Any
 
-from importlib_resources.abc import Traversable
+from importlib.resources.abc import Traversable
 
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
@@ -49,7 +49,7 @@ class Plotter(ABC):
         Traversable object.
 
         :param r_script: An Rscript as a Traversable object. This is done as the Rscript should be within a python
-            package implemented as part of some plotter and is thus found via the importlib_resources package RATHER
+            package implemented as part of some plotter and is thus found via the importlib.resources package RATHER
             than through the typical pathlib functionality.
         :param options: A List of Input options for the script.
         :param out_path: The location of the resulting SINGLE output from this script. This parameter has no effect on
@@ -63,7 +63,7 @@ class Plotter(ABC):
         plot_cmd = f'Rscript /scripts/{r_script.name} {options}'
 
         # If editing in pycharm, the .parent parameter does exist, so ignore the error
-        script_mount = DockerMount(Path(f'{r_script.parent}/'),
+        script_mount = DockerMount(r_script.parent,
                                    Path('/scripts/'))
 
         self._cmd_executor.run_cmd_on_docker(plot_cmd, docker_mounts=[script_mount])

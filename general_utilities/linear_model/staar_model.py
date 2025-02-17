@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import List
-from importlib_resources import files
+from importlib.resources import files
 
-from general_utilities.job_management.command_executor import build_default_command_executor
-from general_utilities.job_management.command_executor import DockerMount
+from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
+from job_management.command_executor import CommandExecutor
 
 
 # Generate the NULL model for STAAR
@@ -14,7 +14,7 @@ def staar_null(phenoname: str, is_binary: bool, sex: int, ignore_base: bool,
     # as part of the general_utilities package. We can extract the system location of this script:
     r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Null.R')
 
-    script_mount = DockerMount(Path(f'{r_script.parent}/'),
+    script_mount = DockerMount(r_script.parent,
                                Path('/scripts/'))
     cmd_executor = build_default_command_executor()
 
@@ -57,7 +57,7 @@ def staar_genes(tarball_prefix: str, chromosome: str, phenoname: str, has_gene_i
     # as part of the general_utilities package. We can extract the system location of this script:
     r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Genes.R')
 
-    script_mount = DockerMount(Path(f'{r_script.parent}/'),
+    script_mount = DockerMount(r_script.parent,
                                Path('/scripts/'))
     cmd_executor = build_default_command_executor()
 
