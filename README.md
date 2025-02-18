@@ -2,6 +2,9 @@
 
 ## Changelog
 
+* v1.5.5
+  * Changed the association_resources bgzip_and_tabix function due to a bug. Default command executor has been removed as a global variable and now only sits within the function itself.
+  
 * v1.5.3 & v1.5.4 
   * Amended the bgzip_and_tabix function to accept an external command executor (e.g. if executing tests locally), otherwise the default command exectuor is used. 
   * Revert python to v3.8 to ensure compatibility with DNA Nexus applets. 
