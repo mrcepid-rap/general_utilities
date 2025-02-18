@@ -7,14 +7,11 @@ import dxpy
 import pandas as pd
 import pandas.core.series
 from dxpy import DXSearchError
+
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger(__name__).get_logger()
-
-# Small note to explain logic – When CMD EXEC is passed to functions, it is to enable functional testing rather than
-# end-to-end testing outside the DNANexus environment. During 'normal' execution the global CMD_EXEC is used.
-#CMD_EXEC = build_default_command_executor()
 
 
 def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromosome: str = None) -> List[str]:
