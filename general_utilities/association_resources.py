@@ -14,7 +14,7 @@ LOGGER = MRCLogger(__name__).get_logger()
 
 # Small note to explain logic – When CMD EXEC is passed to functions, it is to enable functional testing rather than
 # end-to-end testing outside the DNANexus environment. During 'normal' execution the global CMD_EXEC is used.
-CMD_EXEC = build_default_command_executor()
+#CMD_EXEC = build_default_command_executor()
 
 
 def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromosome: str = None) -> List[str]:
@@ -370,7 +370,7 @@ def find_dxlink(name: str, folder: str) -> dict:
 
 def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = None,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3,
-                    cmd_exec: CommandExecutor = CMD_EXEC) -> Tuple[Path, Path]:
+                    cmd_exec: CommandExecutor = build_default_command_executor()) -> Tuple[Path, Path]:
     """BGZIP and TABIX a provided file path
 
     This is a wrapper for bgzip and tabix. In its simplest form will take a filepath and run bgzip and tabix,
@@ -384,6 +384,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = N
     :param begin_row: Row number (in base 1) of the start coordinate column
     :param end_row: Row number (in base 1) of the end coordinate column. This value can be the same as begin row for
         files without an end coordinate but cannot be omitted.
+    :param cmd_exec: a command executor for this function. Set to default command executor, unless specified otherwise.
     :return: A Tuple consisting of the bgziped file and it's corresponding tabix index
     """
 
