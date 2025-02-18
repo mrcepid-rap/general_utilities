@@ -7,7 +7,7 @@ import dxpy
 import pandas as pd
 import pandas.core.series
 from dxpy import DXSearchError
-from general_utilities.job_management.command_executor import build_default_command_executor
+from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger(__name__).get_logger()
