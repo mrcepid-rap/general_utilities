@@ -3,7 +3,7 @@
 ## Changelog
 
 * v1.5.5
-  * Changed the association_resources bgzip_and_tabix function due to a bug. Default command executor has been removed as a global variable and now only sits within the function itself.
+  * Changed the association_resources bgzip_and_tabix function due to a bug. The command is now being executed using pysam, which removes the need for Docker.
   
 * v1.5.3 & v1.5.4 
   * Amended the bgzip_and_tabix function to accept an external command executor (e.g. if executing tests locally), otherwise the default command exectuor is used. 

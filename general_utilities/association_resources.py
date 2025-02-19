@@ -6,9 +6,10 @@ from typing import List, Union, Tuple, IO
 import dxpy
 import pandas as pd
 import pandas.core.series
+import pysam
 from dxpy import DXSearchError
 
-from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
+from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger(__name__).get_logger()
@@ -365,41 +366,36 @@ def find_dxlink(name: str, folder: str) -> dict:
     return dxlink
 
 
-def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = None,
-                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3,
-                    cmd_exec: CommandExecutor = build_default_command_executor()) -> Tuple[Path, Path]:
+def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
+                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
     """BGZIP and TABIX a provided file path
 
-    This is a wrapper for bgzip and tabix. In its simplest form will take a filepath and run bgzip and tabix,
-    with default sequence, begin, and end columns. The user can modify default column specs using parameters and also
-    provide a comment character to set a header line in tabix.
+    This function compresses a file using bgzip and indexes it using tabix. The user can modify default column specs
+    using parameters and also provide a comment character to set a header line in tabix.
 
     :param file_path: A Pathlike to a file on this platform.
-    :param comment_char: A comment character to skip. MUST be a single character. Defaults to 'None'
-    :param skip_row: Number of lines at the beginning of the file to skip using tabix -S parameter
-    :param sequence_row: Row number (in base 1) of the chromosome / sequence name column
-    :param begin_row: Row number (in base 1) of the start coordinate column
+    :param comment_char: A comment character to skip. MUST be a single character. Defaults to None.
+    :param skip_row: Number of lines at the beginning of the file to skip using tabix -S parameter.
+    :param sequence_row: Row number (in base 1) of the chromosome / sequence name column.
+    :param begin_row: Row number (in base 1) of the start coordinate column.
     :param end_row: Row number (in base 1) of the end coordinate column. This value can be the same as begin row for
         files without an end coordinate but cannot be omitted.
-    :param cmd_exec: a command executor for this function. Set to default command executor, unless specified otherwise.
-    :return: A Tuple consisting of the bgziped file and it's corresponding tabix index
+    :return: A Tuple consisting of the bgzipped file and its corresponding tabix index.
     """
 
-    # Run bgzip
-    cmd_executor = cmd_exec
-    bgzip_cmd = f'bgzip /test/{file_path}'
-    cmd_executor.run_cmd_on_docker(bgzip_cmd)
+    # Compress using pysam
+    outfile_compress = Path(f'{file_path}.gz')
+    pysam.tabix_compress(file_path, outfile_compress)
 
-    # Run tabix, and incorporate comment character if requested
-    tabix_cmd = 'tabix '
-    if comment_char:
-        tabix_cmd += f'-c {comment_char} '
-    if skip_row:
-        tabix_cmd += f'-S {skip_row} '
-    tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
-    cmd_executor.run_cmd_on_docker(tabix_cmd)
+    # Run indexing via pysam, and incorporate comment character if requested
+    if comment_char is not None:
+        pysam.tabix_index(outfile_compress, seq_col=sequence_row - 1, start_col=begin_row - 1, end_col=end_row - 1,
+                          meta_char=comment_char, line_skip=skip_row)
+    else:
+        pysam.tabix_index(outfile_compress, seq_col=sequence_row - 1, start_col=begin_row - 1, end_col=end_row - 1,
+                          line_skip=skip_row)
 
-    return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
+    return outfile_compress, Path(f'{outfile_compress}.tbi')
 
 
 def get_include_sample_ids() -> List[str]:
