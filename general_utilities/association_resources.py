@@ -366,15 +366,15 @@ def find_dxlink(name: str, folder: str) -> dict:
     return dxlink
 
 
-def bgzip_and_tabix(file_path: Path, comment_char: str = '#', skip_row: int = 0,
+def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
     """Compress a file using bgzip and create a tabix index.
 
     This function uses pysam to compress a file with bgzip and create a corresponding tabix index.
     The index parameters can be customized to match the file format.
 
-    NOTE: make sure you alwayss specify the parameters (column indices) when running this. The default is set
-    for BED files but it will crash otherwise.
+    NOTE: make sure you  specify the parameters (column indices) when running this. The default column numbers are in BED
+    format, please modify the command if using any non-BED format.
 
     Args:
         file_path: Path to the input file to be compressed and indexed
@@ -393,9 +393,15 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = '#', skip_row: int = 0,
     outfile_compress = f'{file_path}.gz'
     pysam.tabix_compress(str(file_path.absolute()), outfile_compress)
 
-    # Run indexing via pysam, and incorporate comment character if requested
-    pysam.tabix_index(outfile_compress, seq_col=sequence_row - 1, start_col=begin_row - 1, end_col=end_row - 1,
-                      meta_char=comment_char, line_skip=skip_row)
+    try:
+        # Run indexing via pysam, and incorporate comment character if requested
+        pysam.tabix_index(outfile_compress, seq_col=sequence_row - 1, start_col=begin_row - 1, end_col=end_row - 1,
+                          meta_char=comment_char, line_skip=skip_row)
+    except Exception as e:
+        LOGGER.error(f"Failed to index file {outfile_compress}: {e}. Check the bgzip_and_tabix command in "
+                     f"general_utilities - it's likely that the header settings need to be adjusted for your "
+                     f"file format")
+        raise
 
     return Path(outfile_compress), Path(f'{outfile_compress}.tbi')
 
