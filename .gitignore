@@ -5,3 +5,4 @@
 /sub_package.toml
 poetry.lock
 .idea/
+/dx_run.log

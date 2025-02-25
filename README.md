@@ -2,12 +2,8 @@
 
 ## Changelog
 
-* v1.5.3 & v1.5.4 
-  * Amended the bgzip_and_tabix function to accept an external command executor (e.g. if executing tests locally), otherwise the default command exectuor is used. 
-  * Revert python to v3.8 to ensure compatibility with DNA Nexus applets. 
-
 * v1.5.2
-  * Updated python version to `~3.12`. This also involved updating all package dependencies to the latest versions (as of this release – 2025-01-17)
+  * Changed the bgzip_and_tabix function in association_resources - the command is now being executed using pysam, which removes the need for Docker.
   * Cleaned up some imports
 
 * v1.5.1
