@@ -1,15 +1,15 @@
-import os
 import csv
+import os
+from abc import ABC
+from pathlib import Path
+from typing import Set, Tuple, List, Any, Dict
+
 import dxpy
 
-from abc import ABC
-from typing import Set, Tuple, List, Any, Dict
-from pathlib import Path
-
-from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.association_resources import download_dxfile_by_name
-from general_utilities.mrc_logger import MRCLogger
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
+from general_utilities.job_management.command_executor import build_default_command_executor
+from general_utilities.mrc_logger import MRCLogger
 
 
 class IngestData(ABC):
@@ -119,8 +119,8 @@ class IngestData(ABC):
             see the README.
         :return: None
         """
-
-        dxpy.download_dxfile(transcript_index.get_id(), 'transcripts.tsv.gz')
+        if transcript_index.name.startswith("file-"):
+            dxpy.download_dxfile(transcript_index.get_id(), 'transcripts.tsv.gz')
 
     def _ingest_phenofile(self, pheno_files: List[dxpy.DXFile], pheno_name: str) -> Dict[str, Dict[str, Any]]:
         """Download provided phenotype files and attempt to retrieve phenotypes from these file(s)
@@ -154,7 +154,14 @@ class IngestData(ABC):
         phenotypes = {}
 
         for dx_pheno_file in pheno_files:
-            pheno_file = download_dxfile_by_name(dx_pheno_file)
+
+            if dx_pheno_file.name.startswith("file-"):
+
+                pheno_file = download_dxfile_by_name(dx_pheno_file)
+
+            else:
+
+                pheno_file = dx_pheno_file
 
             total_missing_dict = {}
             total_samples = 0
@@ -227,13 +234,22 @@ class IngestData(ABC):
         :return: A boolean that is true if additional covariates beyond the base covariates were provided
         """
 
-        dxpy.download_dxfile(base_covariates.get_id(), 'base_covariates.covariates')
+        if base_covariates.name.startswith("file-"):
 
-        # Check if additional covariates were provided:
-        additional_covariates_found = False
-        if covarfile is not None:
-            dxpy.download_dxfile(covarfile.get_id(), 'additional_covariates.covariates')
-            additional_covariates_found = True
+            dxpy.download_dxfile(base_covariates.get_id(), 'base_covariates.covariates')
+
+            # Check if additional covariates were provided:
+            additional_covariates_found = False
+            if covarfile is not None:
+                dxpy.download_dxfile(covarfile.get_id(), 'additional_covariates.covariates')
+                additional_covariates_found = True
+
+        else:
+
+            # Check if additional covariates were provided:
+            additional_covariates_found = False
+            if covarfile is not None:
+                additional_covariates_found = True
 
         return additional_covariates_found
 
@@ -306,6 +322,7 @@ class IngestData(ABC):
         # 4. Generate A set of all possible samples to include in this analysis
         genetics_samples = set()
         total_base_samples = 0
+
         with Path('base_covariates.covariates').open('r') as base_covariates_file:
             base_covar_reader = csv.DictReader(base_covariates_file, delimiter="\t")
             for indv in base_covar_reader:
@@ -361,7 +378,7 @@ class IngestData(ABC):
 
         # The user may be ignoring the base covariates, but adding specific ones back in. So we need to make sure they
         # are providing correct names here...
-        valid_base_covars = [f'PC{PC}' for PC in range(1,41)] + \
+        valid_base_covars = [f'PC{PC}' for PC in range(1, 41)] + \
                             ['age', 'age_squared', 'sex', 'wes_batch', 'array_batch']
 
         if additional_covariates_found:
@@ -506,18 +523,20 @@ class IngestData(ABC):
         if len(found_quantitative_covariates) + len(found_categorical_covariates) > 0:
             self._logger.info(f'{"Number of individuals with non-null additional covariates":{65}}: {len(add_covars)}')
             self._logger.info(f'{"Additional covariates included in model":{65}}:')
-            self._logger.info(f'{" ":^{5}}{"Quantitative":{60}}: {", ".join(found_quantitative_covariates) if len(found_quantitative_covariates) > 0 else "None"}')
-            self._logger.info(f'{" ":^{5}}{"Categorical":{60}}: {", ".join(found_categorical_covariates) if len(found_categorical_covariates) > 0 else "None"}')
+            self._logger.info(
+                f'{" ":^{5}}{"Quantitative":{60}}: {", ".join(found_quantitative_covariates) if len(found_quantitative_covariates) > 0 else "None"}')
+            self._logger.info(
+                f'{" ":^{5}}{"Categorical":{60}}: {", ".join(found_categorical_covariates) if len(found_categorical_covariates) > 0 else "None"}')
         else:
             self._logger.info(f'No additional covariates provided/found beyond defaults...')
 
         base_covariates_file = Path('base_covariates.covariates')
         final_covariates_file = Path('phenotypes_covariates.formatted.txt')
 
-        with base_covariates_file.open('r') as base_covar_reader,\
-                final_covariates_file.open('w', newline='\n') as final_covariates_writer,\
-                Path('SAMPLES_Include.txt').open('w') as include_samples,\
-                Path('SAMPLES_Include.bcf.txt').open('w') as include_samples_bcf,\
+        with base_covariates_file.open('r') as base_covar_reader, \
+                final_covariates_file.open('w', newline='\n') as final_covariates_writer, \
+                Path('SAMPLES_Include.txt').open('w') as include_samples, \
+                Path('SAMPLES_Include.bcf.txt').open('w') as include_samples_bcf, \
                 Path('SAMPLES_Remove.txt').open('w') as remove_samples:
 
             base_covar_csv = csv.DictReader(base_covar_reader, delimiter="\t")
@@ -545,59 +564,64 @@ class IngestData(ABC):
             indv_written = 0  # Count the number of samples we will analyse
             indv_exclude = 0  # Count the nunber of samples we WONT analyse
             for indv in base_covar_csv:
-                # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
-                # on sex
-                if indv['22001-0.0'] != "NA" and indv['eid'] in genetics_samples:
-                    indv_writer = {'FID': indv['eid'],
-                                   'IID': indv['eid']}
-                    for PC in range(1, 41):
-                        old_pc = f'22009-0.{PC}'
-                        new_pc = f'PC{PC}'
-                        indv_writer[new_pc] = indv[old_pc]
-                    indv_writer['age'] = int(indv['21003-0.0'])
-                    indv_writer['age_squared'] = indv_writer['age']**2
-                    indv_writer['sex'] = int(indv['22001-0.0'])
-                    indv_writer['wes_batch'] = indv['wes.batch']
-                    indv_writer['array_batch'] = indv['22000-0.0']
-                    num_all_samples += 1
+                # if we are working on DNA Nexus
+                if self._parsed_options.base_covariates.name.startswith("file-"):
+                    # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
+                    # on sex
+                    if indv['22001-0.0'] != "NA" and indv['eid'] in genetics_samples:
+                        indv_writer = {'FID': indv['eid'],
+                                       'IID': indv['eid']}
+                        for PC in range(1, 41):
+                            old_pc = f'22009-0.{PC}'
+                            new_pc = f'PC{PC}'
+                            indv_writer[new_pc] = indv[old_pc]
+                        indv_writer['age'] = int(indv['21003-0.0'])
+                        indv_writer['age_squared'] = indv_writer['age'] ** 2
+                        indv_writer['sex'] = int(indv['22001-0.0'])
+                        indv_writer['wes_batch'] = indv['wes.batch']
+                        indv_writer['array_batch'] = indv['22000-0.0']
+                        num_all_samples += 1
 
-                    # Check if we found additional covariates and make sure this sample has non-null values
-                    found_covars = False
-                    if len(add_covars) > 0:
-                        if indv['eid'] in add_covars:
+                        # Check if we found additional covariates and make sure this sample has non-null values
+                        found_covars = False
+                        if len(add_covars) > 0:
+                            if indv['eid'] in add_covars:
+                                found_covars = True
+                                for covariate in add_covars[indv['eid']]:
+                                    indv_writer[covariate] = add_covars[indv['eid']][covariate]
+                        else:
                             found_covars = True
-                            for covariate in add_covars[indv['eid']]:
-                                indv_writer[covariate] = add_covars[indv['eid']][covariate]
-                    else:
-                        found_covars = True
 
-                    found_phenos = False
-                    if len(pheno_names) == 1:
-                        pheno = pheno_names[0]
-                        if indv['eid'] in phenotypes[pheno]:
-                            found_phenos = True
-                            indv_writer[pheno] = phenotypes[pheno][indv['eid']]
-                    else:
-                        found_phenos = False  # As long as this individual has ONE phenotype, write them.
-                        for pheno in pheno_names:
+                        found_phenos = False
+                        if len(pheno_names) == 1:
+                            pheno = pheno_names[0]
                             if indv['eid'] in phenotypes[pheno]:
                                 found_phenos = True
                                 indv_writer[pheno] = phenotypes[pheno][indv['eid']]
-                            else:
-                                indv_writer[pheno] = 'NA'
+                        else:
+                            found_phenos = False  # As long as this individual has ONE phenotype, write them.
+                            for pheno in pheno_names:
+                                if indv['eid'] in phenotypes[pheno]:
+                                    found_phenos = True
+                                    indv_writer[pheno] = phenotypes[pheno][indv['eid']]
+                                else:
+                                    indv_writer[pheno] = 'NA'
 
-                    # exclude based on sex-specific analysis if required:
-                    if found_covars and found_phenos:
-                        if sex == 2:
-                            indv_written += 1
-                            combo_writer.writerow(indv_writer)
-                            include_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
-                            include_samples_bcf.write(f'{indv["eid"]}\n')
-                        elif sex == indv_writer['sex']:
-                            indv_written += 1
-                            combo_writer.writerow(indv_writer)
-                            include_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
-                            include_samples_bcf.write(f'{indv["eid"]}\n')
+                        # exclude based on sex-specific analysis if required:
+                        if found_covars and found_phenos:
+                            if sex == 2:
+                                indv_written += 1
+                                combo_writer.writerow(indv_writer)
+                                include_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                                include_samples_bcf.write(f'{indv["eid"]}\n')
+                            elif sex == indv_writer['sex']:
+                                indv_written += 1
+                                combo_writer.writerow(indv_writer)
+                                include_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                                include_samples_bcf.write(f'{indv["eid"]}\n')
+                            else:
+                                remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                                indv_exclude += 1
                         else:
                             remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
                             indv_exclude += 1
@@ -605,8 +629,68 @@ class IngestData(ABC):
                         remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
                         indv_exclude += 1
                 else:
-                    remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
-                    indv_exclude += 1
+                    # if we are not working on DNA Nexus
+                    # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
+                    # on sex
+                    if indv['sex'] != "NA" and indv['eid'] in genetics_samples:
+                        indv_writer = {'FID': indv['eid'],
+                                       'IID': indv['eid']}
+                        for PC in range(1, 41):
+                            new_pc = f'PC{PC}'
+                            indv_writer[new_pc] = indv[new_pc]
+                        indv_writer['age'] = int(indv['age'])
+                        indv_writer['age_squared'] = indv_writer['age'] ** 2
+                        indv_writer['sex'] = int(indv['sex'])
+                        indv_writer['wes_batch'] = indv['wes_batch']
+                        indv_writer['array_batch'] = indv['array_batch']
+                        num_all_samples += 1
+
+                        # Check if we found additional covariates and make sure this sample has non-null values
+                        found_covars = False
+                        if len(add_covars) > 0:
+                            if indv['eid'] in add_covars:
+                                found_covars = True
+                                for covariate in add_covars[indv['eid']]:
+                                    indv_writer[covariate] = add_covars[indv['eid']][covariate]
+                        else:
+                            found_covars = True
+
+                        found_phenos = False
+                        if len(pheno_names) == 1:
+                            pheno = pheno_names[0]
+                            if indv['eid'] in phenotypes[pheno]:
+                                found_phenos = True
+                                indv_writer[pheno] = phenotypes[pheno][indv['eid']]
+                        else:
+                            found_phenos = False  # As long as this individual has ONE phenotype, write them.
+                            for pheno in pheno_names:
+                                if indv['eid'] in phenotypes[pheno]:
+                                    found_phenos = True
+                                    indv_writer[pheno] = phenotypes[pheno][indv['eid']]
+                                else:
+                                    indv_writer[pheno] = 'NA'
+
+                        # exclude based on sex-specific analysis if required:
+                        if found_covars and found_phenos:
+                            if sex == 2:
+                                indv_written += 1
+                                combo_writer.writerow(indv_writer)
+                                include_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                                include_samples_bcf.write(f'{indv["eid"]}\n')
+                            elif sex == indv_writer['sex']:
+                                indv_written += 1
+                                combo_writer.writerow(indv_writer)
+                                include_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                                include_samples_bcf.write(f'{indv["eid"]}\n')
+                            else:
+                                remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                                indv_exclude += 1
+                        else:
+                            remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                            indv_exclude += 1
+                    else:
+                        remove_samples.write(f'{indv["eid"]} {indv["eid"]}\n')
+                        indv_exclude += 1
 
         # Print to ensure that total number of individuals is consistent between genetic and covariate/phenotype data
         self._logger.info(f'{"Samples with covariates after include/exclude lists applied":{65}}: {num_all_samples}')

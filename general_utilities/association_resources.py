@@ -1,12 +1,11 @@
 import csv
 import gzip
 from pathlib import Path
-from typing import List, Union, Tuple, IO
+from typing import List, Union, Tuple, IO, Dict
 
 import dxpy
 import pandas as pd
 import pandas.core.series
-import pysam
 from dxpy import DXSearchError
 
 from general_utilities.job_management.command_executor import build_default_command_executor
@@ -15,7 +14,9 @@ from general_utilities.mrc_logger import MRCLogger
 LOGGER = MRCLogger(__name__).get_logger()
 
 
-def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromosome: str = None) -> List[str]:
+def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, is_wgs_tar: bool = False,
+                    chromosome: str = None,
+                    bgen_dict: Dict = None) -> List[str]:
     """ Generate a list of chromosomes to process
 
     This method helps to generate a list of data that we want to iterate over. To enable code to iterate over SNP /
@@ -39,18 +40,22 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, chromos
 
     if is_snp_tar:
         chromosomes = list(['SNP'])
+
     elif is_gene_tar:
         chromosomes = list(['GENE'])
     else:
-        chromosomes = [f'{chrom}' for chrom in range(1, 23)]  # Is left-closed? (So does 1..22)
-        chromosomes.extend(['X'])
-        if chromosome:
-            if chromosome in chromosomes:
-                LOGGER.info(f'Restricting following analysis to chrom {chromosome}...')
-                chromosomes = [chromosome]
-            else:
-                raise ValueError(f'Provided chromosome ({chromosome}) is not 1-22, X. Please try again '
-                                 f'(possibly omitting "chr").')
+        if len(bgen_dict) == 24:
+            chromosomes = [f'{chrom}' for chrom in range(1, 23)]  # Is left-closed? (So does 1..22)
+            chromosomes.extend(['X'])
+            if chromosome:
+                if chromosome in chromosomes:
+                    LOGGER.info(f'Restricting following analysis to chrom {chromosome}...')
+                    chromosomes = [chromosome]
+                else:
+                    raise ValueError(f'Provided chromosome ({chromosome}) is not 1-22, X. Please try again '
+                                     f'(possibly omitting "chr").')
+        else:
+            chromosomes = list(bgen_dict.keys())
 
     return chromosomes
 
@@ -366,44 +371,39 @@ def find_dxlink(name: str, folder: str) -> dict:
     return dxlink
 
 
-def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
+def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = None,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
-    """Compress a file using bgzip and create a tabix index.
+    """BGZIP and TABIX a provided file path
 
-    This function uses pysam to compress a file with bgzip and create a corresponding tabix index.
-    The index parameters can be customized to match the file format.
+    This is a wrapper for bgzip and tabix. In its simplest form will take a filepath and run bgzip and tabix,
+    with default sequence, begin, and end columns. The user can modify default column specs using parameters and also
+    provide a comment character to set a header line in tabix.
 
-    NOTE: make sure you  specify the parameters (column indices) when running this. The default column numbers are in BED
-    format, please modify the command if using any non-BED format.
-
-    Args:
-        file_path: Path to the input file to be compressed and indexed
-        comment_char: Comment character to identify header lines (default: '#')
-        skip_row: Number of header lines to skip in the index (default: 0)
-        sequence_row: 1-based column number containing sequence names (default: 1)
-        begin_row: 1-based column number containing start positions (default: 2)
-        end_row: 1-based column number containing end positions (default: 3)
-
-    Returns:
-        Tuple[Path, Path]: Paths to the compressed file (.gz) and its index (.tbi)
-
+    :param file_path: A Pathlike to a file on this platform.
+    :param comment_char: A comment character to skip. MUST be a single character. Defaults to 'None'
+    :param skip_row: Number of lines at the beginning of the file to skip using tabix -S parameter
+    :param sequence_row: Row number (in base 1) of the chromosome / sequence name column
+    :param begin_row: Row number (in base 1) of the start coordinate column
+    :param end_row: Row number (in base 1) of the end coordinate column. This value can be the same as begin row for
+        files without an end coordinate but cannot be omitted.
+    :return: A Tuple consisting of the bgziped file and it's corresponding tabix index
     """
 
-    # Compress using pysam
-    outfile_compress = f'{file_path}.gz'
-    pysam.tabix_compress(str(file_path.absolute()), outfile_compress)
+    # Run bgzip
+    cmd_executor = build_default_command_executor()
+    bgzip_cmd = f'bgzip /test/{file_path}'
+    cmd_executor.run_cmd_on_docker(bgzip_cmd)
 
-    try:
-        # Run indexing via pysam, and incorporate comment character if requested
-        pysam.tabix_index(outfile_compress, seq_col=sequence_row - 1, start_col=begin_row - 1, end_col=end_row - 1,
-                          meta_char=comment_char, line_skip=skip_row)
-    except Exception as e:
-        LOGGER.error(f"Failed to index file {outfile_compress}: {e}. Check the bgzip_and_tabix command in "
-                     f"general_utilities - it's likely that the header settings need to be adjusted for your "
-                     f"file format")
-        raise
+    # Run tabix, and incorporate comment character if requested
+    tabix_cmd = 'tabix '
+    if comment_char:
+        tabix_cmd += f'-c {comment_char} '
+    if skip_row:
+        tabix_cmd += f'-S {skip_row} '
+    tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
+    cmd_executor.run_cmd_on_docker(tabix_cmd)
 
-    return Path(outfile_compress), Path(f'{outfile_compress}.tbi')
+    return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
 
 
 def get_include_sample_ids() -> List[str]:

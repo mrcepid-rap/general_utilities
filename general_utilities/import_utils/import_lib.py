@@ -1,10 +1,11 @@
 import csv
+import re
+import shutil
 import tarfile
-
-import dxpy
-
 from pathlib import Path
 from typing import Dict, Tuple, List, TypedDict, Optional
+
+import dxpy
 
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.mrc_logger import MRCLogger
@@ -48,13 +49,21 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> Non
     bgen = chrom_bgen_index['bgen']
     vep = chrom_bgen_index['vep']
 
-    dxpy.download_dxfile(bgen_index, f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
-    dxpy.download_dxfile(bgen_sample, f'filtered_bgen/{chromosome}.filtered.sample')
-    dxpy.download_dxfile(bgen, f'filtered_bgen/{chromosome}.filtered.bgen')
-    dxpy.download_dxfile(vep, f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
+    if bgen.startswith("file-"):
 
-    # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
-    sample_v2_to_v1(Path(f'filtered_bgen/{chromosome}.filtered.sample'))
+        dxpy.download_dxfile(bgen_index, f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
+        dxpy.download_dxfile(bgen_sample, f'filtered_bgen/{chromosome}.filtered.sample')
+        dxpy.download_dxfile(bgen, f'filtered_bgen/{chromosome}.filtered.bgen')
+        dxpy.download_dxfile(vep, f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
+
+        # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
+        sample_v2_to_v1(Path(f'filtered_bgen/{chromosome}.filtered.sample'))
+
+    else:
+        shutil.copy(bgen_index, f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
+        shutil.copy(bgen_sample, f'filtered_bgen/{chromosome}.filtered.sample')
+        shutil.copy(bgen, f'filtered_bgen/{chromosome}.filtered.bgen')
+        shutil.copy(vep, f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
 
 
 def sample_v2_to_v1(bgen_v2: Path) -> Path:
@@ -116,21 +125,40 @@ def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
     :return: A Dict with keys of chromosomes and values of the BGENInformation typeddict
     """
 
-    # Download the INDEX of bgen files:
-    dxpy.download_dxfile(bgen_index.get_id(), "bgen_locs.tsv")
-    # and load it into a dict:
+    # load filtered bgen info into a dict
     Path('filtered_bgen/').mkdir(exist_ok=True)  # For downloading later...
 
-    with Path('bgen_locs.tsv').open('r') as bgen_index:
-        bgen_index_csv = csv.DictReader(bgen_index, delimiter='\t')
-        bgen_dict: Dict[str, BGENInformation] = dict()
-        for line in bgen_index_csv:
-            bgen_info: BGENInformation = {'index': dxpy.dxlink(line['bgen_index_dxid']),
-                                          'sample': dxpy.dxlink(line['sample_dxid']),
-                                          'bgen': dxpy.dxlink(line['bgen_dxid']),
-                                          'vep': dxpy.dxlink(line['vep_dxid']),
-                                          'vepidx': dxpy.dxlink(line['vep_index_dxid'])}
-            bgen_dict[line['chrom']] = bgen_info
+    # a workaround for non-DNA Nexus files
+    # if the filenames of the bgens start with 'file-xxxxxx' it's a DNA Nexus file
+    if bgen_index.name.startswith("file-"):
+
+        # therefore run the DNA Nexus file parser
+        dxpy.download_dxfile(bgen_index.get_id(), "bgen_locs.tsv")
+
+        with Path('bgen_locs.tsv').open('r') as bgen_index:
+            bgen_index_csv = csv.DictReader(bgen_index, delimiter='\t')
+            bgen_dict: Dict[str, BGENInformation] = dict()
+            for line in bgen_index_csv:
+                bgen_info: BGENInformation = {'index': dxpy.dxlink(line['bgen_index_dxid']),
+                                              'sample': dxpy.dxlink(line['sample_dxid']),
+                                              'bgen': dxpy.dxlink(line['bgen_dxid']),
+                                              'vep': dxpy.dxlink(line['vep_dxid']),
+                                              'vepidx': dxpy.dxlink(line['vep_index_dxid'])}
+                bgen_dict[line['chrom']] = bgen_info
+
+    else:
+
+        # otherwise, parse it locally
+        with Path(bgen_index).open('r') as bgen_index:
+            bgen_index_csv = csv.DictReader(bgen_index, delimiter='\t')
+            bgen_dict: Dict[str, BGENInformation] = dict()
+            for line in bgen_index_csv:
+                bgen_info: BGENInformation = {'index': line['bgen_index_dxid'],
+                                              'sample': line['sample_dxid'],
+                                              'bgen': line['bgen_dxid'],
+                                              'vep': line['vep_dxid'],
+                                              'vepidx': line['vep_index_dxid']}
+                bgen_dict[line['chrom']] = bgen_info
 
     return bgen_dict
 
@@ -152,26 +180,52 @@ def ingest_tarballs(association_tarballs: dxpy.DXFile) -> Tuple[bool, bool, List
     # First create a list of DNANexus fileIDs to process
     tar_files = []
 
-    # association_tarballs likely to be a single tarball:
-    if '.tar.gz' in association_tarballs.describe()['name']:
-        tar_files.append(association_tarballs.describe()['id'])
+    # check if we are working with a DNA Nexus file or not
+    # if we are then process it like a DNA Nexus file
+    if association_tarballs.name.startswith("file-"):
 
-    # association_tarballs likely to be a list of tarballs:
+        # association_tarballs likely to be a single tarball:
+        if '.tar.gz' in association_tarballs.describe()['name']:
+            tar_files.append(association_tarballs.describe()['id'])
+
+        # association_tarballs likely to be a list of tarballs:
+        else:
+            tarball_list = download_dxfile_by_name(association_tarballs, print_status=False)
+            with tarball_list.open('r') as tarball_reader:
+                for association_tarball in tarball_reader:
+                    association_tarball = association_tarball.rstrip()
+                    tar_files.append(association_tarball)
+
+    # otherwise process it as a local file
     else:
-        tarball_list = download_dxfile_by_name(association_tarballs, print_status=False)
-        with tarball_list.open('r') as tarball_reader:
-            for association_tarball in tarball_reader:
-                association_tarball = association_tarball.rstrip()
-                tar_files.append(association_tarball)
+        tar_files.append(association_tarballs)
+        # and make a not that this is not a DNA Nexus run
+        dna_nexus_run = False
 
     # And then process them in order
     for tar_file in tar_files:
-        current_tar = download_dxfile_by_name(tar_file, print_status=False)
+        if dna_nexus_run:
+            current_tar = download_dxfile_by_name(tar_file, print_status=False)
+        else:
+            current_tar = tar_file
         if tarfile.is_tarfile(current_tar):
             tarball_prefix = current_tar.name.replace('.tar.gz', '')
             tarball_prefixes.append(tarball_prefix)
             tar = tarfile.open(current_tar, 'r:gz')
             tar.extractall()
+
+            # Construct regex dynamically from tarball_prefixes
+            prefix_pattern = "|".join(
+                re.escape(prefix) for prefix in tarball_prefixes)  # Escape in case of special characters
+            pattern = rf'^(?:{prefix_pattern})\.([^.]+?)\.(?:BOLT|REGENIE|SAIGE|STAAR)'
+            # Extract matches
+            matches = set()
+            for name in tar.getnames():
+                match = re.search(pattern, name)
+                if match:
+                    extracted_value = match.group(1)  # Extract the second part after the prefix
+                    if extracted_value not in {"SNP", "GENE"}:  # Remove SNP and GENE
+                        matches.add(extracted_value)
 
             if Path(f'{tarball_prefix}.SNP.BOLT.bgen').exists():
                 is_snp_tar = True
@@ -182,7 +236,7 @@ def ingest_tarballs(association_tarballs: dxpy.DXFile) -> Tuple[bool, bool, List
             raise dxpy.AppError(f'Provided association tarball ({tar_file}) '
                                 f'is not a tar.gz file')
 
-    return is_snp_tar, is_gene_tar, tarball_prefixes
+    return is_snp_tar, is_gene_tar, tarball_prefixes, matches
 
 
 def process_regenie_step_one(regenie_run_location: dxpy.DXFile) -> bool:

@@ -1,12 +1,12 @@
-import re
 import csv
-import dxpy
-
+import re
+import shutil
 from pathlib import Path
 from typing import Set, List
 
-from general_utilities.mrc_logger import MRCLogger
+import dxpy
 from general_utilities.job_management.command_executor import CommandExecutor
+from general_utilities.mrc_logger import MRCLogger
 
 
 class GeneticsLoader:
@@ -60,12 +60,24 @@ class GeneticsLoader:
 
         # Now grab all genetic data that I have in the folder /project_resources/genetics/
         Path('genetics/').mkdir(exist_ok=True)  # This is for legacy reasons to make sure all tests work...
-        dxpy.download_dxfile(self._bed_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bed')
-        dxpy.download_dxfile(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
-        dxpy.download_dxfile(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
+        # check if we are working with a DNA Nexus file or not
+        # if we are then process it like a DNA Nexus file
+        if self._bed_file.name.startswith("file-"):
+            dna_nexus_run = True
+            dxpy.download_dxfile(self._bed_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bed')
+            dxpy.download_dxfile(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
+            dxpy.download_dxfile(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
+        else:
+            dna_nexus_run = False
+            shutil.copy(self._bed_file, 'genetics/UKBB_470K_Autosomes_QCd.bed')
+            shutil.copy(self._bim_file, 'genetics/UKBB_470K_Autosomes_QCd.bim')
+            shutil.copy(self._fam_file, 'genetics/UKBB_470K_Autosomes_QCd.fam')
 
         if self._low_mac_list is not None:
-            dxpy.download_dxfile(self._low_mac_list.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
+            if dna_nexus_run:
+                dxpy.download_dxfile(self._low_mac_list.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
+            else:
+                shutil.copy(self._low_mac_list, 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
 
         self._logger.info('Genetic array data downloaded...')
 
@@ -218,15 +230,34 @@ class GeneticsLoader:
         :return: None
         """
         # Generate a plink file to use that only has included individuals:
-        cmd = 'plink2 ' \
-              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
-              '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-        self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
+
+        # check if we are working with a DNA Nexus file or not
+        # if we are then process it like a DNA Nexus file
+        if self._bed_file.name.startswith("file-"):
+
+            cmd = 'plink2 ' \
+                  '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
+                  '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
+
+            self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
+
+        else:
+
+            shutil.copy('SAMPLES_Include.txt', 'genetics/SAMPLES_Include.txt')
+
+            cmd = 'plink2 ' \
+                  '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/genetics/SAMPLES_Include.txt ' \
+                  '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
+
+            # mount = DockerMount(Path('genetics'), Path('/test/genetics'))
+            # cmd_exec = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting', docker_mounts=[mount])
+            # cmd_exec.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 
         # I have to do this to recover the sample information from plink
         with Path('plink_filtered.out').open('r') as plink_out:
             for line in plink_out:
-                count_matcher = re.match('(\\d+) samples \(\\d+ females, \\d+ males; \\d+ founders\) remaining after', line)
+                count_matcher = re.match('(\\d+) samples \(\\d+ females, \\d+ males; \\d+ founders\) remaining after',
+                                         line)
                 if count_matcher:
                     self._logger.info(f'{"Plink individuals written":{65}}: {count_matcher.group(1)}')
 
@@ -247,7 +278,11 @@ class GeneticsLoader:
         Path("genetics/").mkdir(exist_ok=True)
 
         # Downloads the sparse matrix
-        dxpy.download_dxfile(sparse_grm.get_id(),
-                             'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx')
-        dxpy.download_dxfile(sparse_grm_sample.get_id(),
-                             'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx.sampleIDs.txt')
+        if sparse_grm.name.startswith("file-"):
+            dxpy.download_dxfile(sparse_grm.get_id(),
+                                 'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx')
+            dxpy.download_dxfile(sparse_grm_sample.get_id(),
+                                 'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx.sampleIDs.txt')
+        else:
+            shutil.copy(sparse_grm, 'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx')
+            shutil.copy(sparse_grm_sample, 'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx.sampleIDs.txt')

@@ -1,14 +1,14 @@
-import re
-import dxpy
 import argparse
-
-from pathlib import Path
-from importlib import util, import_module
-from typing import List, Type, Optional
+import re
 from abc import ABC, abstractmethod
+from importlib import util, import_module
+from pathlib import Path
+from typing import List, Type, Optional
 
-from general_utilities.mrc_logger import MRCLogger
+import dxpy
+
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
+from general_utilities.mrc_logger import MRCLogger
 
 
 class ModuleLoader(ABC):
@@ -80,37 +80,48 @@ class ModuleLoader(ABC):
             project.
         :return: A 'nullable' dxpy.DXFile
         """
-        try:
+        if input_str.startswith("file-"):
+            try:
+                if input_str == 'None':
+                    return None
+                else:
+                    # First check if the input looks like a DXFile ID (must be 'file-' + 24 alphanumeric characters)
+                    if re.match('file-\\w{24}', input_str):
+                        dxfile = dxpy.DXFile(dxid=input_str)
+                        dxfile.describe()  # This will trigger Exceptions caught below if not actually a DXFile / not found
+
+                    # And then check if the file/path exists on DNANexus
+                    else:
+                        file_handle = Path(input_str)
+                        found_file = dxpy.find_one_data_object(classname='file',
+                                                               project=dxpy.PROJECT_CONTEXT_ID,
+                                                               name_mode='exact',
+                                                               name=f'{file_handle.name}',
+                                                               folder=f'{file_handle.parent}',
+                                                               zero_ok=False)
+                        dxfile = dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
+
+                    return dxfile
+            except dxpy.exceptions.DXSearchError:
+                raise FileNotFoundError(
+                    f'The input parameter – {input_str} – was tried as a filepath, but was not found '
+                    f'in the project this applet has been executed from. Please confirm the file '
+                    f'exists in this project or use a DNANexus file ID (like: file-12345...).')
+            except dxpy.exceptions.DXError:  # This just checks if the format of the input is correct
+                raise TypeError(f'The input for parameter – {input_str} – '
+                                f'does not look like a valid DNANexus file ID.')
+            except dxpy.exceptions.ResourceNotFound:
+                raise TypeError(f'The input for parameter – {input_str} – '
+                                f'does not exist on the DNANexus platform.')
+        else:
             if input_str == 'None':
                 return None
             else:
-                # First check if the input looks like a DXFile ID (must be 'file-' + 24 alphanumeric characters)
-                if re.match('file-\\w{24}', input_str):
-                    dxfile = dxpy.DXFile(dxid=input_str)
-                    dxfile.describe()  # This will trigger Exceptions caught below if not actually a DXFile / not found
-
-                # And then check if the file/path exists on DNANexus
+                if Path(input_str).exists():
+                    print(f"The path '{input_str}' exists. Nice.")
                 else:
-                    file_handle = Path(input_str)
-                    found_file = dxpy.find_one_data_object(classname='file',
-                                                           project=dxpy.PROJECT_CONTEXT_ID,
-                                                           name_mode='exact',
-                                                           name=f'{file_handle.name}',
-                                                           folder=f'{file_handle.parent}',
-                                                           zero_ok=False)
-                    dxfile = dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
-
-                return dxfile
-        except dxpy.exceptions.DXSearchError:
-            raise FileNotFoundError(f'The input parameter – {input_str} – was tried as a filepath, but was not found '
-                                    f'in the project this applet has been executed from. Please confirm the file '
-                                    f'exists in this project or use a DNANexus file ID (like: file-12345...).')
-        except dxpy.exceptions.DXError:  # This just checks if the format of the input is correct
-            raise TypeError(f'The input for parameter – {input_str} – '
-                            f'does not look like a valid DNANexus file ID.')
-        except dxpy.exceptions.ResourceNotFound:
-            raise TypeError(f'The input for parameter – {input_str} – '
-                            f'does not exist on the DNANexus platform.')
+                    raise TypeError(f"The path '{input_str}' does not exist.")
+                return Path(input_str)
 
     @staticmethod
     def comma_str(input_str: str) -> List[str]:
@@ -165,7 +176,7 @@ class ModuleLoader(ABC):
                 end = len(input_args)
             else:
                 start = arg_indicies[i] + 1
-                end = arg_indicies[i+1]
+                end = arg_indicies[i + 1]
             split_args.append(input_args[start:end])
 
         # And finally split the flag from the argument(s) potentially further splitting the argument by whitespace if
@@ -190,7 +201,7 @@ class ModuleLoader(ABC):
                             group = group[1:len(group)]
                         elif match.end() == str_len:
                             quote_match += 1
-                            group = group[0:len(group)-1]
+                            group = group[0:len(group) - 1]
 
                     # If quote_match = 2, then the parameter was wrapped in quotes and we don't strip by whitespace,
                     # add the argument directly as-is

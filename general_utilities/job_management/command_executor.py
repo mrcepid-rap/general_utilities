@@ -1,8 +1,9 @@
-import dxpy
+import os
 import subprocess
-
 from pathlib import Path
 from typing import Union, List
+
+import dxpy
 
 from general_utilities.mrc_logger import MRCLogger
 
@@ -300,7 +301,7 @@ def build_default_command_executor() -> CommandExecutor:
     :return: A CommandExecutor object
     """
 
-    default_mounts = [DockerMount(Path('/home/dnanexus/'), Path('/test/'))]
+    default_mounts = [DockerMount(Path(os.getcwd()), Path('/test/'))]
     cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
                                    docker_mounts=default_mounts)
 

@@ -1,13 +1,13 @@
-import os
-import math
-import dxpy
 import inspect
-
-from enum import Enum, auto
-from time import sleep, time
+import os
 from datetime import datetime
+from enum import Enum, auto
 from importlib import import_module
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
+
+import dxpy
+import math
+from time import sleep, time
 
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
@@ -192,7 +192,8 @@ class SubjobUtility:
         self._retries = retries
         if 'DX_JOB_ID' in os.environ:
             parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
-            self._default_instance_type = parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
+            self._default_instance_type = \
+            parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
         else:
             self._default_instance_type = None
 
@@ -628,5 +629,3 @@ def prep_current_image(required_files: List[dict]) -> CommandExecutor:
         download_dxfile_by_name(file, print_status=False)
 
     return cmd_executor
-
-
