@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List
-from importlib.resources import files
-
+# from importlib.resources import files
+from importlib_resources import files
 from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
 from job_management.command_executor import CommandExecutor
 
