@@ -161,8 +161,6 @@ class IngestData(ABC):
 
                 pheno_file = download_dxfile_by_name(dx_pheno_file)
 
-                print(pheno_file)
-
             else:
 
                 pheno_file = dx_pheno_file
@@ -172,7 +170,6 @@ class IngestData(ABC):
 
             # Now process the downloaded pheno_file and extract phenotype names/raw phenotypes
             dialect = csv.Sniffer().sniff(pheno_file.open('r').readline(), delimiters=[' ', '\t'])
-            print(dialect)
             with pheno_file.open('r') as pheno_reader:
                 pheno_csv = csv.DictReader(pheno_reader, delimiter=dialect.delimiter)
                 field_names = pheno_csv.fieldnames
