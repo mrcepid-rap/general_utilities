@@ -155,6 +155,18 @@ class IngestData(ABC):
 
         for dx_pheno_file in pheno_files:
 
+            print(dx_pheno_file)
+            print(dx_pheno_file.name)
+
+            print("Type of dx_pheno_file:", type(dx_pheno_file))
+            print("String representation of dx_pheno_file:", str(dx_pheno_file))
+            print("Attributes and methods of dx_pheno_file:", dir(dx_pheno_file))
+
+            if hasattr(dx_pheno_file, '__dict__'):
+                print("dx_pheno_file __dict__:", vars(dx_pheno_file))
+            else:
+                print("dx_pheno_file has no __dict__ attribute")
+
             if dx_pheno_file.name.startswith("file-"):
 
                 pheno_file = download_dxfile_by_name(dx_pheno_file)
