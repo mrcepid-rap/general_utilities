@@ -1,15 +1,15 @@
 from pathlib import Path
 from typing import List
+
 # from importlib.resources import files
 from importlib_resources import files
+
 from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
-from job_management.command_executor import CommandExecutor
 
 
 # Generate the NULL model for STAAR
 def staar_null(phenoname: str, is_binary: bool, sex: int, ignore_base: bool,
                found_quantitative_covariates: List[str], found_categorical_covariates: List[str]) -> None:
-
     # I have made a custom script in order to generate the STAAR Null model that is installed using pip
     # as part of the general_utilities package. We can extract the system location of this script:
     r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Null.R')
@@ -52,7 +52,6 @@ def staar_null(phenoname: str, is_binary: bool, sex: int, ignore_base: bool,
 # Run rare variant association testing using STAAR
 # Returns the finished chromosome to aid in output file creation
 def staar_genes(tarball_prefix: str, chromosome: str, phenoname: str, has_gene_info: bool) -> tuple:
-
     # I have made a custom script in order to generate STAAR per-gene models that is installed using pip
     # as part of the general_utilities package. We can extract the system location of this script:
     r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Genes.R')
