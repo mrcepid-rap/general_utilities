@@ -508,7 +508,7 @@ class SubjobUtility:
                         for value in output_value:
                             # This is possibly (likely) a file
                             if '$dnanexus_link' in value:
-                                if value['$dnanexus_link'].startswith('file-'):
+                                if isinstance(value['$dnanexus_link'], dxpy.bindings.dxfile.DXFile):
                                     if self._download_on_complete:  # Download the file if the user wants it locally
                                         new_values.append(download_dxfile_by_name(value, print_status=False))
                                     else:
@@ -530,7 +530,7 @@ class SubjobUtility:
                         if type(output_value) is dict:
                             if '$dnanexus_link' in output_value:
                                 # This is still likely a file...
-                                if output_value['$dnanexus_link'].startswith('file-'):
+                                if isinstance(output_value['$dnanexus_link'], dxpy.bindings.dxfile.DXFile):
                                     if self._download_on_complete:  # Download the file if the user wants it locally
                                         output_dict[output_key] = download_dxfile_by_name(output_value,
                                                                                           print_status=False)

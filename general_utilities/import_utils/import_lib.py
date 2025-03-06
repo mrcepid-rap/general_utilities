@@ -49,7 +49,7 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> Non
     bgen = chrom_bgen_index['bgen']
     vep = chrom_bgen_index['vep']
 
-    if bgen.startswith("file-"):
+    if isinstance(bgen, dxpy.bindings.dxfile.DXFile):
 
         dxpy.download_dxfile(bgen_index, f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
         dxpy.download_dxfile(bgen_sample, f'filtered_bgen/{chromosome}.filtered.sample')
@@ -130,7 +130,7 @@ def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
 
     # a workaround for non-DNA Nexus files
     # if the filenames of the bgens start with 'file-xxxxxx' it's a DNA Nexus file
-    if bgen_index.name.startswith("file-"):
+    if isinstance(bgen_index.name, dxpy.bindings.dxfile.DXFile):
 
         # therefore run the DNA Nexus file parser
         dxpy.download_dxfile(bgen_index.get_id(), "bgen_locs.tsv")
@@ -182,7 +182,7 @@ def ingest_tarballs(association_tarballs: dxpy.DXFile) -> Tuple[bool, bool, List
 
     # check if we are working with a DNA Nexus file or not
     # if we are then process it like a DNA Nexus file
-    if association_tarballs.name.startswith("file-"):
+    if isinstance(association_tarballs.name, dxpy.bindings.dxfile.DXFile):
 
         # association_tarballs likely to be a single tarball:
         if '.tar.gz' in association_tarballs.describe()['name']:

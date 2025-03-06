@@ -80,7 +80,7 @@ class ModuleLoader(ABC):
             project.
         :return: A 'nullable' dxpy.DXFile
         """
-        if input_str.startswith("file-"):
+        if isinstance(input_str, dxpy.bindings.dxfile.DXFile):
             try:
                 if input_str == 'None':
                     return None

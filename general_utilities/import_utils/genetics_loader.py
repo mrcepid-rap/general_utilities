@@ -62,7 +62,7 @@ class GeneticsLoader:
         Path('genetics/').mkdir(exist_ok=True)  # This is for legacy reasons to make sure all tests work...
         # check if we are working with a DNA Nexus file or not
         # if we are then process it like a DNA Nexus file
-        if self._bed_file.name.startswith("file-"):
+        if isinstance(self._bed_file.name, dxpy.bindings.dxfile.DXFile):
             dna_nexus_run = True
             dxpy.download_dxfile(self._bed_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bed')
             dxpy.download_dxfile(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
@@ -233,7 +233,7 @@ class GeneticsLoader:
 
         # check if we are working with a DNA Nexus file or not
         # if we are then process it like a DNA Nexus file
-        if self._bed_file.name.startswith("file-"):
+        if isinstance(self._bed_file.name, dxpy.bindings.dxfile.DXFile):
 
             cmd = 'plink2 ' \
                   '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
@@ -278,7 +278,7 @@ class GeneticsLoader:
         Path("genetics/").mkdir(exist_ok=True)
 
         # Downloads the sparse matrix
-        if sparse_grm.name.startswith("file-"):
+        if isinstance(sparse_grm.name, dxpy.bindings.dxfile.DXFile):
             dxpy.download_dxfile(sparse_grm.get_id(),
                                  'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx')
             dxpy.download_dxfile(sparse_grm_sample.get_id(),

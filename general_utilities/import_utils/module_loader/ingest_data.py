@@ -119,7 +119,7 @@ class IngestData(ABC):
             see the README.
         :return: None
         """
-        if transcript_index.name.startswith("file-"):
+        if isinstance(transcript_index.name, dxpy.bindings.dxfile.DXFile):
             dxpy.download_dxfile(transcript_index.get_id(), 'transcripts.tsv.gz')
 
     def _ingest_phenofile(self, pheno_files: List[dxpy.DXFile], pheno_name: str) -> Dict[str, Dict[str, Any]]:
@@ -234,7 +234,7 @@ class IngestData(ABC):
         :return: A boolean that is true if additional covariates beyond the base covariates were provided
         """
 
-        if base_covariates.name.startswith("file-"):
+        if isinstance(base_covariates.name, dxpy.bindings.dxfile.DXFile):
 
             dxpy.download_dxfile(base_covariates.get_id(), 'base_covariates.covariates')
 
@@ -565,7 +565,7 @@ class IngestData(ABC):
             indv_exclude = 0  # Count the nunber of samples we WONT analyse
             for indv in base_covar_csv:
                 # if we are working on DNA Nexus
-                if self._parsed_options.base_covariates.name.startswith("file-"):
+                if isinstance(self._parsed_options.base_covariates.name, dxpy.bindings.dxfile.DXFile):
                     # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
                     # on sex
                     if indv['22001-0.0'] != "NA" and indv['eid'] in genetics_samples:
