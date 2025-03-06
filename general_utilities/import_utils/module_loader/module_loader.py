@@ -81,6 +81,7 @@ class ModuleLoader(ABC):
         :return: A 'nullable' dxpy.DXFile
         """
         if isinstance(input_str, dxpy.bindings.dxfile.DXFile):
+            print(input_str)
             try:
                 if input_str == 'None':
                     return None
@@ -88,11 +89,13 @@ class ModuleLoader(ABC):
                     # First check if the input looks like a DXFile ID (must be 'file-' + 24 alphanumeric characters)
                     if re.match('file-\\w{24}', input_str):
                         dxfile = dxpy.DXFile(dxid=input_str)
+                        print(dxfile)
                         dxfile.describe()  # This will trigger Exceptions caught below if not actually a DXFile / not found
 
                     # And then check if the file/path exists on DNANexus
                     else:
                         file_handle = Path(input_str)
+                        print(file_handle)
                         found_file = dxpy.find_one_data_object(classname='file',
                                                                project=dxpy.PROJECT_CONTEXT_ID,
                                                                name_mode='exact',
@@ -100,6 +103,7 @@ class ModuleLoader(ABC):
                                                                folder=f'{file_handle.parent}',
                                                                zero_ok=False)
                         dxfile = dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
+                        print(dxfile)
 
                     return dxfile
             except dxpy.exceptions.DXSearchError:
