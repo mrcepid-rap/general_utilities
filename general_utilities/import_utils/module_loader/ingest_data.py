@@ -567,7 +567,7 @@ class IngestData(ABC):
             indv_exclude = 0  # Count the nunber of samples we WONT analyse
             for indv in base_covar_csv:
                 # if we are working on DNA Nexus
-                if isinstance(self._parsed_options.base_covariates.name, dxpy.bindings.dxfile.DXFile):
+                if isinstance(input_filetype_parser(self._parsed_options.base_covariates), dxpy.DXFile):
                     # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
                     # on sex
                     if indv['22001-0.0'] != "NA" and indv['eid'] in genetics_samples:
