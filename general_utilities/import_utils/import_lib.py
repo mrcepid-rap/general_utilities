@@ -3,7 +3,7 @@ import re
 import shutil
 import tarfile
 from pathlib import Path
-from typing import Dict, Tuple, List, TypedDict, Optional
+from typing import Dict, Tuple, List, TypedDict, Optional, Union
 
 import dxpy
 
@@ -254,3 +254,62 @@ def process_regenie_step_one(regenie_run_location: dxpy.DXFile) -> bool:
             tar = tarfile.open(tarball_path, 'r:gz')
             tar.extractall()
         return True
+
+
+def input_filetype_parser(input_str: Optional[Union[str, Path, dxpy.DXFile]]) -> Optional[Union[dxpy.DXFile, Path]]:
+    """
+    Parses an input string and returns the appropriate file type.
+
+    - If input_str is None or "None", returns None.
+    - If input_str matches a DNANexus file ID (e.g., "file-1234567890ABCDEFG12345678"), returns a dxpy.DXFile.
+    - Otherwise, treats input_str as an absolute file path:
+         * First, attempts to locate the file on DNANexus.
+         * If not found on DNANexus, checks if the file exists locally.
+         * Returns a Path if it exists locally.
+
+    :param input_str: The input string representing a DNANexus file ID or an absolute file path.
+    :return: Either a dxpy.DXFile or a pathlib.Path.
+    :raises FileNotFoundError: If the file is not found on DNANexus or locally.
+    :raises ValueError: If a provided file path is not absolute.
+    :raises TypeError: If a DNANexus file ID is invalid.
+    """
+    # Handle the case of a "None" input.
+    if input_str is None or input_str == 'None':
+        return None
+
+    file_handle = Path(input_str)
+
+    # Case 1: DNANexus file ID.
+    if re.fullmatch(r'file-\w{24}', input_str):
+        try:
+            dxfile = dxpy.DXFile(dxid=input_str)
+            dxfile.describe()  # Validates that the file exists on DNANexus.
+            return dxfile
+        except (dxpy.exceptions.DXError, dxpy.exceptions.ResourceNotFound) as e:
+            raise TypeError(f"Invalid DNANexus file ID: {input_str}") from e
+
+    # Case 2: File path.
+    else:
+        if not file_handle.is_absolute():
+            raise ValueError(f"Provided path '{input_str}' is not absolute. Please provide an absolute path.")
+
+        try:
+            # Attempt to locate the file on DNANexus.
+            found_file = dxpy.find_one_data_object(
+                classname='file',
+                project=dxpy.PROJECT_CONTEXT_ID,
+                name_mode='exact',
+                name=file_handle.name,
+                folder=str(file_handle.parent),
+                zero_ok=False
+            )
+            return dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
+        except dxpy.exceptions.DXSearchError:
+            # If not found on DNANexus, check if the file exists locally.
+            if file_handle.exists():
+                logging.info(f"Local file '{input_str}' found.")
+                return file_handle
+            else:
+                raise FileNotFoundError(
+                    f"File '{input_str}' not found on DNANexus or locally."
+                )

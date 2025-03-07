@@ -10,7 +10,7 @@ from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
-
+from general_utilities.import_utils.import_lib import input_filetype_parser
 
 class IngestData(ABC):
     """Download and process required files and data to enable module functionality.
@@ -236,7 +236,8 @@ class IngestData(ABC):
         :return: A boolean that is true if additional covariates beyond the base covariates were provided
         """
 
-        if isinstance(base_covariates.name, dxpy.bindings.dxfile.DXFile):
+
+        if input_filetype_parser(base_covariates) == dxpy.DXFile:
 
             dxpy.download_dxfile(base_covariates.get_id(), 'base_covariates.covariates')
 
