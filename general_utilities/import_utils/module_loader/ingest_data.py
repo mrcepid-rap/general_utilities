@@ -119,7 +119,8 @@ class IngestData(ABC):
             see the README.
         :return: None
         """
-        if isinstance(transcript_index.name, dxpy.bindings.dxfile.DXFile):
+        if isinstance(input_filetype_parser(transcript_index), dxpy.DXFile):
+
             dxpy.download_dxfile(transcript_index.get_id(), 'transcripts.tsv.gz')
 
     def _ingest_phenofile(self, pheno_files: List[dxpy.DXFile], pheno_name: str) -> Dict[str, Dict[str, Any]]:
@@ -157,7 +158,7 @@ class IngestData(ABC):
 
             print(dx_pheno_file)
 
-            if isinstance(dx_pheno_file, dxpy.bindings.dxfile.DXFile):
+            if isinstance(input_filetype_parser(dx_pheno_file), dxpy.DXFile):
 
                 pheno_file = download_dxfile_by_name(dx_pheno_file)
 
