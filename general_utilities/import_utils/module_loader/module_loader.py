@@ -3,7 +3,7 @@ import re
 from abc import ABC, abstractmethod
 from importlib import util, import_module
 from pathlib import Path
-from typing import List, Type, Optional, Any
+from typing import List, Type, Optional, Any, Union
 
 import dxpy
 from dxpy import DXError
@@ -69,7 +69,7 @@ class ModuleLoader(ABC):
         self._outputs = outputs
 
     @staticmethod
-    def dxfile_input(input_str: str) -> Optional[dxpy.DXFile, Path]:
+    def dxfile_input(input_str: str) -> Optional[Union[dxpy.DXFile, Path]]:
         """A method that defines a 'dxfile' type for argparse. Allows for a 'None' input default for optional files
 
         This method is to allow for a dxfile 'type' when defining arguments for argparse. This method is passed as an
