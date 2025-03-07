@@ -3,9 +3,10 @@ import re
 from abc import ABC, abstractmethod
 from importlib import util, import_module
 from pathlib import Path
-from typing import List, Type, Optional
+from typing import List, Type, Optional, Any
 
 import dxpy
+from dxpy import DXError
 
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
 from general_utilities.mrc_logger import MRCLogger
@@ -68,7 +69,7 @@ class ModuleLoader(ABC):
         self._outputs = outputs
 
     @staticmethod
-    def dxfile_input(input_str: str) -> Optional[dxpy.DXFile]:
+    def dxfile_input(input_str: str) -> Optional[dxpy.DXFile, Path]:
         """A method that defines a 'dxfile' type for argparse. Allows for a 'None' input default for optional files
 
         This method is to allow for a dxfile 'type' when defining arguments for argparse. This method is passed as an
@@ -81,48 +82,50 @@ class ModuleLoader(ABC):
         :return: A 'nullable' dxpy.DXFile
         """
         print(input_str)
-        if isinstance(input_str, dxpy.bindings.dxfile.DXFile):
+        if input_str == 'None':
+            return None
+        else:
+
+            dxfile = dxpy.DXFile(dxid=input_str)
+            file_handle = Path(input_str)
+
             try:
-                if input_str == 'None':
-                    return None
+                # First check if the input looks like a DXFile ID (must be 'file-' + 24 alphanumeric characters)
+                if re.match('file-\\w{24}', input_str):
+                    dxfile.describe()  # This will trigger Exceptions caught below if not actually a DXFile / not found
+
+                # And then check if the file/path exists on DNANexus
                 else:
-                    # First check if the input looks like a DXFile ID (must be 'file-' + 24 alphanumeric characters)
-                    if re.match('file-\\w{24}', input_str):
-                        dxfile = dxpy.DXFile(dxid=input_str)
-                        dxfile.describe()  # This will trigger Exceptions caught below if not actually a DXFile / not found
+                    found_file = dxpy.find_one_data_object(classname='file',
+                                                           project=dxpy.PROJECT_CONTEXT_ID,
+                                                           name_mode='exact',
+                                                           name=f'{file_handle.name}',
+                                                           folder=f'{file_handle.parent}',
+                                                           zero_ok=False)
+                    dxfile = dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
 
-                    # And then check if the file/path exists on DNANexus
-                    else:
-                        file_handle = Path(input_str)
-                        found_file = dxpy.find_one_data_object(classname='file',
-                                                               project=dxpy.PROJECT_CONTEXT_ID,
-                                                               name_mode='exact',
-                                                               name=f'{file_handle.name}',
-                                                               folder=f'{file_handle.parent}',
-                                                               zero_ok=False)
-                        dxfile = dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
-
-                    return dxfile
+                return dxfile
             except dxpy.exceptions.DXSearchError:
-                raise FileNotFoundError(
-                    f'The input parameter – {input_str} – was tried as a filepath, but was not found '
-                    f'in the project this applet has been executed from. Please confirm the file '
-                    f'exists in this project or use a DNANexus file ID (like: file-12345...).')
+
+                if file_handle.exists():
+                    print(f"The path '{input_str}' exists. Nice.")
+                else:
+                    raise FileNotFoundError(
+                        f'The input parameter – {input_str} – was tried as a filepath, but was not found '
+                        f'in the project this applet has been executed from. Please confirm the file '
+                        f'exists in this project or use a DNANexus file ID (like: file-12345...).')
+
+                return file_handle
+
             except dxpy.exceptions.DXError:  # This just checks if the format of the input is correct
                 raise TypeError(f'The input for parameter – {input_str} – '
                                 f'does not look like a valid DNANexus file ID.')
             except dxpy.exceptions.ResourceNotFound:
+
                 raise TypeError(f'The input for parameter – {input_str} – '
                                 f'does not exist on the DNANexus platform.')
-        else:
-            if input_str == 'None':
-                return None
-            else:
-                if Path(input_str).exists():
-                    print(f"The path '{input_str}' exists. Nice.")
-                else:
-                    raise TypeError(f"The path '{input_str}' does not exist.")
-                return Path(input_str)
+
+
 
     @staticmethod
     def comma_str(input_str: str) -> List[str]:
