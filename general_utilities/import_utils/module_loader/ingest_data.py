@@ -236,8 +236,7 @@ class IngestData(ABC):
         :return: A boolean that is true if additional covariates beyond the base covariates were provided
         """
 
-
-        if input_filetype_parser(base_covariates) == dxpy.DXFile:
+        if isinstance(input_filetype_parser(base_covariates), dxpy.DXFile):
 
             dxpy.download_dxfile(base_covariates.get_id(), 'base_covariates.covariates')
 
