@@ -130,7 +130,7 @@ def ingest_wes_bgen(bgen_index: dxpy.DXFile) -> Dict[str, BGENInformation]:
 
     # a workaround for non-DNA Nexus files
     # if the filenames of the bgens start with 'file-xxxxxx' it's a DNA Nexus file
-    if isinstance(bgen_index.name, dxpy.bindings.dxfile.DXFile):
+    if isinstance(input_filetype_parser(bgen_index), dxpy.DXFile):
 
         # therefore run the DNA Nexus file parser
         dxpy.download_dxfile(bgen_index.get_id(), "bgen_locs.tsv")
