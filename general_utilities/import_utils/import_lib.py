@@ -182,7 +182,7 @@ def ingest_tarballs(association_tarballs: dxpy.DXFile) -> Tuple[bool, bool, List
 
     # check if we are working with a DNA Nexus file or not
     # if we are then process it like a DNA Nexus file
-    if isinstance(association_tarballs.name, dxpy.bindings.dxfile.DXFile):
+    if isinstance(input_filetype_parser(association_tarballs), dxpy.DXFile):
 
         # association_tarballs likely to be a single tarball:
         if '.tar.gz' in association_tarballs.describe()['name']:
