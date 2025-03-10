@@ -14,7 +14,7 @@ from general_utilities.mrc_logger import MRCLogger
 LOGGER = MRCLogger(__name__).get_logger()
 
 
-def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, is_wgs_tar: bool = False,
+def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False,
                     chromosome: str = None,
                     bgen_dict: Dict = None) -> List[str]:
     """ Generate a list of chromosomes to process
@@ -29,6 +29,7 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False, is_wgs_
     :param is_snp_tar: Is the current analysis processing a collapsed SNP fileset?
     :param is_gene_tar: Is the current analysis processing a collapsed GENE-list fileset?
     :param chromosome: Do we want to analyse a single chromosome?
+    :param bgen_dict: A dictionary of bgen files to process
     :return: A list containing chromosomes that we want to analyse
     """
 
