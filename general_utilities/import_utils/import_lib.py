@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Dict, Tuple, List, TypedDict, Optional, Union
 
 import dxpy
-
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.mrc_logger import MRCLogger
 
@@ -48,8 +47,8 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> Non
     bgen_sample = chrom_bgen_index['sample']
     bgen = chrom_bgen_index['bgen']
     vep = chrom_bgen_index['vep']
-    print(bgen)
-    if isinstance(input_filetype_parser(bgen['$dnanexus_link']), dxpy.DXFile):
+
+    if isinstance(bgen, dict) and isinstance(input_filetype_parser(bgen['$dnanexus_link']), dxpy.DXFile):
 
         dxpy.download_dxfile(bgen_index, f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
         dxpy.download_dxfile(bgen_sample, f'filtered_bgen/{chromosome}.filtered.sample')

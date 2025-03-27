@@ -81,13 +81,13 @@ class ModuleLoader(ABC):
             project.
         :return: A 'nullable' dxpy.DXFile
         """
-        print(input_str)
         if input_str == 'None':
             return None
         else:
-
+            if Path(input_str).exists():
+                print(f"The path '{input_str}' exists. Nice.")
+                return Path(input_str)
             dxfile = dxpy.DXFile(dxid=input_str)
-            file_handle = Path(input_str)
 
             try:
                 # First check if the input looks like a DXFile ID (must be 'file-' + 24 alphanumeric characters)
@@ -99,29 +99,22 @@ class ModuleLoader(ABC):
                     found_file = dxpy.find_one_data_object(classname='file',
                                                            project=dxpy.PROJECT_CONTEXT_ID,
                                                            name_mode='exact',
-                                                           name=f'{file_handle.name}',
-                                                           folder=f'{file_handle.parent}',
+                                                           name=f'{Path(input_str).name}',
+                                                           folder=f'{Path(input_str).parent}',
                                                            zero_ok=False)
                     dxfile = dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
 
                 return dxfile
             except dxpy.exceptions.DXSearchError:
-
-                if file_handle.exists():
-                    print(f"The path '{input_str}' exists. Nice.")
-                else:
-                    raise FileNotFoundError(
-                        f'The input parameter – {input_str} – was tried as a filepath, but was not found '
-                        f'in the project this applet has been executed from. Please confirm the file '
-                        f'exists in this project or use a DNANexus file ID (like: file-12345...).')
-
-                return file_handle
+                raise FileNotFoundError(
+                    f'The input parameter – {input_str} – was tried as a filepath, but was not found '
+                    f'in the project this applet has been executed from. Please confirm the file '
+                    f'exists in this project or use a DNANexus file ID (like: file-12345...).')
 
             except dxpy.exceptions.DXError:  # This just checks if the format of the input is correct
                 raise TypeError(f'The input for parameter – {input_str} – '
                                 f'does not look like a valid DNANexus file ID.')
             except dxpy.exceptions.ResourceNotFound:
-
                 raise TypeError(f'The input for parameter – {input_str} – '
                                 f'does not exist on the DNANexus platform.')
 
