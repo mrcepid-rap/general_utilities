@@ -8,6 +8,7 @@ import dxpy
 
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
+from general_utilities.import_utils.module_loader.input_parser import InputParser
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.import_utils.import_lib import input_filetype_parser
@@ -119,9 +120,7 @@ class IngestData(ABC):
             see the README.
         :return: None
         """
-        if isinstance(input_filetype_parser(transcript_index), dxpy.DXFile):
-
-            dxpy.download_dxfile(transcript_index.get_id(), 'transcripts.tsv.gz')
+        InputParser(transcript_index.get_id(), 'transcripts.tsv.gz')
 
     def _ingest_phenofile(self, pheno_files: List[dxpy.DXFile], pheno_name: str) -> Dict[str, Dict[str, Any]]:
         """Download provided phenotype files and attempt to retrieve phenotypes from these file(s)
@@ -156,15 +155,7 @@ class IngestData(ABC):
 
         for dx_pheno_file in pheno_files:
 
-            print(dx_pheno_file)
-
-            if isinstance(input_filetype_parser(dx_pheno_file), dxpy.DXFile):
-
-                pheno_file = download_dxfile_by_name(dx_pheno_file)
-
-            else:
-
-                pheno_file = dx_pheno_file
+            pheno_file = InputParser(dx_pheno_file)
 
             total_missing_dict = {}
             total_samples = 0
@@ -237,15 +228,13 @@ class IngestData(ABC):
         :return: A boolean that is true if additional covariates beyond the base covariates were provided
         """
 
-        if isinstance(input_filetype_parser(base_covariates), dxpy.DXFile):
+        InputParser(base_covariates.get_id(), 'base_covariates.covariates')
 
-            dxpy.download_dxfile(base_covariates.get_id(), 'base_covariates.covariates')
-
-            # Check if additional covariates were provided:
-            additional_covariates_found = False
-            if covarfile is not None:
-                dxpy.download_dxfile(covarfile.get_id(), 'additional_covariates.covariates')
-                additional_covariates_found = True
+        # Check if additional covariates were provided:
+        additional_covariates_found = False
+        if covarfile is not None:
+            dxpy.download_dxfile(covarfile.get_id(), 'additional_covariates.covariates')
+            additional_covariates_found = True
 
         else:
 
@@ -272,10 +261,10 @@ class IngestData(ABC):
 
         inclusion_found, exclusion_found = False, False
         if inclusion_list is not None:
-            dxpy.download_dxfile(inclusion_list.get_id(), 'INCLUSION.lst')
+            InputParser(inclusion_list.get_id(), 'INCLUSION.lst'')
             inclusion_found = True
         if exclusion_list is not None:
-            dxpy.download_dxfile(exclusion_list.get_id(), 'EXCLUSION.lst')
+            InputParser(exclusion_list.get_id(), 'EXCLUSION.lst')
             exclusion_found = True
 
         return inclusion_found, exclusion_found

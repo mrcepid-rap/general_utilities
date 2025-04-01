@@ -3,13 +3,11 @@ import re
 from abc import ABC, abstractmethod
 from importlib import util, import_module
 from pathlib import Path
-from typing import List, Type, Optional, Any, Union
-
+from typing import List, Type, Optional, Union
+from general_utilities.import_utils.module_loader.input_parser import InputParser
 import dxpy
-from dxpy import DXError
 
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
-from general_utilities.mrc_logger import MRCLogger
 
 
 class ModuleLoader(ABC):
@@ -37,7 +35,6 @@ class ModuleLoader(ABC):
     def __init__(self, output_prefix: str, input_args: str):
 
         # Initiate logger – This can also be used by a class which implements this Interface
-        self._logger = MRCLogger(__name__).get_logger()
 
         # Set empty outputs array to hold anything a module may produce and returnable to the main() method calling this
         # class
@@ -69,56 +66,10 @@ class ModuleLoader(ABC):
         self._outputs = outputs
 
     @staticmethod
-    def dxfile_input(input_str: str) -> Optional[Union[dxpy.DXFile, Path]]:
-        """A method that defines a 'dxfile' type for argparse. Allows for a 'None' input default for optional files
-
-        This method is to allow for a dxfile 'type' when defining arguments for argparse. This method is passed as an
-        argument to :func:`argparse.ArgumentParser().add_argument()` method as type=self.dxfile_input. This method does
-        allow for generic filepaths that live somewhere on the RAP / DNANexus filesystem, but these files MUST exist
-        in the current executing project AND be an absolute path for this functionality to work.
-
-        :param input_str: A DXFile ID in the form file-1234567890ABCDEFG or an absolute path to a file in the current
-            project.
-        :return: A 'nullable' dxpy.DXFile
-        """
-        if input_str == 'None':
-            return None
-        else:
-            if Path(input_str).exists():
-                print(f"The path '{input_str}' exists. Nice.")
-                return Path(input_str)
-            dxfile = dxpy.DXFile(dxid=input_str)
-
-            try:
-                # First check if the input looks like a DXFile ID (must be 'file-' + 24 alphanumeric characters)
-                if re.match('file-\\w{24}', input_str):
-                    dxfile.describe()  # This will trigger Exceptions caught below if not actually a DXFile / not found
-
-                # And then check if the file/path exists on DNANexus
-                else:
-                    found_file = dxpy.find_one_data_object(classname='file',
-                                                           project=dxpy.PROJECT_CONTEXT_ID,
-                                                           name_mode='exact',
-                                                           name=f'{Path(input_str).name}',
-                                                           folder=f'{Path(input_str).parent}',
-                                                           zero_ok=False)
-                    dxfile = dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
-
-                return dxfile
-            except dxpy.exceptions.DXSearchError:
-                raise FileNotFoundError(
-                    f'The input parameter – {input_str} – was tried as a filepath, but was not found '
-                    f'in the project this applet has been executed from. Please confirm the file '
-                    f'exists in this project or use a DNANexus file ID (like: file-12345...).')
-
-            except dxpy.exceptions.DXError:  # This just checks if the format of the input is correct
-                raise TypeError(f'The input for parameter – {input_str} – '
-                                f'does not look like a valid DNANexus file ID.')
-            except dxpy.exceptions.ResourceNotFound:
-                raise TypeError(f'The input for parameter – {input_str} – '
-                                f'does not exist on the DNANexus platform.')
-
-
+    def dxfile_input(input_str: str, download_now=False) -> InputParser:
+        """Argparse type validator for DNA Nexus files or paths"""
+        input_class = InputParser(input_str, download_now=download_now)
+        return input_class.file_handle
 
     @staticmethod
     def comma_str(input_str: str) -> List[str]:

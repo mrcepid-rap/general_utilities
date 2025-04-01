@@ -1,74 +1,124 @@
+import re
+from pathlib import Path
+from typing import Union, Optional
+
 import dxpy
-import pandas as pd
+
+from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.mrc_logger import MRCLogger
 
+
 class InputParser:
+    """
+    This class is designed to deal with any input filetypes, and based on whichever filetype we are working with run
+    a number of file-processing steps (e.g. download the file).
+    """
 
-    def __init__(self, input_str: str) -> None:
+    def __init__(self, input_str: str, download_now: bool, destination: Path = None):
 
+        # Initiate the InputParser
+
+        # For logging
         self._logger = MRCLogger(__name__).get_logger()
 
-    def _download(self):
+        # The input string which can be a path, or a DNA Nexus file-ID, or something else
+        self._input_str = input_str
 
-    def decide_filetype(input_str: Optional[Union[str, Path, dxpy.DXFile]]) -> Optional[Union[dxpy.DXFile, Path]]:
+        # Whether the input also specifies where we want to download this file to
+        self._destination = destination
+
+        # Let's first see what filetype we are working with
+        self.file_handle = self._decide_filetype()
+
+        # if we need the files downloaded, run the downloader
+        if download_now:
+            self.file_handle = self._download_file()
+
+    def _download_file(self) -> Path:
         """
-        Parses an input and returns the appropriate file type.
+        Download a DNA Nexus file to the specified destination.
 
-        - If input_str is None or "None", returns None.
-        - If input_str is a dxpy.DXFile, returns it directly.
-        - If input_str is a Path, processes it accordingly.
-        - If input_str is a string matching a DNANexus file ID, returns a dxpy.DXFile.
-        - Otherwise, treats input_str as an absolute file path:
-             * First, attempts to locate the file on DNANexus.
-             * If not found on DNANexus, checks if the file exists locally.
-             * Returns a Path if it exists locally.
+        This method handles the downloading of a DNA Nexus file based on the input string provided during the initialization
+        of the `InputParser` class. If the input string is a valid DNA Nexus file ID, the file is downloaded to the specified
+        destination or a default location if no destination is provided. If the file already exists at the destination, it
+        returns the existing file handle.
 
-        :param input_str: The input representing a DNANexus file ID, a local file path, or already a dxpy.DXFile.
-        :return: Either a dxpy.DXFile or a pathlib.Path.
-        :raises FileNotFoundError: If the file is not found on DNANexus or locally.
-        :raises ValueError: If a provided file path is not absolute.
-        :raises TypeError: If a DNANexus file ID is invalid.
+        Returns:
+            Path: The path to the downloaded file or the existing file handle.
+
+        Raises:
+            Exception: If the file download fails for any reason.
         """
-        # Handle the case of a "None" input.
-        if input_str is None or input_str == 'None':
+        try:
+            if isinstance(self.file_handle, dxpy.DXFile):
+                if self._destination is None:
+                    file_path = download_dxfile_by_name(self._input_str)
+                    return file_path
+                elif self._destination.exists():
+                    # if the destination already exists
+                    file_path = self._destination
+                    return file_path
+                else:
+                    # download file to destination
+                    file_path = download_dxfile_by_name(self._input_str, self._destination)
+                    return file_path
+            return self.file_handle
+        except Exception as e:
+            self._logger.error(f"Failed to download DNA Nexus file: {e}")
+            raise
+
+    def _decide_filetype(self) -> Optional[Union[dxpy.DXFile, Path]]:
+        """
+        Determine if the input is a DNA Nexus file or a local path.
+
+        This method checks the type of the input string and determines whether it is a DNA Nexus file ID,
+        a local file path, or an existing DXFile or Path object. It handles the following cases:
+        - If the input is None or 'None', it returns None.
+        - If the input is already a DXFile or Path object, it returns the input as is.
+        - If the input is a local path, it checks if the path is absolute and exists.
+        - If the input is a DNA Nexus file ID, it validates and returns the corresponding DXFile object.
+        - If the input is a file name, it searches for the file on DNA Nexus and returns the corresponding DXFile object.
+
+        :return: A DXFile or Path object if the input is valid, otherwise raises an appropriate exception.
+        :raises ValueError: If the local path is not absolute.
+        :raises dxpy.exceptions.DXError: If the DNA Nexus file ID is invalid.
+        :raises FileNotFoundError: If the file is not found locally or on DNA Nexus.
+        """
+        if self._input_str is None or self._input_str == 'None':
             return None
 
-        # If it's already a dxpy.DXFile or a Path, return it (or decide if you want to re-validate)
-        if isinstance(input_str, dxpy.DXFile) or isinstance(input_str, Path):
-            return input_str
+        # Handle existing DXFile or Path objects
+        if isinstance(self._input_str, (dxpy.DXFile, Path)):
+            return self._input_str
 
-        # Now, assume input_str is a string.
-        # Case 1: DNANexus file ID.
-        if re.fullmatch(r'file-\w{24}', input_str):
+        # Handle local path first
+        path = Path(self._input_str)
+        if not path.is_absolute():
+            raise ValueError(f"Path must be absolute: {self._input_str}")
+
+        if path.exists():
+            return path
+
+        # Check if it's a DNA Nexus file ID
+        if re.fullmatch(r'file-\w{24}', self._input_str):
             try:
-                dxfile = dxpy.DXFile(dxid=input_str)
-                dxfile.describe()  # Validates that the file exists on DNANexus.
-                return dxfile
-            except (dxpy.exceptions.DXError, dxpy.exceptions.ResourceNotFound) as e:
-                raise TypeError(f"Invalid DNANexus file ID: {input_str}") from e
+                dx_file = dxpy.DXFile(dxid=self._input_str)
+                dx_file.describe()
+                return dx_file
+            except dxpy.exceptions.DXError as e:
+                self._logger.error(f"Invalid DNA Nexus file ID: {e}")
+                raise
 
-        # Case 2: File path.
-        file_handle = Path(input_str)
-        if not file_handle.is_absolute():
-            raise ValueError(f"Provided path '{input_str}' is not absolute. Please provide an absolute path.")
-
+        # Try to find on DNA Nexus by path
         try:
-            # Attempt to locate the file on DNANexus.
-            found_file = dxpy.find_one_data_object(
+            found = dxpy.find_one_data_object(
                 classname='file',
                 project=dxpy.PROJECT_CONTEXT_ID,
                 name_mode='exact',
-                name=file_handle.name,
-                folder=str(file_handle.parent),
+                name=path.name,
+                folder=str(path.parent),
                 zero_ok=False
             )
-            return dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
+            return dxpy.DXFile(dxid=found['id'], project=found['project'])
         except dxpy.exceptions.DXSearchError:
-            # If not found on DNANexus, check if the file exists locally.
-            if file_handle.exists():
-                logging.info(f"Local file '{input_str}' found.")
-                return file_handle
-            else:
-                raise FileNotFoundError(
-                    f"File '{input_str}' not found on DNANexus or locally."
-                )
+            raise FileNotFoundError(f"File not found locally or on DNA Nexus: {self._input_str}")

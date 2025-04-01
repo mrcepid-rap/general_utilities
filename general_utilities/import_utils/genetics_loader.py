@@ -63,16 +63,10 @@ class GeneticsLoader:
         Path('genetics/').mkdir(exist_ok=True)  # This is for legacy reasons to make sure all tests work...
         # check if we are working with a DNA Nexus file or not
         # if we are then process it like a DNA Nexus file
-        if isinstance(input_filetype_parser(self._bed_file), dxpy.DXFile):
-            dna_nexus_run = True
-            dxpy.download_dxfile(self._bed_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bed')
-            dxpy.download_dxfile(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
-            dxpy.download_dxfile(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
-        else:
-            dna_nexus_run = False
-            shutil.copy(self._bed_file, 'genetics/UKBB_470K_Autosomes_QCd.bed')
-            shutil.copy(self._bim_file, 'genetics/UKBB_470K_Autosomes_QCd.bim')
-            shutil.copy(self._fam_file, 'genetics/UKBB_470K_Autosomes_QCd.fam')
+        InputParser(self._bed_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bed')
+        InputParser(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
+        InputParser(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
+
 
         if self._low_mac_list is not None:
             if dna_nexus_run:
@@ -234,7 +228,8 @@ class GeneticsLoader:
 
         # check if we are working with a DNA Nexus file or not
         # if we are then process it like a DNA Nexus file
-        if isinstance(input_filetype_parser(self._bed_file), dxpy.DXFile):
+
+        if isinstance(InputParser(self._bed_file, 'genetics/UKBB_470K_Autosomes_QCd.bed'), dxpy.DXFile):
 
             cmd = 'plink2 ' \
                   '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
