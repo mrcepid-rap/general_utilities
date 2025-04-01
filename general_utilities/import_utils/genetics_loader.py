@@ -7,7 +7,7 @@ from typing import Set, List
 import dxpy
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.import_lib import input_filetype_parser
+from general_utilities.import_utils.module_loader.input_parser import InputParser
 
 
 class GeneticsLoader:
