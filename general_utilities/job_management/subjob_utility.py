@@ -1,18 +1,18 @@
-import os
-import math
-import dxpy
 import inspect
-
-from enum import Enum, auto
-from time import sleep, time
+import os
 from datetime import datetime
+from enum import Enum, auto
 from importlib import import_module
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
+
+import dxpy
+import math
+from time import sleep, time
 
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-
+from general_utilities.import_utils.import_lib import input_filetype_parser
 
 class Environment(Enum):
     """An Enum that defines the launch environment used to generate jobs.
@@ -201,7 +201,8 @@ class SubjobUtility:
         self._retries = retries
         if 'DX_JOB_ID' in os.environ:
             parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
-            self._default_instance_type = parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
+            self._default_instance_type = \
+            parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
         else:
             self._default_instance_type = None
 
@@ -516,7 +517,8 @@ class SubjobUtility:
                         for value in output_value:
                             # This is possibly (likely) a file
                             if '$dnanexus_link' in value:
-                                if value['$dnanexus_link'].startswith('file-'):
+                                if isinstance(input_filetype_parser(value['$dnanexus_link']), dxpy.DXFile):
+
                                     if self._download_on_complete:  # Download the file if the user wants it locally
                                         new_values.append(download_dxfile_by_name(value, print_status=False))
                                     else:
@@ -538,7 +540,7 @@ class SubjobUtility:
                         if type(output_value) is dict:
                             if '$dnanexus_link' in output_value:
                                 # This is still likely a file...
-                                if output_value['$dnanexus_link'].startswith('file-'):
+                                if isinstance(input_filetype_parser(output_value['$dnanexus_link']), dxpy.DXFile):
                                     if self._download_on_complete:  # Download the file if the user wants it locally
                                         output_dict[output_key] = download_dxfile_by_name(output_value,
                                                                                           print_status=False)
@@ -637,5 +639,3 @@ def prep_current_image(required_files: List[dict]) -> CommandExecutor:
         download_dxfile_by_name(file, print_status=False)
 
     return cmd_executor
-
-
