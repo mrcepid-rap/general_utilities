@@ -9,7 +9,6 @@ description = ""
 authors = [ "Eugene Gardner <eugene.gardner@mrc-epid.cam.ac.uk>",]
 readme = "README.md"
 repository = "https://github.com/mrcepid-rap/general_utilities"
-licence = "MIT"
 
 [tool.poetry.dependencies]
 python = "~3.8"

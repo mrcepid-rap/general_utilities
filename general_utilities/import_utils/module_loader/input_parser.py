@@ -36,12 +36,9 @@ class InputParser:
 
     def _download_file(self) -> Path:
         """
-        Download a DNA Nexus file to the specified destination.
+        Download a file to the specified destination or handle it based on its type.
 
-        This method handles the downloading of a DNA Nexus file based on the input string provided during the initialization
-        of the `InputParser` class. If the input string is a valid DNA Nexus file ID, the file is downloaded to the specified
-        destination or a default location if no destination is provided. If the file already exists at the destination, it
-        returns the existing file handle.
+        This method handles DNA Nexus files, local files, and files that need to be downloaded using `gsutil cp`.
 
         Returns:
             Path: The path to the downloaded file or the existing file handle.
@@ -62,9 +59,24 @@ class InputParser:
                     # download file to destination
                     file_path = download_dxfile_by_name(self._input_str, self._destination)
                     return file_path
-            return self.file_handle
+
+            # Handle local path in the current directory
+            path = Path(self._input_str)
+            if path.exists() and path.is_file():
+                return path.resolve()
+
+            # Handle destination if it already exists
+            if self._destination and self._destination.exists():
+                return self._destination
+
+            # Download using gsutil
+            gsutil_cmd = f"gsutil cp {self._input_str} ."
+            result = subprocess.run(gsutil_cmd, shell=True, check=True, text=True, capture_output=True)
+            self._logger.info(f"Downloaded file using gsutil: {result.stdout.strip()}")
+            return Path(self._input_str).resolve()
+
         except Exception as e:
-            self._logger.error(f"Failed to download DNA Nexus file: {e}")
+            self._logger.error(f"Failed to handle file: {e}")
             raise
 
     def _decide_filetype(self) -> Optional[Union[dxpy.DXFile, Path]]:
