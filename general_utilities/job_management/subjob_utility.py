@@ -12,7 +12,7 @@ from time import sleep, time
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.import_lib import input_filetype_parser
+from general_utilities.import_utils.module_loader.insmedinput import InsmedInput
 
 class Environment(Enum):
     """An Enum that defines the launch environment used to generate jobs.
@@ -508,7 +508,7 @@ class SubjobUtility:
                         for value in output_value:
                             # This is possibly (likely) a file
                             if '$dnanexus_link' in value:
-                                if isinstance(input_filetype_parser(value['$dnanexus_link']), dxpy.DXFile):
+                                if isinstance(InsmedInput(value['$dnanexus_link'], download_now=False).input_str, dxpy.DXFile):
 
                                     if self._download_on_complete:  # Download the file if the user wants it locally
                                         new_values.append(download_dxfile_by_name(value, print_status=False))
@@ -531,7 +531,7 @@ class SubjobUtility:
                         if type(output_value) is dict:
                             if '$dnanexus_link' in output_value:
                                 # This is still likely a file...
-                                if isinstance(input_filetype_parser(output_value['$dnanexus_link']), dxpy.DXFile):
+                                if isinstance(InsmedInput(output_value['$dnanexus_link'], download_now=False).input_str, dxpy.DXFile):
                                     if self._download_on_complete:  # Download the file if the user wants it locally
                                         output_dict[output_key] = download_dxfile_by_name(output_value,
                                                                                           print_status=False)
