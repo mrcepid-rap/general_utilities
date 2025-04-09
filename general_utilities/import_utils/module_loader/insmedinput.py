@@ -8,7 +8,7 @@ from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.mrc_logger import MRCLogger
 
 
-class InputParser:
+class InsmedInput:
     """
     This class is designed to deal with any input filetypes, and based on whichever filetype we are working with run
     a number of file-processing steps (e.g. download the file).
@@ -16,7 +16,7 @@ class InputParser:
 
     def __init__(self, input_str: str, download_now: bool, destination: Path = None):
 
-        # Initiate the InputParser
+        # Initiate the InsmedInput class
 
         # For logging
         self._logger = MRCLogger(__name__).get_logger()
@@ -106,7 +106,7 @@ class InputParser:
         # Handle local path first
         path = Path(self._input_str)
         if not path.is_absolute():
-            raise ValueError(f"Path must be absolute: {self._input_str}")
+            path = path.resolve()
 
         if path.exists():
             return path

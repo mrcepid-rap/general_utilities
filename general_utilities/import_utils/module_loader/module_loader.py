@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from importlib import util, import_module
 from pathlib import Path
 from typing import List, Type, Optional, Union
-from general_utilities.import_utils.module_loader.input_parser import InputParser
+from general_utilities.import_utils.module_loader.insmedinput import InsmedInput
 import dxpy
 
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
@@ -66,9 +66,9 @@ class ModuleLoader(ABC):
         self._outputs = outputs
 
     @staticmethod
-    def dxfile_input(input_str: str, download_now=False) -> InputParser:
+    def dxfile_input(input_str: str, download_now=False) -> InsmedInput:
         """Argparse type validator for DNA Nexus files or paths"""
-        input_class = InputParser(input_str, download_now=download_now)
+        input_class = InsmedInput(input_str, download_now=download_now)
         return input_class.file_handle
 
     @staticmethod

@@ -8,10 +8,9 @@ import dxpy
 
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
-from general_utilities.import_utils.module_loader.input_parser import InputParser
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.import_lib import input_filetype_parser
+from general_utilities.import_utils.module_loader.insmedinput import InsmedInput
 
 class IngestData(ABC):
     """Download and process required files and data to enable module functionality.
@@ -120,7 +119,7 @@ class IngestData(ABC):
             see the README.
         :return: None
         """
-        InputParser(transcript_index.get_id(), 'transcripts.tsv.gz')
+        InsmedInput(transcript_index, download_now=True, destination='transcripts.tsv.gz')
 
     def _ingest_phenofile(self, pheno_files: List[dxpy.DXFile], pheno_name: str) -> Dict[str, Dict[str, Any]]:
         """Download provided phenotype files and attempt to retrieve phenotypes from these file(s)
@@ -155,7 +154,7 @@ class IngestData(ABC):
 
         for dx_pheno_file in pheno_files:
 
-            pheno_file = InputParser(dx_pheno_file)
+            pheno_file = InsmedInput(dx_pheno_file, download_now=True).file_handle
 
             total_missing_dict = {}
             total_samples = 0
@@ -228,7 +227,7 @@ class IngestData(ABC):
         :return: A boolean that is true if additional covariates beyond the base covariates were provided
         """
 
-        InputParser(base_covariates.get_id(), 'base_covariates.covariates')
+        InsmedInput(base_covariates, download_now=True, destination='base_covariates.covariates')
 
         # Check if additional covariates were provided:
         additional_covariates_found = False
@@ -261,10 +260,10 @@ class IngestData(ABC):
 
         inclusion_found, exclusion_found = False, False
         if inclusion_list is not None:
-            InputParser(inclusion_list.get_id(), 'INCLUSION.lst'')
+            InsmedInput(inclusion_list.get_id(), 'INCLUSION.lst')
             inclusion_found = True
         if exclusion_list is not None:
-            InputParser(exclusion_list.get_id(), 'EXCLUSION.lst')
+            InsmedInput(exclusion_list.get_id(), 'EXCLUSION.lst')
             exclusion_found = True
 
         return inclusion_found, exclusion_found
@@ -557,7 +556,7 @@ class IngestData(ABC):
             indv_exclude = 0  # Count the nunber of samples we WONT analyse
             for indv in base_covar_csv:
                 # if we are working on DNA Nexus
-                if isinstance(input_filetype_parser(self._parsed_options.base_covariates), dxpy.DXFile):
+                if isinstance(InsmedInput(self._parsed_options.base_covariates, download_now=False)._input_str, dxpy.DXFile):
                     # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
                     # on sex
                     if indv['22001-0.0'] != "NA" and indv['eid'] in genetics_samples:
