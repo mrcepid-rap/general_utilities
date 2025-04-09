@@ -49,21 +49,13 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> Non
     bgen = chrom_bgen_index['bgen']
     vep = chrom_bgen_index['vep']
 
-    if isinstance(bgen, dict) and isinstance(input_filetype_parser(bgen['$dnanexus_link']), dxpy.DXFile):
+    InsmedInput(bgen_index, download_now=False, destination=f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
+    InsmedInput(bgen_sample, download_now=False, destination=f'filtered_bgen/{chromosome}.filtered.sample')
+    InsmedInput(bgen, download_now=False, destination=f'filtered_bgen/{chromosome}.filtered.bgen')
+    InsmedInput(vep, download_now=False, destination=f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
 
-        dxpy.download_dxfile(bgen_index, f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
-        dxpy.download_dxfile(bgen_sample, f'filtered_bgen/{chromosome}.filtered.sample')
-        dxpy.download_dxfile(bgen, f'filtered_bgen/{chromosome}.filtered.bgen')
-        dxpy.download_dxfile(vep, f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
-
-        # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
-        sample_v2_to_v1(Path(f'filtered_bgen/{chromosome}.filtered.sample'))
-
-    else:
-        shutil.copy(bgen_index, f'filtered_bgen/{chromosome}.filtered.bgen.bgi')
-        shutil.copy(bgen_sample, f'filtered_bgen/{chromosome}.filtered.sample')
-        shutil.copy(bgen, f'filtered_bgen/{chromosome}.filtered.bgen')
-        shutil.copy(vep, f'filtered_bgen/{chromosome}.filtered.vep.tsv.gz')
+    # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
+    sample_v2_to_v1(Path(f'filtered_bgen/{chromosome}.filtered.sample'))
 
 
 def sample_v2_to_v1(bgen_v2: Path) -> Path:

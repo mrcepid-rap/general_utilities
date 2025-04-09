@@ -22,7 +22,7 @@ class InsmedInput:
     The file_handle will return the local filepath of the file in question.
     """
 
-    def __init__(self, input_str: str, download_now: bool, destination: Path = None):
+    def __init__(self, input_str: Union[str, Path, dxpy.DXFile], download_now: bool, destination: Path = None):
 
         # Initiate the InsmedInput class
 
@@ -30,7 +30,7 @@ class InsmedInput:
         self._logger = MRCLogger(__name__).get_logger()
 
         # The input string which can be a path, or a DNA Nexus file-ID, or something else
-        self._input_str = input_str
+        self.input_str = input_str
 
         # Whether the input also specifies where we want to download this file to
         self._destination = destination
@@ -65,19 +65,19 @@ class InsmedInput:
         try:
             if isinstance(self.file_handle, dxpy.DXFile):
                 if self._destination is None:
-                    file_path = download_dxfile_by_name(self._input_str)
-                    return file_path
+                    file_path = download_dxfile_by_name(self.input_str)
+                    return Path(file_path)
                 elif self._destination.exists():
                     # if the destination already exists
                     file_path = self._destination
-                    return file_path
+                    return Path(file_path)
                 else:
                     # download file to destination
-                    file_path = download_dxfile_by_name(self._input_str, self._destination)
-                    return file_path
+                    file_path = dxpy.download_dxfile(self.input_str, str(self._destination))
+                    return Path(file_path)
 
             # Handle local path in the current directory
-            path = Path(self._input_str)
+            path = Path(self.input_str)
             if path.exists() and path.is_file():
                 return path.resolve()
 
@@ -86,10 +86,10 @@ class InsmedInput:
                 return self._destination
 
             # Download using gsutil
-            gsutil_cmd = f"gsutil cp {self._input_str} ."
+            gsutil_cmd = f"gsutil cp {self.input_str} ."
             result = subprocess.run(gsutil_cmd, shell=True, check=True, text=True, capture_output=True)
             self._logger.info(f"Downloaded file using gsutil: {result.stdout.strip()}")
-            return Path(self._input_str).resolve()
+            return Path(self.input_str).resolve()
 
         except Exception as e:
             self._logger.error(f"Failed to handle file: {e}")
@@ -112,15 +112,15 @@ class InsmedInput:
         :raises dxpy.exceptions.DXError: If the DNA Nexus file ID is invalid.
         :raises FileNotFoundError: If the file is not found locally or on DNA Nexus.
         """
-        if self._input_str is None or self._input_str == 'None':
+        if self.input_str is None or self.input_str == 'None':
             return None
 
         # Handle existing DXFile or Path objects
-        if isinstance(self._input_str, (dxpy.DXFile, Path)):
-            return self._input_str
+        if isinstance(self.input_str, (dxpy.DXFile, Path)):
+            return self.input_str
 
         # Handle local path first
-        path = Path(self._input_str)
+        path = Path(self.input_str)
         if not path.is_absolute():
             path = path.resolve()
 
@@ -128,9 +128,9 @@ class InsmedInput:
             return path
 
         # Check if it's a DNA Nexus file ID
-        if re.fullmatch(r'file-\w{24}', self._input_str):
+        if re.fullmatch(r'file-\w{24}', self.input_str):
             try:
-                dx_file = dxpy.DXFile(dxid=self._input_str)
+                dx_file = dxpy.DXFile(dxid=self.input_str)
                 dx_file.describe()
                 return dx_file
             except dxpy.exceptions.DXError as e:
@@ -149,4 +149,4 @@ class InsmedInput:
             )
             return dxpy.DXFile(dxid=found['id'], project=found['project'])
         except dxpy.exceptions.DXSearchError:
-            raise FileNotFoundError(f"File not found locally or on DNA Nexus: {self._input_str}")
+            raise FileNotFoundError(f"File not found locally or on DNA Nexus: {self.input_str}")

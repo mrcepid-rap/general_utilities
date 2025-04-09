@@ -222,29 +222,11 @@ class GeneticsLoader:
         :return: None
         """
         # Generate a plink file to use that only has included individuals:
+        cmd = 'plink2 ' \
+              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
+              '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
 
-        # check if we are working with a DNA Nexus file or not
-        # if we are then process it like a DNA Nexus file
-
-        if isinstance(InsmedInput(self._bed_file, 'genetics/UKBB_470K_Autosomes_QCd.bed'), dxpy.DXFile):
-
-            cmd = 'plink2 ' \
-                  '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
-                  '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-
-            self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
-
-        else:
-
-            shutil.copy('SAMPLES_Include.txt', 'genetics/SAMPLES_Include.txt')
-
-            cmd = 'plink2 ' \
-                  '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/genetics/SAMPLES_Include.txt ' \
-                  '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-
-            # mount = DockerMount(Path('genetics'), Path('/test/genetics'))
-            # cmd_exec = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting', docker_mounts=[mount])
-            # cmd_exec.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
+        self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 
         # I have to do this to recover the sample information from plink
         with Path('plink_filtered.out').open('r') as plink_out:
