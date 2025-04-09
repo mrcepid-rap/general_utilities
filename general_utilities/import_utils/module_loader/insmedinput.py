@@ -1,4 +1,5 @@
 import re
+import subprocess
 from pathlib import Path
 from typing import Union, Optional
 
@@ -10,8 +11,15 @@ from general_utilities.mrc_logger import MRCLogger
 
 class InsmedInput:
     """
-    This class is designed to deal with any input filetypes, and based on whichever filetype we are working with run
-    a number of file-processing steps (e.g. download the file).
+    This class is designed to deal with all the different input filetypes that we deal with across multiple platforms.
+    For example, if running on DNA Nexus then we are dealing with dxpy files, if running local test, then we are
+    dealing with filepaths. Should we work with new platforms, we can add new filetype handling in this class.
+
+    The class takes a fileID of any kind as input, and downloads the file to our local directory. If the output
+    filepath is specific, then the file will be downloaded corresponding to that filepath. If the file already exists,
+    it will not be downloaded.
+
+    The file_handle will return the local filepath of the file in question.
     """
 
     def __init__(self, input_str: str, download_now: bool, destination: Path = None):
@@ -38,13 +46,21 @@ class InsmedInput:
         """
         Download a file to the specified destination or handle it based on its type.
 
-        This method handles DNA Nexus files, local files, and files that need to be downloaded using `gsutil cp`.
+        This method supports the following scenarios:
+        - Downloads DNA Nexus files using the `download_dxfile_by_name` utility.
+        - Resolves and returns local file paths if the file already exists.
+        - Downloads files using the `gsutil cp` command for Google Cloud Storage paths (in development).
+
+        Behavior:
+        - If the input is a DNA Nexus file ID, the file is downloaded to the specified destination or the current directory.
+        - If the input is a local file path, it verifies the file's existence and resolves its absolute path.
+        - If the input is a Google Cloud Storage path, the file is downloaded using `gsutil`.
 
         Returns:
             Path: The path to the downloaded file or the existing file handle.
 
         Raises:
-            Exception: If the file download fails for any reason.
+            Exception: If the file download fails or an unexpected error occurs.
         """
         try:
             if isinstance(self.file_handle, dxpy.DXFile):
