@@ -14,6 +14,7 @@ class FileType(Enum):
     DNA_NEXUS_FILE = "DNA Nexus File"
     LOCAL_PATH = "Local Path"
     GCLOUD_FILE = "Google Cloud File"
+    NONE = "None"
 
 
 class InsmedInput:
@@ -179,7 +180,7 @@ class InsmedInput:
         :raises dxpy.exceptions.DXError: If the DNA Nexus file ID is invalid or cannot be described.
         """
         if self._input_str is None or self._input_str == 'None':
-            raise FileNotFoundError(f"No input file provided.")
+            return FileType.NONE
 
         # Handle existing DXFile or Path objects
         if isinstance(self._input_str, (dxpy.DXFile, Path)):
