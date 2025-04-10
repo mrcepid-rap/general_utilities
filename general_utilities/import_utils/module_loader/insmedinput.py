@@ -30,7 +30,7 @@ class InsmedInput:
     The file_handle will return the local filepath of the file in question.
     """
 
-    def __init__(self, input_str: Union[str, Path, dxpy.DXFile], download_now: False, destination: Path = None):
+    def __init__(self, input_str: Union[str, Path, dxpy.DXFile], download_now: bool = False, destination: Path = None):
 
         # Initiate the InsmedInput class
 
@@ -57,8 +57,8 @@ class InsmedInput:
         # if we are downloading now, then we need to download the file
         if download_now:
             self._downloaded = True
-            # download the file
-            self.file_handle = self._download_file(self._file_type)
+            self.file_handle = self._parse_file(self._file_type)
+            self._logger.info(f"File downloaded: {self.file_handle}")
 
     def _resolve_file_type(self) -> Optional[FileType]:
         """
@@ -81,7 +81,7 @@ class InsmedInput:
         if not self._downloaded:
             return self._file_type
 
-    def _download_file(self, file_type: FileType) -> Path:
+    def _parse_file(self, file_type: FileType) -> Path:
         """
         Download a file based on its type using an Enum.
 
@@ -100,7 +100,6 @@ class InsmedInput:
             FileType.GCLOUD_FILE: self._download_gsutil_file,
         }
 
-        # Get the method based on the file type and call it
         if file_type in method_map:
             return method_map[file_type]()
         else:
@@ -157,7 +156,8 @@ class InsmedInput:
         :return: A `Path` object representing the resolved local file path of the downloaded file.
         :raises subprocess.CalledProcessError: If the `gsutil` command fails during execution.
         """
-        gsutil_cmd = f"gsutil cp {self._input_str} ."
+        output_path = self._destination or Path(self._input_str).name
+        gsutil_cmd = f"gsutil cp {self._input_str} {output_path}"
         result = subprocess.run(gsutil_cmd, shell=True, check=True, text=True, capture_output=True)
         self._logger.info(f"Downloaded file using gsutil: {result.stdout.strip()}")
         return Path(self._input_str).resolve()
@@ -217,3 +217,26 @@ class InsmedInput:
             return FileType.DNA_NEXUS_FILE
         except dxpy.exceptions.DXSearchError:
             raise FileNotFoundError(f"File not found locally or on DNA Nexus: {self._input_str}")
+
+    def download(self, destination: Optional[Path] = None) -> Path:
+        """
+        Public method to trigger the download of the file.
+
+        Args:
+            destination (Optional[Path]): An optional override for the destination path.
+
+        Returns:
+            Path: The path to the downloaded file.
+        """
+        if destination:
+            self._destination = destination
+
+        if not self._downloaded:
+            self._logger.info("Starting file download...")
+            self._downloaded = True
+            self.file_handle = self._parse_file(self._file_type)
+            self._logger.info(f"File downloaded successfully: {self.file_handle}")
+            return self.file_handle
+        else:
+            self._logger.info(f"File was already downloaded: {self.file_handle}")
+            return self.file_handle
