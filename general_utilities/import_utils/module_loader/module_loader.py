@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from importlib import util, import_module
 from pathlib import Path
 from typing import List, Type, Optional, Union
-from general_utilities.import_utils.module_loader.input_file_handler import InsmedInput
+from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
 import dxpy
 
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
@@ -66,10 +66,13 @@ class ModuleLoader(ABC):
         self._outputs = outputs
 
     @staticmethod
-    def dxfile_input(input_str: str, download_now=False) -> InsmedInput:
-        """Argparse type validator for DNA Nexus files or paths"""
-        input_class = InsmedInput(input_str, download_now=download_now)
-        return input_class.file_handle
+    def dxfile_input(input_str: str) -> InputFileHandler:
+        """Return the input string as an InputFileHandler object."""
+        if input_str is None or input_str == 'None':
+            return None
+        else:
+            file_handler = InputFileHandler(input_str)
+        return file_handler
 
     @staticmethod
     def comma_str(input_str: str) -> List[str]:

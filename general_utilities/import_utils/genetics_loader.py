@@ -7,7 +7,7 @@ from typing import Set, List
 import dxpy
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.module_loader.input_file_handler import InsmedInput
+from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
 
 
 class GeneticsLoader:
@@ -63,13 +63,13 @@ class GeneticsLoader:
         Path('genetics/').mkdir(exist_ok=True)  # This is for legacy reasons to make sure all tests work...
         # check if we are working with a DNA Nexus file or not
         # if we are then process it like a DNA Nexus file
-        InsmedInput(self._bed_file, download_now=True, destination='genetics/UKBB_470K_Autosomes_QCd.bed')
-        InsmedInput(self._bim_file, download_now=True, destination='genetics/UKBB_470K_Autosomes_QCd.bim')
-        InsmedInput(self._fam_file, download_now=True, destination='genetics/UKBB_470K_Autosomes_QCd.fam')
+        self._bed_file.get_file_handle()
+        self._bim_file.get_file_handle()
+        self._fam_file.get_file_handle()
 
         if self._low_mac_list is not None:
-            InsmedInput(self._low_mac_list, download_now=True,
-                        destination='genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
+            # Download the low MAC list
+            self._low_mac_list.get_file_handle()
 
         self._logger.info('Genetic array data downloaded...')
 
@@ -237,7 +237,7 @@ class GeneticsLoader:
                     self._logger.info(f'{"Plink individuals written":{65}}: {count_matcher.group(1)}')
 
     @staticmethod
-    def ingest_sparse_matrix(sparse_grm: dxpy.DXFile, sparse_grm_sample: dxpy.DXFile) -> None:
+    def ingest_sparse_matrix(sparse_grm: InputFileHandler, sparse_grm_sample: InputFileHandler) -> None:
         """Downloads the sparse matrix for use by GLM / STAAR
 
         This is included as a static method within this class to allow for easier use by modules which only require
@@ -249,11 +249,7 @@ class GeneticsLoader:
         :return: None
         """
 
-        # Make the genetics dir as it might not exist
-        Path("genetics/").mkdir(exist_ok=True)
-
         # Downloads the sparse matrix
-        InsmedInput(sparse_grm, download_now=True, destination='genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx')
-        InsmedInput(sparse_grm_sample, download_now=True,
-                    destination='genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx.sampleIDs.txt')
+        sparse_grm.get_file_handle()
+        sparse_grm_sample.get_file_handle()
 

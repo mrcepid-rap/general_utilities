@@ -10,7 +10,8 @@ from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.module_loader.input_file_handler import InsmedInput
+from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler, FileType
+
 
 class IngestData(ABC):
     """Download and process required files and data to enable module functionality.
@@ -110,7 +111,7 @@ class IngestData(ABC):
         return threads
 
     @staticmethod
-    def _ingest_transcript_index(transcript_index: dxpy.DXFile) -> None:
+    def _ingest_transcript_index(transcript_index: InputFileHandler) -> None:
         """Get transcripts for gene annotation
 
         The provided file with always be placed at `$HOME/transcripts.tsv.gz`.
@@ -119,9 +120,9 @@ class IngestData(ABC):
             see the README.
         :return: None
         """
-        InsmedInput(transcript_index, download_now=True, destination='transcripts.tsv.gz')
+        transcript_index.get_file_handle()
 
-    def _ingest_phenofile(self, pheno_files: List[dxpy.DXFile], pheno_name: str) -> Dict[str, Dict[str, Any]]:
+    def _ingest_phenofile(self, pheno_files: List[InputFileHandler], pheno_name: str) -> Dict[str, Dict[str, Any]]:
         """Download provided phenotype files and attempt to retrieve phenotypes from these file(s)
 
         There can be multiple phenotype files in some modes, so this method will iterate through the provided list
@@ -154,7 +155,7 @@ class IngestData(ABC):
 
         for dx_pheno_file in pheno_files:
 
-            pheno_file = InsmedInput(dx_pheno_file, download_now=True).file_handle
+            pheno_file = dx_pheno_file.get_file_handle()
 
             total_missing_dict = {}
             total_samples = 0
@@ -216,7 +217,7 @@ class IngestData(ABC):
         return phenotypes
 
     @staticmethod
-    def _ingest_covariates(base_covariates: dxpy.DXFile, covarfile: dxpy.DXFile) -> bool:
+    def _ingest_covariates(base_covariates: InputFileHandler, covarfile: InputFileHandler) -> bool:
         """Download covariate data
 
         Base covariates will always be placed at `$HOME/base_covariates.covariates`. Additional covariates (if provided)
@@ -227,12 +228,12 @@ class IngestData(ABC):
         :return: A boolean that is true if additional covariates beyond the base covariates were provided
         """
 
-        InsmedInput(base_covariates, download_now=True, destination='base_covariates.covariates')
+        base_covariates.get_file_handle()
 
         # Check if additional covariates were provided:
         additional_covariates_found = False
         if covarfile is not None:
-            dxpy.download_dxfile(covarfile.get_id(), 'additional_covariates.covariates')
+            covarfile.get_file_handle()
             additional_covariates_found = True
 
         else:
@@ -556,7 +557,7 @@ class IngestData(ABC):
             indv_exclude = 0  # Count the nunber of samples we WONT analyse
             for indv in base_covar_csv:
                 # if we are working on DNA Nexus
-                if isinstance(InsmedInput(self._parsed_options.base_covariates, download_now=False).input_str, dxpy.DXFile):
+                if self._parsed_options.base_covariates.file_type is FileType.DNA_NEXUS_FILE:
                     # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter
                     # on sex
                     if indv['22001-0.0'] != "NA" and indv['eid'] in genetics_samples:
