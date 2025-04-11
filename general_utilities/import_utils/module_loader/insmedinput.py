@@ -63,7 +63,7 @@ class InsmedInput:
             self._downloaded = True
             self._logger.info(f"File downloaded: {self.file_handle}")
         else:
-            self._file_handle = None
+            self.file_handle = None
 
     def get_file_type(self) -> Optional[FileType]:
         """
