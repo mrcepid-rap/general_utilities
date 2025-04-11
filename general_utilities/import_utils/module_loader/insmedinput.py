@@ -141,6 +141,7 @@ class InsmedInput:
         path = Path(self._input_str)
         if path.exists() and path.is_file():
             return path.resolve()
+        # If the destination is specified and exists, return it
         if self._destination and self._destination.exists():
             return self._destination
         raise FileNotFoundError(f"Local file not found: {self._input_str}")
@@ -157,6 +158,9 @@ class InsmedInput:
         :raises subprocess.CalledProcessError: If the `gsutil` command fails during execution.
         """
         output_path = self._destination or Path(self._input_str).name
+        # if the destination already exists, return it
+        if Path(output_path).exists():
+            return Path(output_path).resolve()
         gsutil_cmd = f"gsutil cp {self._input_str} {output_path}"
         result = subprocess.run(gsutil_cmd, shell=True, check=True, text=True, capture_output=True)
         self._logger.info(f"Downloaded file using gsutil: {result.stdout.strip()}")
@@ -220,13 +224,23 @@ class InsmedInput:
 
     def download(self, destination: Optional[Path] = None) -> Path:
         """
-        Public method to trigger the download of the file.
+        Download the file to the specified destination or the default location.
+
+        This method triggers the download of the file based on its type (e.g., DNA Nexus file, local path, or Google Cloud file).
+        If a destination path is provided, the file will be downloaded to that location. If the file has already been downloaded,
+        it simply returns the path to the existing file.
 
         Args:
-            destination (Optional[Path]): An optional override for the destination path.
+            destination (Optional[Path]): An optional override for the destination path where the file should be downloaded.
 
         Returns:
-            Path: The path to the downloaded file.
+            Path: The local file path where the file has been downloaded or already exists.
+
+        Raises:
+            FileNotFoundError: If the file cannot be resolved or downloaded.
+            ValueError: If the file type is unsupported.
+            subprocess.CalledProcessError: If the `gsutil` command fails during a Google Cloud file download.
+            dxpy.exceptions.DXError: If the DNA Nexus file download fails.
         """
         if destination:
             self._destination = destination
