@@ -52,10 +52,10 @@ class InsmedInput:
 
         # ACTIONS:
         # For some parts of the workflow we need to know the input files
-        self.input = self._get_input_str()
+        self.input = self.get_input_str()
 
         # Let's get filetype that we are working with as a public attribute
-        self.file_type = self._resolve_file_type()
+        self.file_type = self.get_file_type()
 
         # if we are downloading now, then we need to download the file
         if download_now:
@@ -65,7 +65,7 @@ class InsmedInput:
         else:
             self._file_handle = None
 
-    def _resolve_file_type(self) -> Optional[FileType]:
+    def get_file_type(self) -> Optional[FileType]:
         """
         Return the resolved file type for the input.
 
@@ -75,7 +75,7 @@ class InsmedInput:
         if not self._downloaded:
             return self._file_type
 
-    def _get_input_str(self):
+    def get_input_str(self):
         """
         Retrieve the input string or object provided during initialization.
 
