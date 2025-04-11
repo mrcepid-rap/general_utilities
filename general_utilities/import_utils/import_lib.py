@@ -8,7 +8,7 @@ from typing import Dict, Tuple, List, TypedDict, Optional, Union
 import dxpy
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.module_loader.insmedinput import InsmedInput
+from general_utilities.import_utils.module_loader.input_file_handler import InsmedInput
 
 LOGGER = MRCLogger().get_logger()
 

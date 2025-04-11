@@ -16,7 +16,7 @@ class FileType(Enum):
     GCLOUD_FILE = "Google Cloud File"
 
 
-class InsmedInput:
+class InputFileHandler:
     """
     This class is designed to deal with all the different input filetypes that we deal with across multiple platforms.
     For example, if running on DNA Nexus then we are dealing with dxpy files, if running local test, then we are

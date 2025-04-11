@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from importlib import util, import_module
 from pathlib import Path
 from typing import List, Type, Optional, Union
-from general_utilities.import_utils.module_loader.insmedinput import InsmedInput
+from general_utilities.import_utils.module_loader.input_file_handler import InsmedInput
 import dxpy
 
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs

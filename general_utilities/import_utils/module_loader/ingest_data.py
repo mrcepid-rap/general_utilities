@@ -10,7 +10,7 @@ from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.module_loader.insmedinput import InsmedInput
+from general_utilities.import_utils.module_loader.input_file_handler import InsmedInput
 
 class IngestData(ABC):
     """Download and process required files and data to enable module functionality.
