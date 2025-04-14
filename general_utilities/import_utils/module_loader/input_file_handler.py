@@ -145,6 +145,9 @@ class InputFileHandler:
         :return: A `Path` object representing the resolved local file path of the downloaded file.
         :raises FileNotFoundError: If the GCS file path is invalid or download fails.
         """
+        ##### TO-DO
+        # this sections needs to be properly tested on GCloud
+
         # Parse GCS URI
         match = re.match(r'^gs://([^/]+)/(.+)$', self._input_str)
         if not match:
