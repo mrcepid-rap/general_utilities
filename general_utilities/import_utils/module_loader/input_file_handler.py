@@ -149,11 +149,7 @@ class InputFileHandler:
         # this sections needs to be properly tested on GCloud
 
         # Parse GCS URI
-        match = re.match(r'^gs://([^/]+)/(.+)$', self._input_str)
-        if not match:
-            raise ValueError(f"Invalid GCS path: {self._input_str}")
-
-        bucket_name, blob_name = match.groups()
+        bucket_name, blob_name = self._input_str.groups()
         output_path = Path(blob_name).name
         output_path = Path(output_path)
 
