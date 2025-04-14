@@ -4,13 +4,10 @@ from abc import ABC
 from pathlib import Path
 from typing import Set, Tuple, List, Any, Dict
 
-import dxpy
-
-from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
+from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler, FileType
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler, FileType
 
 
 class IngestData(ABC):
@@ -246,25 +243,27 @@ class IngestData(ABC):
         return additional_covariates_found
 
     @staticmethod
-    def _define_exclusion_lists(inclusion_list: dxpy.DXFile, exclusion_list: dxpy.DXFile) -> Tuple[bool, bool]:
+    def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[
+        bool, bool]:
         """Get inclusion/exclusion sample lists
 
         If provided, inclusion and exclusion lists will be downloaded to `$HOME/INCLUSION.lst` and
         `$HOME/EXCLUSION.list`, respectively.
 
-        :param inclusion_list: A DXFile (possibly None if not provided) pointing to a sample inclusion list file on
+        :param inclusion_list: An InputFileParser class (possibly None if not provided) pointing to a sample inclusion list file on
             the RAP
-        :param exclusion_list: A DXFile (possibly None if not provided) pointing to a sample inclusion list file on
+        :param exclusion_list: An InputFileParser class (possibly None if not provided) pointing to a sample inclusion list file on
             the RAP
         :return: A Tuple with two booleans, describing if an inclusion or exclusion list were found, respectively
         """
 
         inclusion_found, exclusion_found = False, False
         if inclusion_list is not None:
-            InsmedInput(inclusion_list.get_id(), 'INCLUSION.lst')
+            # make sure the file is called INCLUSION.lst
+            inclusion_list.get_file_handle().rename(Path('INCLUSION.lst'))
             inclusion_found = True
         if exclusion_list is not None:
-            InsmedInput(exclusion_list.get_id(), 'EXCLUSION.lst')
+            exclusion_list.get_file_handle().rename(Path('EXCLUSION.lst'))
             exclusion_found = True
 
         return inclusion_found, exclusion_found

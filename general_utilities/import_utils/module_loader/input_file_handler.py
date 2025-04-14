@@ -1,7 +1,7 @@
 import re
-from enum import Enum
+from enum import Enum, auto
 from pathlib import Path
-from typing import Union, Optional
+from typing import Union
 
 import dxpy
 from google.cloud import storage
@@ -11,9 +11,10 @@ from general_utilities.mrc_logger import MRCLogger
 
 
 class FileType(Enum):
-    DNA_NEXUS_FILE = "DNA Nexus File"
-    LOCAL_PATH = "Local Path"
-    GCLOUD_FILE = "Google Cloud File"
+    """Enum representing different file types."""
+    DNA_NEXUS_FILE = auto()
+    LOCAL_PATH = auto()
+    GCLOUD_FILE = auto()
 
 
 class InputFileHandler:
@@ -29,11 +30,11 @@ class InputFileHandler:
     The file_handle will return the local filepath of the file in question.
     """
 
-    def __init__(self, input_str: Union[str, Path, dxpy.DXFile], download_now: bool = False):
+    def __init__(self, input_file: Union[str, Path, dxpy.DXFile], download_now: bool = False):
         """
         Initializes the InsmedInput class to handle input files from different platforms.
 
-        :param input_str: The input file identifier (e.g., a DXFile object, local path, or GCS URI).
+        :param input_file: The input file identifier (e.g., a DXFile object, local path, or GCS URI).
         :param download_now: If True, download the file during initialization.
         """
 
@@ -42,7 +43,7 @@ class InputFileHandler:
         self._logger = MRCLogger(__name__).get_logger()
 
         # set the input string
-        self._input_str = input_str
+        self._input_str = input_file
 
         # The file type of the input string
         self._file_type = self._decide_filetype()
@@ -51,31 +52,24 @@ class InputFileHandler:
         self._downloaded = False
 
         # ACTIONS:
-        # For some parts of the workflow we need to know the input files
-        self.input = self.get_input_str()
-
-        # Let's get filetype that we are working with as a public attribute
-        self.file_type = self.get_file_type()
-
         # if we are downloading now, then we need to download the file
         if download_now:
             self.file_handle = self.get_file_handle()
             self._downloaded = True
-            self._logger.info(f"File downloaded: {self.file_handle}")
+            self._logger.debug(f"File downloaded: {self.file_handle}")
         else:
             self.file_handle = None
 
-    def get_file_type(self) -> Optional[FileType]:
+    def get_file_type(self) -> FileType:
         """
         Return the resolved file type for the input.
 
         :return: A `FileType` enum indicating the input file type.
         """
-        # if we are not downloading now but we want to know the filetype
-        if not self._downloaded:
-            return self._file_type
+        # if we are not downloading now, but we want to know the filetype
+        return self._file_type
 
-    def get_input_str(self):
+    def get_input_str(self) -> Union[str, Path, dxpy.DXFile]:
         """
         Retrieve the input string or object provided during initialization.
 
@@ -86,7 +80,7 @@ class InputFileHandler:
         """
         return self._input_str
 
-    def _parse_file(self, file_type: FileType) -> Path:
+    def _resolve_file(self, file_type: FileType) -> Path:
         """
         Download a file based on its type using an Enum.
 
@@ -100,9 +94,9 @@ class InputFileHandler:
         """
         # Map Enum values to corresponding methods
         method_map = {
-            FileType.DNA_NEXUS_FILE: self._download_dnanexus_file,
+            FileType.DNA_NEXUS_FILE: self._resolve_dnanexus_file,
             FileType.LOCAL_PATH: self._resolve_local_file,
-            FileType.GCLOUD_FILE: self._download_gsutil_file,
+            FileType.GCLOUD_FILE: self._resolve_gsutil_file,
         }
 
         if file_type in method_map:
@@ -110,7 +104,7 @@ class InputFileHandler:
         else:
             raise ValueError(f"Unsupported file type: {file_type}")
 
-    def _download_dnanexus_file(self) -> Path:
+    def _resolve_dnanexus_file(self) -> Path:
         """
         Download a file from DNA Nexus.
 
@@ -136,9 +130,10 @@ class InputFileHandler:
         path = Path(self._input_str)
         if path.exists() and path.is_file():
             return path.resolve()
-        raise FileNotFoundError(f"Local file not found: {self._input_str}")
+        else:
+            raise FileNotFoundError(f"Local file not found: {self._input_str}")
 
-    def _download_gsutil_file(self) -> Path:
+    def _resolve_gsutil_file(self) -> Path:
         """
         Download a file from a Google Cloud Storage (GCS) bucket using the Google Cloud Storage Python client.
 
@@ -169,14 +164,14 @@ class InputFileHandler:
             blob = bucket.blob(blob_name)
 
             blob.download_to_filename(str(output_path))
-            self._logger.info(f"Downloaded file using GCS API: {output_path}")
+            self._logger.debug(f"Downloaded file using GCS API: {output_path}")
             return output_path.resolve()
 
         except Exception as e:
             self._logger.error(f"Failed to download from GCS: {e}")
             raise FileNotFoundError(f"Failed to download {self._input_str}")
 
-    def _decide_filetype(self) -> Union[FileType]:
+    def _decide_filetype(self) -> FileType:
         """
         Determine the type of the input and classify it as a DNA Nexus file, a local path, or an existing file object.
 
@@ -196,43 +191,54 @@ class InputFileHandler:
         if self._input_str is None or self._input_str == 'None':
             raise ValueError("No input provided, please check")
 
-        # Handle existing DXFile or Path objects
-        if isinstance(self._input_str, (dxpy.DXFile, Path)):
+        # Handle DXFile or Path objects
+        elif isinstance(self._input_str, (dxpy.DXFile, Path)):
             return FileType.DNA_NEXUS_FILE if isinstance(self._input_str, dxpy.DXFile) else FileType.LOCAL_PATH
 
-        # Handle local path first
-        path = Path(self._input_str)
-        if not path.is_absolute():
-            path = path.resolve()
+        # Check if the input is a GCloud file
+        elif re.match(r'^gs://([^/]+)/(.+)$', self._input_str):
+            return FileType.GCLOUD_FILE
 
-        if path.exists():
-            return FileType.LOCAL_PATH
+        # We may have a path that is written as a string
+        elif isinstance(self._input_str, str):
+            path = Path(self._input_str)
+            if not path.is_absolute():
+                path = path.resolve()
+                if path.exists():
+                    return FileType.LOCAL_PATH
 
         # Check if it's a DNA Nexus file ID
-        if re.fullmatch(r'file-\w{24}', self._input_str):
+        elif re.match('file-\\w{24}', self._input_str):
             try:
-                dx_file = dxpy.DXFile(dxid=self._input_str)
-                dx_file.describe()
+                dxpy.DXFile(dxid=self._input_str)
                 return FileType.DNA_NEXUS_FILE
-            except dxpy.exceptions.DXError as e:
-                self._logger.error(f"Invalid DNA Nexus file ID: {e}")
-                raise
+            except dxpy.exceptions.DXError:
+                raise TypeError(f'The input for parameter – {self._input_str} – '
+                                f'does not look like a valid DNANexus file ID.')
+        else:
+            try:
+                file_handle = Path(self._input_str)
+                dxpy.find_one_data_object(
+                    classname='file',
+                    project=dxpy.PROJECT_CONTEXT_ID,
+                    name_mode='exact',
+                    name=f'{file_handle.name}',
+                    folder=f'{file_handle.parent}',
+                    zero_ok=False
+                )
+                return FileType.DNA_NEXUS_FILE
+            except dxpy.exceptions.DXSearchError:
+                raise FileNotFoundError(
+                    f'The input parameter – {self._input_str} – was tried as a filepath, but was not found '
+                    f'in the project this applet has been executed from. Please confirm the file '
+                    f'exists in this project or use a DNANexus file ID (like: file-12345...).')
+            except dxpy.exceptions.ResourceNotFound:
+                raise TypeError(f'The input for parameter – {self._input_str} – '
+                                f'does not exist on the DNANexus platform.')
 
-        # Try to find on DNA Nexus by path
-        try:
-            found = dxpy.find_one_data_object(
-                classname='file',
-                project=dxpy.PROJECT_CONTEXT_ID,
-                name_mode='exact',
-                name=path.name,
-                folder=str(path.parent),
-                zero_ok=False
-            )
-            return FileType.DNA_NEXUS_FILE
-        except dxpy.exceptions.DXSearchError:
-            raise FileNotFoundError(f"File not found locally or on DNA Nexus: {self._input_str}")
+        raise ValueError(f"Unable to determine file type for input: {self._input_str}")
 
-    def get_file_handle(self) -> Path:
+    def get_file_handle(self, overwrite: bool = False) -> Path:
         """
         Download the file based on its type and return the local file path.
 
@@ -250,11 +256,17 @@ class InputFileHandler:
         """
 
         if not self._downloaded:
-            self._logger.info("Starting file download...")
-            self.file_handle = self._parse_file(self._file_type)
+            self._logger.debug("Starting file download...")
+            self.file_handle = self._resolve_file(self._file_type)
             self._downloaded = True
-            self._logger.info(f"File downloaded successfully: {self.file_handle}")
+            self._logger.debug(f"File downloaded successfully: {self.file_handle}")
+            return self.file_handle
+        elif overwrite:
+            self._logger.warning("Overwriting existing file...")
+            self.file_handle = self._resolve_file(self._file_type)
+            self._downloaded = True
+            self._logger.info(f"File overwritten successfully: {self.file_handle}")
             return self.file_handle
         else:
-            self._logger.info(f"File was already downloaded: {self.file_handle}")
+            self._logger.warning(f"File was already downloaded: {self.file_handle}")
             return self.file_handle

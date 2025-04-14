@@ -26,9 +26,9 @@ class GeneticsLoader:
     :param low_mac_list: An optional list of low minor allele count variants for exclusion when running BOLT
     """
 
-    def __init__(self, bed_file: dxpy.DXFile, fam_file: dxpy.DXFile, bim_file: dxpy.DXFile, sample_files: List[Path],
-                 cmd_executor: CommandExecutor, low_mac_list: dxpy.DXFile = None,
-                 sparse_grm: dxpy.DXFile = None, sparse_grm_sample: dxpy.DXFile = None):
+    def __init__(self, bed_file: InputFileHandler, fam_file: InputFileHandler, bim_file: InputFileHandler, sample_files: List[Path],
+                 cmd_executor: CommandExecutor, low_mac_list: InputFileHandler = None,
+                 sparse_grm: InputFileHandler = None, sparse_grm_sample: InputFileHandler = None):
 
         self._logger = MRCLogger(__name__).get_logger()
         self._cmd_executor = cmd_executor
@@ -244,8 +244,8 @@ class GeneticsLoader:
         the sparse matrix and NOT the plink genetics files, while also keeping it in an obvious place for
         maintainability purposes.
 
-        :param sparse_grm: A DXFile representation of the sparse genetic matrix for GLM and STAAR
-        :param sparse_grm_sample: A DXFile representation of the corresponding sample file for the sparse genetic matrix
+        :param sparse_grm: A InputFileHandler class representation of the sparse genetic matrix for GLM and STAAR
+        :param sparse_grm_sample: A InputFileHandler class representation of the corresponding sample file for the sparse genetic matrix
         :return: None
         """
 

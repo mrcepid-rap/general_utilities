@@ -1,9 +1,8 @@
-import dxpy
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List
 
+from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import CommandExecutor
 
 
@@ -17,17 +16,17 @@ class ProgramArgs(ABC):
     implemented version of this method in individual modules subclasses that implement ModuleLoader.
     """
 
-    phenofile: List[dxpy.DXFile]
+    phenofile: List[InputFileHandler]
     phenoname: str
-    covarfile: dxpy.DXFile
+    covarfile: InputFileHandler
     categorical_covariates: List[str]
     quantitative_covariates: List[str]
     is_binary: bool
     sex: int
-    exclusion_list: dxpy.DXFile
-    inclusion_list: dxpy.DXFile
-    transcript_index: dxpy.DXFile
-    base_covariates: dxpy.DXFile
+    exclusion_list: InputFileHandler
+    inclusion_list: InputFileHandler
+    transcript_index: InputFileHandler
+    base_covariates: InputFileHandler
     ignore_base: bool
 
     def __post_init__(self):
@@ -61,7 +60,6 @@ class AssociationPack(ABC):
     def __init__(self, is_binary: bool, sex: int, threads: int, pheno_names: List[str], ignore_base_covariates: bool,
                  found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
                  cmd_executor: CommandExecutor):
-
         self.is_binary = is_binary
         self.sex = sex
         self.threads = threads

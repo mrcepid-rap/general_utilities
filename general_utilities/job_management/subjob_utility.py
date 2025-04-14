@@ -12,7 +12,7 @@ from time import sleep, time
 from general_utilities.association_resources import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.module_loader.input_file_handler import InsmedInput
+from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
 
 class Environment(Enum):
     """An Enum that defines the launch environment used to generate jobs.
