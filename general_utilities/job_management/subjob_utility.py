@@ -508,12 +508,9 @@ class SubjobUtility:
                         for value in output_value:
                             # This is possibly (likely) a file
                             if '$dnanexus_link' in value:
-                                if isinstance(InsmedInput(value['$dnanexus_link'], download_now=False).input_str, dxpy.DXFile):
 
-                                    if self._download_on_complete:  # Download the file if the user wants it locally
-                                        new_values.append(download_dxfile_by_name(value, print_status=False))
-                                    else:
-                                        new_values.append(value)
+                                if self._download_on_complete:  # Download the file if the user wants it locally
+                                    new_values.append(download_dxfile_by_name(value, print_status=False))
                                 else:
                                     new_values.append(value)
 
@@ -531,14 +528,12 @@ class SubjobUtility:
                         if type(output_value) is dict:
                             if '$dnanexus_link' in output_value:
                                 # This is still likely a file...
-                                if isinstance(InsmedInput(output_value['$dnanexus_link'], download_now=False).input_str, dxpy.DXFile):
-                                    if self._download_on_complete:  # Download the file if the user wants it locally
-                                        output_dict[output_key] = download_dxfile_by_name(output_value,
-                                                                                          print_status=False)
-                                    else:
-                                        output_dict[output_key] = output_value
-                                else:  # This is something else that I don't think actually exists in DNANexus...
+                                if self._download_on_complete:  # Download the file if the user wants it locally
+                                    output_dict[output_key] = download_dxfile_by_name(output_value,
+                                                                                      print_status=False)
+                                else:
                                     output_dict[output_key] = output_value
+
                             else:  # I don't think this else can happen, but adding it just to be sure
                                 output_dict[output_key] = output_value
                         # This is unlikely to be a file

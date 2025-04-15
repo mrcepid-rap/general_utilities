@@ -3,11 +3,10 @@ import re
 from abc import ABC, abstractmethod
 from importlib import util, import_module
 from pathlib import Path
-from typing import List, Type, Optional, Union
-from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
-import dxpy
+from typing import List, Type, Optional
 
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
+from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
 
 
 class ModuleLoader(ABC):
@@ -66,7 +65,7 @@ class ModuleLoader(ABC):
         self._outputs = outputs
 
     @staticmethod
-    def dxfile_input(input_str: str) -> InputFileHandler:
+    def dxfile_input(input_str: str) -> Optional[InputFileHandler]:
         """Return the input string as an InputFileHandler object."""
         if input_str is None or input_str == 'None':
             return None

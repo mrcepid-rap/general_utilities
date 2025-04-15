@@ -1,4 +1,5 @@
 /build/
+build
 /dist/
 /general_utilities.egg-info/
 /.talismanrc
@@ -7,3 +8,4 @@ poetry.lock
 .idea/
 /dx_run.log
 uv.lock
+.venv

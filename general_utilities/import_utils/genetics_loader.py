@@ -59,10 +59,7 @@ class GeneticsLoader:
         :return: None
         """
 
-        # Now grab all genetic data that I have in the folder /project_resources/genetics/
-        Path('genetics/').mkdir(exist_ok=True)  # This is for legacy reasons to make sure all tests work...
-        # check if we are working with a DNA Nexus file or not
-        # if we are then process it like a DNA Nexus file
+        # download the genotype data
         self._bed_file.get_file_handle()
         self._bim_file.get_file_handle()
         self._fam_file.get_file_handle()

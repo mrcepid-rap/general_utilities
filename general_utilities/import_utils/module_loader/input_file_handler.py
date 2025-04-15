@@ -28,15 +28,16 @@ class InputFileHandler:
     it will not be downloaded.
 
     The file_handle will return the local filepath of the file in question.
+
+    :param input_file: The input file identifier (e.g., a DXFile object, local path, or GCS URI).
+    :param download_now: If True, download the file during initialization.
     """
 
-    def __init__(self, input_file: Union[str, Path, dxpy.DXFile], download_now: bool = False):
-        """
-        Initializes the InsmedInput class to handle input files from different platforms.
+    ### TO-DO ###
+    # See whether we have to use blobs for GCloud or if there is something newer
+    # IMPORTANT: We need to build an authenticator class for GCloud and/or other data platforms
 
-        :param input_file: The input file identifier (e.g., a DXFile object, local path, or GCS URI).
-        :param download_now: If True, download the file during initialization.
-        """
+    def __init__(self, input_file: Union[str, Path, dxpy.DXFile], download_now: bool = False):
 
         # Initiate the InsmedInput class
         # For logging
@@ -54,7 +55,7 @@ class InputFileHandler:
         # ACTIONS:
         # if we are downloading now, then we need to download the file
         if download_now:
-            self.file_handle = self.get_file_handle()
+            self._file_handle = self.get_file_handle()
             self._downloaded = True
             self._logger.debug(f"File downloaded: {self.file_handle}")
         else:
@@ -79,6 +80,48 @@ class InputFileHandler:
         :return: The input string or object (`str`, `Path`, or `dxpy.DXFile`) provided to the class.
         """
         return self._input_str
+
+    def get_file_handle(self, overwrite: bool = False, docker_handle: bool = False) -> Path:
+        """
+        Download the file based on its type and return the local file path.
+
+        Determines the type of the input file (e.g., DNA Nexus file, local path, or Google Cloud file) and downloads it
+        to the current working directory. If the file has already been downloaded, it returns the path to the
+        existing file without re-downloading.
+
+        :param overwrite: If True, overwrite the existing file even if it has already been downloaded.
+        :return: A `Path` object representing the local file path where the file has been downloaded or already exists.
+        :raises FileNotFoundError: If the file cannot be resolved or downloaded.
+        :raises ValueError: If the file type is unsupported.
+        :raises dxpy.exceptions.DXError: If the DNA Nexus file download fails.
+        """
+
+        if not self._downloaded:
+            self._logger.debug("Starting file download...")
+            self.file_handle = self._resolve_file(self._file_type)
+            self._downloaded = True
+            self._logger.debug(f"File downloaded successfully: {self.file_handle}")
+            return self.file_handle
+        elif overwrite:
+            self._logger.warning("Overwriting existing file...")
+            self.file_handle = self._resolve_file(self._file_type)
+            self._downloaded = True
+            self._logger.debug(f"File overwritten successfully: {self.file_handle}")
+            return self.file_handle
+        else:
+            self._logger.warning(f"File was already downloaded: {self.file_handle}")
+            return self.file_handle
+
+    def get_filename(self) -> str:
+        """
+        Get the filename of the input file.
+
+        This method extracts the filename from the input string or object, regardless of its type (e.g., DNA Nexus file,
+        local path, or Google Cloud file). It returns the name of the file without any directory information.
+
+        :return: The filename as a string.
+        """
+        return Path(self.get_file_handle()).name
 
     def _resolve_file(self, file_type: FileType) -> Path:
         """
@@ -127,9 +170,9 @@ class InputFileHandler:
         :return: A `Path` object representing the resolved local file path.
         :raises FileNotFoundError: If the file does not exist locally.
         """
-        path = Path(self._input_str)
-        if path.exists() and path.is_file():
-            return path.resolve()
+        path = self._check_absolute_path()
+        if path.is_file():
+            return path
         else:
             raise FileNotFoundError(f"Local file not found: {self._input_str}")
 
@@ -145,8 +188,6 @@ class InputFileHandler:
         :return: A `Path` object representing the resolved local file path of the downloaded file.
         :raises FileNotFoundError: If the GCS file path is invalid or download fails.
         """
-        ##### TO-DO
-        # this sections needs to be properly tested on GCloud
 
         # Parse GCS URI
         bucket_name, blob_name = self._input_str.groups()
@@ -190,30 +231,35 @@ class InputFileHandler:
         if self._input_str is None or self._input_str == 'None':
             raise ValueError("No input provided, please check")
 
-        # Handle DXFile or Path objects
-        elif isinstance(self._input_str, (dxpy.DXFile, Path)):
-            return FileType.DNA_NEXUS_FILE if isinstance(self._input_str, dxpy.DXFile) else FileType.LOCAL_PATH
+        # Handle DXFile
+        elif isinstance(self._input_str, dxpy.DXFile):
+            return FileType.DNA_NEXUS_FILE
+
+        # Handle local paths encoded as paths
+        elif isinstance(self._input_str, Path) and self._input_str.exists:
+            return FileType.LOCAL_PATH
 
         # Check if the input is a GCloud file
         elif re.match(r'^gs://([^/]+)/(.+)$', self._input_str):
             return FileType.GCLOUD_FILE
 
-        # We may have a path that is written as a string
-        elif isinstance(self._input_str, str):
-            path = Path(self._input_str)
-            if not path.is_absolute():
-                path = path.resolve()
-                if path.exists():
-                    return FileType.LOCAL_PATH
-
         # Check if it's a DNA Nexus file ID
-        elif re.match('file-\\w{24}', self._input_str):
+        elif re.match('file-\\w{24}', self._input_str) or re.match('project-\\w{24}', self._input_str):
             try:
                 dxpy.DXFile(dxid=self._input_str)
                 return FileType.DNA_NEXUS_FILE
             except dxpy.exceptions.DXError:
                 raise TypeError(f'The input for parameter – {self._input_str} – '
                                 f'does not look like a valid DNANexus file ID.')
+
+        # We may have a path that is written as a string
+        elif isinstance(self._input_str, str):
+            path = self._check_absolute_path()
+            if path.exists():
+                return FileType.LOCAL_PATH
+            else:
+                raise FileNotFoundError(f'The input parameter – {self._input_str} – could not be resolved to a file. ')
+
         else:
             try:
                 file_handle = Path(self._input_str)
@@ -235,37 +281,17 @@ class InputFileHandler:
                 raise TypeError(f'The input for parameter – {self._input_str} – '
                                 f'does not exist on the DNANexus platform.')
 
-        raise ValueError(f"Unable to determine file type for input: {self._input_str}")
-
-    def get_file_handle(self, overwrite: bool = False) -> Path:
+    def _check_absolute_path(self) -> Path:
         """
-        Download the file based on its type and return the local file path.
+        Resolve a given input string to an absolute path.
 
-        This method determines the type of the input file (e.g., DNA Nexus file, local path, or Google Cloud file) and downloads it
-        to the current working directory. If the file has already been downloaded, it returns the path to the
-        existing file without re-downloading.
-
-        Returns:
-            Path: The local file path where the file has been downloaded or already exists.
-
-        Raises:
-            FileNotFoundError: If the file cannot be resolved or downloaded.
-            ValueError: If the file type is unsupported.
-            dxpy.exceptions.DXError: If the DNA Nexus file download fails.
+        :param input_str: The input string representing a file path.
+        :return: A `Path` object representing the absolute path.
         """
-
-        if not self._downloaded:
-            self._logger.debug("Starting file download...")
-            self.file_handle = self._resolve_file(self._file_type)
-            self._downloaded = True
-            self._logger.debug(f"File downloaded successfully: {self.file_handle}")
-            return self.file_handle
-        elif overwrite:
-            self._logger.warning("Overwriting existing file...")
-            self.file_handle = self._resolve_file(self._file_type)
-            self._downloaded = True
-            self._logger.info(f"File overwritten successfully: {self.file_handle}")
-            return self.file_handle
-        else:
-            self._logger.warning(f"File was already downloaded: {self.file_handle}")
-            return self.file_handle
+        path = Path(self._input_str)
+        if not path.is_absolute():
+            path = path.resolve()
+        # if the path doesn't start with a '/' then we need to add it
+        if not path.name.startswith('/'):
+            path = Path(f'/{path}')
+        return path
