@@ -170,7 +170,7 @@ class InputFileHandler:
         # if we are working with a DX filepath
         elif self._input_str is str or Path:
             input_path = self._check_absolute_path()
-            dxfile =  find_dxlink(name=f'{input_path.name}', folder=f'{input_path.parent}')
+            dxfile = find_dxlink(name=f'{input_path.name}', folder=f'{input_path.parent}')
             file_path = download_dxfile_by_name(dxfile)
         else:
             raise FileNotFoundError(f"DNA Nexus input string {self._input_str} could not be resolved.")
@@ -263,9 +263,9 @@ class InputFileHandler:
 
         # Check if it's a DNA Nexus file ID
         elif re.match('file-\\w{24}', self._input_str):
-            try:
-                dxpy.DXFile(dxid=self._input_str)
-                return FileType.DNA_NEXUS_FILE
+            dxpy.DXFile(dxid=self._input_str)
+            return FileType.DNA_NEXUS_FILE
+
         # the DNA Nexus file might have the project prefix so we should
         # separate out the project form the file and try to find it again
         elif re.match('project-\\w{24}', self._input_str):
