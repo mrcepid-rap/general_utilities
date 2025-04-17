@@ -1,13 +1,11 @@
 import csv
 import re
-import shutil
 from pathlib import Path
 from typing import Set, List
 
-import dxpy
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 
 
 class GeneticsLoader:

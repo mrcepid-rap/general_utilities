@@ -1,18 +1,18 @@
 import inspect
+import math
 import os
 from datetime import datetime
 from enum import Enum, auto
 from importlib import import_module
+from time import sleep, time
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
 import dxpy
-import math
-from time import sleep, time
 
-from general_utilities.association_resources import download_dxfile_by_name
+from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
+
 
 class Environment(Enum):
     """An Enum that defines the launch environment used to generate jobs.
@@ -193,7 +193,7 @@ class SubjobUtility:
         if 'DX_JOB_ID' in os.environ:
             parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
             self._default_instance_type = \
-            parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
+                parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
         else:
             self._default_instance_type = None
 

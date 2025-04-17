@@ -6,7 +6,7 @@ from typing import Union
 import dxpy
 from google.cloud import storage
 
-from general_utilities.association_resources import download_dxfile_by_name
+from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name, find_dxlink
 from general_utilities.mrc_logger import MRCLogger
 
 
@@ -81,7 +81,7 @@ class InputFileHandler:
         """
         return self._input_str
 
-    def get_file_handle(self, overwrite: bool = False, docker_handle: bool = False) -> Path:
+    def get_file_handle(self, overwrite: bool = False) -> Path:
         """
         Download the file based on its type and return the local file path.
 
@@ -157,7 +157,24 @@ class InputFileHandler:
         :return: A `Path` object representing the resolved local file path of the downloaded file.
         :raises dxpy.exceptions.DXError: If the DNA Nexus file download fails.
         """
-        file_path = download_dxfile_by_name(self._input_str)
+
+        # if we are working with a DNA Nexus file ID
+        if re.match('file-\\w{24}', self._input_str):
+            file_path = download_dxfile_by_name(self._input_str)
+        # if we are working with a project and file ID
+        elif re.match('project-\\w{24}', self._input_str):
+            project = (m := re.findall(r'(project-\w{24})', self._input_str)) and m[0]
+            file = (m := re.findall(r'(file-\w{24})', self._input_str)) and m[0]
+            dxfile = dxpy.DXFile(project=project, dxid=file)
+            file_path = download_dxfile_by_name(dxfile)
+        # if we are working with a DX filepath
+        elif self._input_str is str or Path:
+            input_path = self._check_absolute_path()
+            dxfile =  find_dxlink(name=f'{input_path.name}', folder=f'{input_path.parent}')
+            file_path = download_dxfile_by_name(dxfile)
+        else:
+            raise FileNotFoundError(f"DNA Nexus input string {self._input_str} could not be resolved.")
+
         return Path(file_path).resolve()
 
     def _resolve_local_file(self) -> Path:
@@ -211,7 +228,7 @@ class InputFileHandler:
             self._logger.error(f"Failed to download from GCS: {e}")
             raise FileNotFoundError(f"Failed to download {self._input_str}")
 
-    def _decide_filetype(self) -> FileType:
+    def _decide_filetype(self) -> FileType | None:
         """
         Determine the type of the input and classify it as a DNA Nexus file, a local path, or an existing file object.
 
@@ -228,6 +245,7 @@ class InputFileHandler:
         :raises ValueError: If the local path is not absolute.
         :raises dxpy.exceptions.DXError: If the DNA Nexus file ID is invalid or cannot be described.
         """
+        # if the input is None (note that 'None' could be spelt as a string), then we should raise an error
         if self._input_str is None or self._input_str == 'None':
             raise ValueError("No input provided, please check")
 
@@ -244,33 +262,28 @@ class InputFileHandler:
             return FileType.GCLOUD_FILE
 
         # Check if it's a DNA Nexus file ID
-        elif re.match('file-\\w{24}', self._input_str) or re.match('project-\\w{24}', self._input_str):
+        elif re.match('file-\\w{24}', self._input_str):
             try:
                 dxpy.DXFile(dxid=self._input_str)
+                return FileType.DNA_NEXUS_FILE
+        # the DNA Nexus file might have the project prefix so we should
+        # separate out the project form the file and try to find it again
+        elif re.match('project-\\w{24}', self._input_str):
+            try:
+                # separate project out from the file
+                project = (m := re.findall(r'(project-\w{24})', self._input_str)) and m[0]
+                file = (m := re.findall(r'(file-\w{24})', self._input_str)) and m[0]
+                dxpy.DXFile(project=project, dxid=file)
                 return FileType.DNA_NEXUS_FILE
             except dxpy.exceptions.DXError:
                 raise TypeError(f'The input for parameter – {self._input_str} – '
                                 f'does not look like a valid DNANexus file ID.')
 
-        # We may have a path that is written as a string
-        elif isinstance(self._input_str, str):
-            path = self._check_absolute_path()
-            if path.exists():
-                return FileType.LOCAL_PATH
-            else:
-                raise FileNotFoundError(f'The input parameter – {self._input_str} – could not be resolved to a file. ')
-
-        else:
+        # we could have the DNA Nexus file as filepath, so we need to get the DNA Nexus file ID from the filepath
+        elif self._input_str == str:
             try:
                 file_handle = Path(self._input_str)
-                dxpy.find_one_data_object(
-                    classname='file',
-                    project=dxpy.PROJECT_CONTEXT_ID,
-                    name_mode='exact',
-                    name=f'{file_handle.name}',
-                    folder=f'{file_handle.parent}',
-                    zero_ok=False
-                )
+                find_dxlink(name=f'{file_handle.name}', folder=f'{file_handle.parent}')
                 return FileType.DNA_NEXUS_FILE
             except dxpy.exceptions.DXSearchError:
                 raise FileNotFoundError(
@@ -280,6 +293,16 @@ class InputFileHandler:
             except dxpy.exceptions.ResourceNotFound:
                 raise TypeError(f'The input for parameter – {self._input_str} – '
                                 f'does not exist on the DNANexus platform.')
+
+        # We may have a path that is written as a string, so let's convert it to a path and see if it exists
+        elif isinstance(self._input_str, str):
+            path = self._check_absolute_path()
+            if path.exists():
+                return FileType.LOCAL_PATH
+
+        # last resort is we can't find the file so we should throw an error
+        else:
+            raise FileNotFoundError(f'The input parameter – {self._input_str} – could not be resolved to a file. ')
 
     def _check_absolute_path(self) -> Path:
         """

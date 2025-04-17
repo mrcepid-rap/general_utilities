@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Type, Optional
 
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
-from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 
 
 class ModuleLoader(ABC):

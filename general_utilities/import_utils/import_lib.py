@@ -2,11 +2,11 @@ import csv
 import re
 import tarfile
 from pathlib import Path
-from typing import Dict, Tuple, List, TypedDict, Optional, Union, Any
+from typing import Dict, TypedDict, Optional, Union, Any
 
 import dxpy
 
-from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger().get_logger()

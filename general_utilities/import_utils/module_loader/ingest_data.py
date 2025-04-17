@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Set, Tuple, List, Any, Dict
 
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
-from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler, FileType
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler, FileType
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
 

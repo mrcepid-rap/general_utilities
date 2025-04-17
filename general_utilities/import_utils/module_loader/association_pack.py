@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List
 
-from general_utilities.import_utils.module_loader.input_file_handler import InputFileHandler
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import CommandExecutor
 
 
