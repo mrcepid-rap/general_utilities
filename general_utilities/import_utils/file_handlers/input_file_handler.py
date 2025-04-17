@@ -282,7 +282,7 @@ class InputFileHandler:
         # we could have the DNA Nexus file as filepath, so we need to get the DNA Nexus file ID from the filepath
         elif self._input_str == str:
             try:
-                file_handle = Path(self._input_str)
+                file_handle = self._check_absolute_path()
                 find_dxlink(name=f'{file_handle.name}', folder=f'{file_handle.parent}')
                 return FileType.DNA_NEXUS_FILE
             except dxpy.exceptions.DXSearchError:
