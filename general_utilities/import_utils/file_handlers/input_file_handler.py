@@ -228,7 +228,7 @@ class InputFileHandler:
             self._logger.error(f"Failed to download from GCS: {e}")
             raise FileNotFoundError(f"Failed to download {self._input_str}")
 
-    def _decide_filetype(self) -> FileType | None:
+    def _decide_filetype(self) -> FileType:
         """
         Determine the type of the input and classify it as a DNA Nexus file, a local path, or an existing file object.
 
