@@ -1,13 +1,11 @@
 import csv
 import re
-import shutil
 from pathlib import Path
 from typing import Set, List
 
-import dxpy
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.import_lib import input_filetype_parser
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 
 
 class GeneticsLoader:
@@ -26,9 +24,9 @@ class GeneticsLoader:
     :param low_mac_list: An optional list of low minor allele count variants for exclusion when running BOLT
     """
 
-    def __init__(self, bed_file: dxpy.DXFile, fam_file: dxpy.DXFile, bim_file: dxpy.DXFile, sample_files: List[Path],
-                 cmd_executor: CommandExecutor, low_mac_list: dxpy.DXFile = None,
-                 sparse_grm: dxpy.DXFile = None, sparse_grm_sample: dxpy.DXFile = None):
+    def __init__(self, bed_file: InputFileHandler, fam_file: InputFileHandler, bim_file: InputFileHandler, sample_files: List[Path],
+                 cmd_executor: CommandExecutor, low_mac_list: InputFileHandler = None,
+                 sparse_grm: InputFileHandler = None, sparse_grm_sample: InputFileHandler = None):
 
         self._logger = MRCLogger(__name__).get_logger()
         self._cmd_executor = cmd_executor
@@ -59,26 +57,14 @@ class GeneticsLoader:
         :return: None
         """
 
-        # Now grab all genetic data that I have in the folder /project_resources/genetics/
-        Path('genetics/').mkdir(exist_ok=True)  # This is for legacy reasons to make sure all tests work...
-        # check if we are working with a DNA Nexus file or not
-        # if we are then process it like a DNA Nexus file
-        if isinstance(input_filetype_parser(self._bed_file), dxpy.DXFile):
-            dna_nexus_run = True
-            dxpy.download_dxfile(self._bed_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bed')
-            dxpy.download_dxfile(self._bim_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.bim')
-            dxpy.download_dxfile(self._fam_file.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.fam')
-        else:
-            dna_nexus_run = False
-            shutil.copy(self._bed_file, 'genetics/UKBB_470K_Autosomes_QCd.bed')
-            shutil.copy(self._bim_file, 'genetics/UKBB_470K_Autosomes_QCd.bim')
-            shutil.copy(self._fam_file, 'genetics/UKBB_470K_Autosomes_QCd.fam')
+        # download the genotype data
+        self._bed_file.get_file_handle()
+        self._bim_file.get_file_handle()
+        self._fam_file.get_file_handle()
 
         if self._low_mac_list is not None:
-            if dna_nexus_run:
-                dxpy.download_dxfile(self._low_mac_list.get_id(), 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
-            else:
-                shutil.copy(self._low_mac_list, 'genetics/UKBB_470K_Autosomes_QCd.low_MAC.snplist')
+            # Download the low MAC list
+            self._low_mac_list.get_file_handle()
 
         self._logger.info('Genetic array data downloaded...')
 
@@ -231,28 +217,11 @@ class GeneticsLoader:
         :return: None
         """
         # Generate a plink file to use that only has included individuals:
+        cmd = 'plink2 ' \
+              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
+              '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
 
-        # check if we are working with a DNA Nexus file or not
-        # if we are then process it like a DNA Nexus file
-        if isinstance(input_filetype_parser(self._bed_file), dxpy.DXFile):
-
-            cmd = 'plink2 ' \
-                  '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
-                  '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-
-            self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
-
-        else:
-
-            shutil.copy('SAMPLES_Include.txt', 'genetics/SAMPLES_Include.txt')
-
-            cmd = 'plink2 ' \
-                  '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/genetics/SAMPLES_Include.txt ' \
-                  '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
-
-            # mount = DockerMount(Path('genetics'), Path('/test/genetics'))
-            # cmd_exec = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting', docker_mounts=[mount])
-            # cmd_exec.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
+        self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 
         # I have to do this to recover the sample information from plink
         with Path('plink_filtered.out').open('r') as plink_out:
@@ -263,27 +232,19 @@ class GeneticsLoader:
                     self._logger.info(f'{"Plink individuals written":{65}}: {count_matcher.group(1)}')
 
     @staticmethod
-    def ingest_sparse_matrix(sparse_grm: dxpy.DXFile, sparse_grm_sample: dxpy.DXFile) -> None:
+    def ingest_sparse_matrix(sparse_grm: InputFileHandler, sparse_grm_sample: InputFileHandler) -> None:
         """Downloads the sparse matrix for use by GLM / STAAR
 
         This is included as a static method within this class to allow for easier use by modules which only require
         the sparse matrix and NOT the plink genetics files, while also keeping it in an obvious place for
         maintainability purposes.
 
-        :param sparse_grm: A DXFile representation of the sparse genetic matrix for GLM and STAAR
-        :param sparse_grm_sample: A DXFile representation of the corresponding sample file for the sparse genetic matrix
+        :param sparse_grm: A InputFileHandler class representation of the sparse genetic matrix for GLM and STAAR
+        :param sparse_grm_sample: A InputFileHandler class representation of the corresponding sample file for the sparse genetic matrix
         :return: None
         """
 
-        # Make the genetics dir as it might not exist
-        Path("genetics/").mkdir(exist_ok=True)
-
         # Downloads the sparse matrix
-        if isinstance(input_filetype_parser(sparse_grm), dxpy.DXFile):
-            dxpy.download_dxfile(sparse_grm.get_id(),
-                                 'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx')
-            dxpy.download_dxfile(sparse_grm_sample.get_id(),
-                                 'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx.sampleIDs.txt')
-        else:
-            shutil.copy(sparse_grm, 'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx')
-            shutil.copy(sparse_grm_sample, 'genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx.sampleIDs.txt')
+        sparse_grm.get_file_handle()
+        sparse_grm_sample.get_file_handle()
+

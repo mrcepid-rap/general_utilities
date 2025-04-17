@@ -4,7 +4,7 @@ import pytest
 from typing import List
 from pathlib import Path
 from general_utilities import association_resources
-
+from general_utilities.import_utils.file_handlers import dnanexus_utilities
 test_folder = os.getenv('TEST_DIR')
 
 
@@ -64,9 +64,9 @@ def test_generate_linked_dx_file(upload_type: type):
         test_file.write('This is a test file to upload to the DNANexus platform...\n')
 
     if upload_type == str:
-        uploaded_file = association_resources.generate_linked_dx_file(test_path.name)
+        uploaded_file = dnanexus_utilities.generate_linked_dx_file(test_path.name)
     elif upload_type == Path:
-        uploaded_file = association_resources.generate_linked_dx_file(test_path)
+        uploaded_file = dnanexus_utilities.generate_linked_dx_file(test_path)
 
     assert test_path.exists() == False and uploaded_file.describe(fields={'name': True})['name'] == 'test.txt'
 

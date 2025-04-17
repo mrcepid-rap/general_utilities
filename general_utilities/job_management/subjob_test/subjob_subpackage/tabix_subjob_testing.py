@@ -3,7 +3,7 @@ import dxpy
 
 from pathlib import Path
 
-from general_utilities.association_resources import download_dxfile_by_name, generate_linked_dx_file
+from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name, generate_linked_dx_file
 
 
 @dxpy.entry_point('tabix_subjob')
