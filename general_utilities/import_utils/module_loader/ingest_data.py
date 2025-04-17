@@ -560,11 +560,11 @@ class IngestData(ABC):
             indv_exclude = 0  # Count the nunber of samples we WONT analyse
             for indv in base_covar_csv:
                 # if we are working on DNA Nexus
+                indv_writer = {}
+
                 if self._parsed_options.base_covariates.get_file_type() is FileType.DNA_NEXUS_FILE:
-                    # need to exclude blank row individuals, eid is normally the only thing that shows up, so filter on sex
                     if indv['22001-0.0'] != "NA" and indv['eid'] in genetics_samples:
-                        indv_writer = {'FID': indv['eid'],
-                                       'IID': indv['eid']}
+                        indv_writer = {'FID': indv['eid'], 'IID': indv['eid']}
                         for PC in range(1, 41):
                             old_pc = f'22009-0.{PC}'
                             new_pc = f'PC{PC}'
@@ -576,16 +576,14 @@ class IngestData(ABC):
                         indv_writer['array_batch'] = indv['22000-0.0']
                         num_all_samples += 1
 
-                if self._parsed_options.base_covariates.get_file_type() is FileType.LOCAL_PATH:
-                    # if we are not working on DNA Nexus
+                elif self._parsed_options.base_covariates.get_file_type() is FileType.LOCAL_PATH:
                     if indv['sex'] != "NA" and indv['eid'] in genetics_samples:
-                        indv_writer = {'FID': indv['eid'],
-                                       'IID': indv['eid']}
+                        indv_writer = {'FID': indv['eid'], 'IID': indv['eid']}
                         for PC in range(1, 41):
                             new_pc = f'PC{PC}'
                             indv_writer[new_pc] = indv[new_pc]
                         indv_writer['age'] = int(indv['age'])
-                        indv_writer['age_squared'] = indv_writer['age'] ** 2
+                        indv_writer['age_squared'] = indv['age'] ** 2
                         indv_writer['sex'] = int(indv['sex'])
                         indv_writer['wes_batch'] = indv['wes_batch']
                         indv_writer['array_batch'] = indv['array_batch']
