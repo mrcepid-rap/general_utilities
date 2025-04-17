@@ -2,7 +2,7 @@ import csv
 import os
 from abc import ABC
 from pathlib import Path
-from typing import Set, Tuple, List, Any, Dict
+from typing import Set, Tuple, List, Any, Dict, Union
 
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler, FileType
@@ -244,7 +244,7 @@ class IngestData(ABC):
 
     @staticmethod
     def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[
-        Path | None, Path | None]:
+        Union[Path, None], Union[Path, None]]:
         """Get inclusion/exclusion sample lists
 
         If provided, inclusion and exclusion lists will be downloaded to `$HOME/INCLUSION.lst` and
