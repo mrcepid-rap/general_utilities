@@ -214,7 +214,7 @@ class IngestData(ABC):
         return phenotypes
 
     @staticmethod
-    def _ingest_covariates(base_covariates: InputFileHandler, covarfile: InputFileHandler) -> bool:
+    def _ingest_covariates(base_covariates: InputFileHandler, covarfile: InputFileHandler) -> Union[Path, None]:
         """Download covariate data
 
         Base covariates will always be placed at `$HOME/base_covariates.covariates`. Additional covariates (if provided)
@@ -225,22 +225,14 @@ class IngestData(ABC):
         :return: A boolean that is true if additional covariates beyond the base covariates were provided
         """
 
+        # download the base covariates file
         base_covariates.get_file_handle()
 
         # Check if additional covariates were provided:
-        additional_covariates_found = False
         if covarfile is not None:
-            covarfile.get_file_handle()
-            additional_covariates_found = True
+            additional_covariates = covarfile.get_file_handle()
 
-        else:
-
-            # Check if additional covariates were provided:
-            additional_covariates_found = False
-            if covarfile is not None:
-                additional_covariates_found = True
-
-        return additional_covariates_found
+            return additional_covariates
 
     @staticmethod
     def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[
@@ -250,8 +242,6 @@ class IngestData(ABC):
         If provided, inclusion and exclusion lists will be downloaded to `$HOME/INCLUSION.lst` and
         `$HOME/EXCLUSION.list`, respectively.
 
-        :param inclusion_list: An InputFileParser class (possibly None if not provided) pointing to a sample inclusion list file on
-            the RAP
         :param exclusion_list: An InputFileParser class (possibly None if not provided) pointing to a sample inclusion list file on
             the RAP
         :return: A Tuple with two booleans, describing if an inclusion or exclusion list were found, respectively
@@ -272,7 +262,7 @@ class IngestData(ABC):
 
         return inclusion_list, exclusion_list
 
-    def _select_individuals(self, inclusion_found, exclusion_found) -> Set[str]:
+    def _select_individuals(self, inclusion_found: Path, exclusion_found: Path) -> Set[str]:
         """Define individuals based on exclusion/inclusion lists.
 
         Three steps to this:
@@ -297,7 +287,7 @@ class IngestData(ABC):
         # 1. Get a list of individuals that we ARE going to use
         include_samples = set()
         if inclusion_found is True:
-            inclusion_file = open('INCLUSION.lst', 'r')
+            inclusion_file = open(inclusion_found, 'r')
             for indv in inclusion_file:
                 indv = indv.rstrip()
                 include_samples.add(indv)
@@ -305,7 +295,7 @@ class IngestData(ABC):
         # 2. Get a list of individuals that we ARE NOT going to use
         exclude_samples = set()
         if exclusion_found is True:
-            exclude_file = open('EXCLUSION.lst', 'r')
+            exclude_file = open(exclusion_found, 'r')
             for indv in exclude_file:
                 indv = indv.rstrip()
                 exclude_samples.add(indv)
@@ -317,6 +307,7 @@ class IngestData(ABC):
         # 4. Generate A set of all possible samples to include in this analysis
         genetics_samples = set()
         total_base_samples = 0
+
 
         with Path('base_covariates.covariates').open('r') as base_covariates_file:
             base_covar_reader = csv.DictReader(base_covariates_file, delimiter="\t")

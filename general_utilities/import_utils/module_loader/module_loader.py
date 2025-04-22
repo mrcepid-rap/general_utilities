@@ -70,8 +70,7 @@ class ModuleLoader(ABC):
         if input_str is None or input_str == 'None':
             return None
         else:
-            file_handler = InputFileHandler(input_str)
-        return file_handler
+            return InputFileHandler(input_str)
 
     @staticmethod
     def comma_str(input_str: str) -> List[str]:
