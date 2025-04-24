@@ -1,5 +1,6 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "general_utilities"
@@ -30,5 +31,6 @@ dependencies = [
 Repository = "https://github.com/mrcepid-rap/general_utilities"
 
 [tool.setuptools]
+packages = ["general_utilities"]
 include-package-data = true
 
