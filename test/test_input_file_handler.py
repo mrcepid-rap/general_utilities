@@ -53,6 +53,12 @@ def test_input_file_handler_get_file_type(input_file, expected_file_type, expect
         ("project-Fx2x0fQJ06KfqV7Y3fFZq1jp:/H. Sapiens - GRCh38 with alt contigs - hs38DHXXX/hs38DH.fa.fai",
          FileType.DNA_NEXUS_FILE, TypeError,
          Path("hs38DH.fa.fai")),
+        ("project-Fx2x0fQJ06KfqV7Y3fFZq1jp/H. Sapiens - GRCh38 with alt contigs - hs38DH/hs38DH.fa.fai",
+         FileType.DNA_NEXUS_FILE, ValueError,
+         Path("hs38DH.fa.fai")),
+        ("project-Fx2x0fQJ06KfqV7Y3fFZq1jp:H. Sapiens - GRCh38 with alt contigs - hs38DH/hs38DH.fa.fai",
+         FileType.DNA_NEXUS_FILE, None,
+         Path("hs38DH.fa.fai")),
         ("test_data/transcripts.tsv.gz", FileType.LOCAL_PATH, None, Path("transcripts.tsv.gz")),
     ],
 )
