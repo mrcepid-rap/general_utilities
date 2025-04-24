@@ -1,4 +1,5 @@
 import csv
+import os
 import re
 import tarfile
 from pathlib import Path
@@ -53,7 +54,7 @@ def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> Non
     vep.get_file_handle()
 
     # Make a plink-compatible sample file (the one downloaded above is in bgen sample-v2 format)
-    sample_v2_to_v1(Path(f'{chromosome}.filtered.sample'))
+    sample_v2_to_v1(Path(f'{chromosome}.sample'))
 
 
 def sample_v2_to_v1(bgen_v2: Path) -> Path:

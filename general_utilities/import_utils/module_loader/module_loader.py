@@ -231,6 +231,7 @@ class ModuleLoader(ABC):
                                        "covariates will still be removed.",
                                   dest='ignore_base', action='store_true')
 
+
     @abstractmethod
     def start_module(self) -> None:
         """Triggers module-specific loading required for the functionality of that module.

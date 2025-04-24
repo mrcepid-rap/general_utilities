@@ -24,7 +24,8 @@ class GeneticsLoader:
     :param low_mac_list: An optional list of low minor allele count variants for exclusion when running BOLT
     """
 
-    def __init__(self, bed_file: InputFileHandler, fam_file: InputFileHandler, bim_file: InputFileHandler, sample_files: List[Path],
+    def __init__(self, bed_file: InputFileHandler, fam_file: InputFileHandler, bim_file: InputFileHandler,
+                 sample_files: List[Path],
                  cmd_executor: CommandExecutor, low_mac_list: InputFileHandler = None,
                  sparse_grm: InputFileHandler = None, sparse_grm_sample: InputFileHandler = None):
 
@@ -38,7 +39,8 @@ class GeneticsLoader:
         self._sparse_grm = sparse_grm
         self._sparse_grm_sample = sparse_grm_sample
 
-        self._ingest_genetic_data()
+        bed_filename, bim_filename, fam_filename = self._ingest_genetic_data()
+
         if self._sparse_grm is not None:
             self.ingest_sparse_matrix(self._sparse_grm, self._sparse_grm_sample)
 
@@ -46,7 +48,7 @@ class GeneticsLoader:
             self._logger.info('Multiple sample data types detected, synchronising sample lists...')
             self._union_sample = self._write_union_sample(sample_files)
             self._synchronise_genetic_data()
-        self._generate_filtered_genetic_data()
+        self._generate_filtered_genetic_data(bed_filename, bim_filename, fam_filename)
 
     def _ingest_genetic_data(self) -> None:
         """Downloads provided genetic data in plink binary format to this instance.
@@ -58,15 +60,17 @@ class GeneticsLoader:
         """
 
         # download the genotype data
-        self._bed_file.get_file_handle()
-        self._bim_file.get_file_handle()
-        self._fam_file.get_file_handle()
+        bed_filename = self._bed_file.get_file_handle()
+        bim_filename = self._bim_file.get_file_handle()
+        fam_filename = self._fam_file.get_file_handle()
 
         if self._low_mac_list is not None:
             # Download the low MAC list
             self._low_mac_list.get_file_handle()
 
         self._logger.info('Genetic array data downloaded...')
+
+        return bed_filename, bim_filename, fam_filename
 
     @staticmethod
     def _generate_sample_set(sample_path: Path) -> Set[str]:
@@ -205,7 +209,7 @@ class GeneticsLoader:
 
         new_remove_path.replace(remove_path)
 
-    def _generate_filtered_genetic_data(self) -> None:
+    def _generate_filtered_genetic_data(self, bed_filename, bim_filename, fam_filename) -> None:
         """Generates a genetic file plink binary dataset filtered to only individuals we want to include in association
             tests
 
@@ -216,10 +220,21 @@ class GeneticsLoader:
 
         :return: None
         """
+        # Extract the stems (filenames without extensions)
+        bed_stem = Path(bed_filename).stem
+        bim_stem = Path(bim_filename).stem
+        fam_stem = Path(fam_filename).stem
+
+        # Check if all stems are the same
+        if bed_stem == bim_stem == fam_stem:
+            genetic_data = bed_stem
+        else:
+            raise ValueError("The stems for the files do not match!")
+
         # Generate a plink file to use that only has included individuals:
-        cmd = 'plink2 ' \
-              '--bfile /test/genetics/UKBB_470K_Autosomes_QCd --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
-              '--out /test/genetics/UKBB_470K_Autosomes_QCd_WBA'
+        cmd = f'plink2 ' \
+              f'--bfile /test/{genetic_data} --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
+              f'--out /test/UKBB_470K_Autosomes_QCd_WBA'
 
         self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 

@@ -9,19 +9,23 @@ from general_utilities.mrc_logger import MRCLogger
 LOGGER = MRCLogger(__name__).get_logger()
 
 
-def find_dxlink(name: str, folder: str) -> dict:
+def find_dxlink(name: str, folder: str, project=None) -> dict:
     """This method is a simple wrapper for dxpy.find_one_data_object() for ease of repetitive use
 
     :param name: EXACT name of the file to be searched for (without path information)
     :param folder: EXACT name of the folder where this should be found
+    :param project: The project ID to search in. If None, will use the current project context
     :return: A dxpy.dxlink() representation of the file
     """
+
+    if project is None:
+        project = dxpy.PROJECT_CONTEXT_ID
 
     try:
         dxlink = dxpy.dxlink(dxpy.find_one_data_object(name=name,
                                                        classname='file',
                                                        folder=folder,
-                                                       project=dxpy.PROJECT_CONTEXT_ID,
+                                                       project=project,
                                                        name_mode='exact',
                                                        zero_ok=False))
     except DXSearchError:
