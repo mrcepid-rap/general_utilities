@@ -1,6 +1,11 @@
 from pathlib import Path
 
-def get_r_script_file():
+def get_r_script_file() -> Path:
+    """
+    Generates an R script for plotting Manhattan and QQ plots.
+    The script is saved to the current working directory.
+    :return: Path to the generated R script.
+    """
     r_script_content = """#!/usr/bin/env Rscript --vanilla
 
 library(data.table)
