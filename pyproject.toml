@@ -30,7 +30,5 @@ dependencies = [
 Repository = "https://github.com/mrcepid-rap/general_utilities"
 
 [tool.setuptools]
-packages = ["general_utilities"]
+include-package-data = true
 
-[tool.setuptools.package-data]
-"general_utilities" = ["*.R"]
