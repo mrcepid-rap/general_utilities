@@ -48,12 +48,12 @@ class IngestData(ABC):
                                                                                     parsed_options.covarfile)
 
         # Sample inclusion / exclusion lists
-        inclusion_found, exclusion_found = self._define_exclusion_lists(parsed_options.inclusion_list,
+        inclusion_filepath, exclusion_filepath = self._define_exclusion_lists(parsed_options.inclusion_list,
                                                                         parsed_options.exclusion_list)
 
         # Once all data is ingested, process the covariates/phenotypes into a single file of individuals that we want
         # to analyse
-        genetics_samples = self._select_individuals(inclusion_found, exclusion_found, base_covariates_file)
+        genetics_samples = self._select_individuals(inclusion_filepath, exclusion_filepath, base_covariates_file)
 
         # Process additional covariates (check if requested in the function)
         found_categorical_covariates, found_quantitative_covariates, add_covars = \
@@ -82,9 +82,9 @@ class IngestData(ABC):
                                                  found_quantitative_covariates=found_quantitative_covariates,
                                                  found_categorical_covariates=found_categorical_covariates,
                                                  cmd_executor=cmd_executor,
-                                                 low_MAC_list=parsed_options.low_MAC_list,
-                                                 sparse_grm=parsed_options.sparse_grm,
-                                                 sparse_grm_sample=parsed_options.sparse_grm_sample
+                                                 covariate_file=base_covariates_file,
+                                                 inclusion_file=inclusion_filepath,
+                                                 exclusion_file=exclusion_filepath
                                                  )
 
     def get_association_pack(self) -> AssociationPack:
@@ -220,7 +220,7 @@ class IngestData(ABC):
         return phenotypes
 
     @staticmethod
-    def _ingest_covariates(base_covariates: InputFileHandler, covarfile: InputFileHandler) -> Tuple[Path, None]:
+    def _ingest_covariates(base_covariates: InputFileHandler, covarfile: InputFileHandler) -> Tuple[Path, Union[Path, None]]:
         """Download covariate data
 
         Base covariates will always be placed at `$HOME/base_covariates.covariates`. Additional covariates (if provided)
@@ -237,14 +237,11 @@ class IngestData(ABC):
         # Check if additional covariates were provided:
         if covarfile is not None:
             additional_covariates = covarfile.get_file_handle()
-
-            return base_covariates, additional_covariates
-
         else:
-
             # If no additional covariates were provided, set it to None
             additional_covariates = None
-            return base_covariates, additional_covariates
+
+        return base_covariates, additional_covariates
 
     @staticmethod
     def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[
@@ -254,7 +251,9 @@ class IngestData(ABC):
         If provided, inclusion and exclusion lists will be downloaded to `$HOME/INCLUSION.lst` and
         `$HOME/EXCLUSION.list`, respectively.
 
-        :param exclusion_list: An InputFileParser class (possibly None if not provided) pointing to a sample inclusion list file on
+        :param inclusion_list: A DXFile (possibly None if not provided) pointing to a sample inclusion list file on
+            the RAP
+        :param exclusion_list: A DXFile (possibly None if not provided) pointing to a sample inclusion list file on
             the RAP
         :return: A Tuple with two booleans, describing if an inclusion or exclusion list were found, respectively
         """
@@ -274,7 +273,7 @@ class IngestData(ABC):
 
         return inclusion_list, exclusion_list
 
-    def _select_individuals(self, inclusion_found: Path, exclusion_found: Path, base_covariates: Path) -> Set[str]:
+    def _select_individuals(self, inclusion_filepath: Path, exclusion_filepath: Path, base_covariates: Path) -> Set[str]:
         """Define individuals based on exclusion/inclusion lists.
 
         Three steps to this:
@@ -291,26 +290,27 @@ class IngestData(ABC):
         * If exclusion: a sample CANNOT be in the file and be included.
         * If neither: All samples in base_covariates with genetics_qc_pass = PASS are included
 
-        :param inclusion_found: Was an inclusion list found?
-        :param exclusion_found: Was an exclusion list found?
+        :param inclusion_filepath: Filepath to the inclusion list, if provided. If not provided, this is set to None.
+        :param exclusion_filepath: Filepath to the exclusion list, if provided. If not provided, this is set to None.
+        :param base_covariates: Filepath to the base_covariates file.
         :return: A set() containing eids of the samples for all downstream analysis
         """
 
         # 1. Get a list of individuals that we ARE going to use
         include_samples = set()
-        if inclusion_found is True:
-            inclusion_file = open(inclusion_found, 'r')
-            for indv in inclusion_file:
-                indv = indv.rstrip()
-                include_samples.add(indv)
+        if inclusion_filepath is True:
+            with open(inclusion_filepath, 'r') as inclusion_file:
+                for indv in inclusion_file:
+                    indv = indv.rstrip()
+                    include_samples.add(indv)
 
         # 2. Get a list of individuals that we ARE NOT going to use
         exclude_samples = set()
-        if exclusion_found is True:
-            exclude_file = open(exclusion_found, 'r')
-            for indv in exclude_file:
-                indv = indv.rstrip()
-                exclude_samples.add(indv)
+        if exclusion_filepath is True:
+            with open(exclusion_filepath, 'r') as exclude_file:
+                for indv in exclude_file:
+                    indv = indv.rstrip()
+                    exclude_samples.add(indv)
 
         # 3. Get individuals that are POSSIBLE to include (they actually have WES AND pass genetic data filtering) and
         # only keep 'include' samples.
@@ -329,12 +329,12 @@ class IngestData(ABC):
 
                 # extract the variable indicating whether an individual has passed genetic data QC:
                 if genetics_status == 1:
-                    if inclusion_found is False and exclusion_found is False:
+                    if inclusion_filepath is False and exclusion_filepath is False:
                         genetics_samples.add(eid)
-                    elif inclusion_found is False and exclusion_found is True:
+                    elif inclusion_filepath is False and exclusion_filepath is True:
                         if eid not in exclude_samples:
                             genetics_samples.add(eid)
-                    elif inclusion_found is True and exclusion_found is False:
+                    elif inclusion_filepath is True and exclusion_filepath is False:
                         if eid in include_samples:
                             genetics_samples.add(eid)
                     else:
@@ -346,7 +346,7 @@ class IngestData(ABC):
         self._logger.info(f'{"Total samples after inclusion/exclusion lists applied":{65}}: {len(genetics_samples)}')
         return genetics_samples
 
-    def _process_additional_covariates(self, additional_covariates_found: Union[bool, Path],
+    def _process_additional_covariates(self, additional_covariates_found: Path,
                                        categorical_covariates: List[str],
                                        quantitative_covariates: List[str]
                                        ) -> Tuple[List[str], List[str], Dict[str, Dict[str, Any]]]:
@@ -482,7 +482,8 @@ class IngestData(ABC):
     def _create_covariate_file(self, genetics_samples: Set[str], phenotypes: Dict[str, Dict[str, Any]],
                                pheno_names: List[str], ignore_base_options: bool,
                                found_categorical_covariates: List[str], found_quantitative_covariates: List[str],
-                               add_covars: Dict[str, Dict[str, Any]], sex: int, base_covariates_file: Path) -> None:
+                               add_covars: Dict[str, Dict[str, Any]], sex: int, base_covariates_file: Path) -> tuple[
+        Path, Path, Path]:
 
         """Print final covariate + phenotype file while implementing sample inclusion/exclusion
 
@@ -528,13 +529,11 @@ class IngestData(ABC):
         else:
             self._logger.info(f'No additional covariates provided/found beyond defaults...')
 
-        # base_covariates_file = Path('base_covariates.covariates')
         final_covariates_file = Path('phenotypes_covariates.formatted.txt')
 
         with base_covariates_file.open('r') as base_covar_reader, \
                 final_covariates_file.open('w', newline='\n') as final_covariates_writer, \
                 Path('SAMPLES_Include.txt').open('w') as include_samples, \
-                Path('SAMPLES_Include.bcf.txt').open('w') as include_samples_bcf, \
                 Path('SAMPLES_Remove.txt').open('w') as remove_samples:
 
             base_covar_csv = csv.DictReader(base_covar_reader, delimiter="\t")
@@ -562,71 +561,70 @@ class IngestData(ABC):
             indv_written = 0  # Count the number of samples we will analyse
             indv_exclude = 0  # Count the nunber of samples we WONT analyse
             for indv in base_covar_csv:
-                # if we are working on DNA Nexus
-                indv_writer = {}
+                # If genetic sex is not NA and the individual is in the genetics sample list, then we can write them
+                if indv['sex'] != "NA" and [indv['FID'] and indv['IID']] in genetics_samples:
 
-                indv_writer = {'FID': indv['FID'], 'IID': indv['IID']}
-                for PC in range(1, 41):
-                    new_pc = f'PC{PC}'
-                    indv_writer[new_pc] = indv[new_pc]
-                indv_writer['age'] = int(indv['age'])
-                indv_writer['age_squared'] = indv_writer['age'] ** 2
-                indv_writer['sex'] = int(indv['sex'])
-                indv_writer['wes_batch'] = indv['wes_batch']
-                indv_writer['array_batch'] = indv['array_batch']
-                num_all_samples += 1
+                    # write a correctly formatted covariate file
+                    indv_writer = {'FID': indv['FID'], 'IID': indv['IID']}
+                    for PC in range(1, 41):
+                        new_pc = f'PC{PC}'
+                        indv_writer[new_pc] = indv[new_pc]
+                    indv_writer['age'] = int(indv['age'])
+                    indv_writer['age_squared'] = indv_writer['age'] ** 2
+                    indv_writer['sex'] = int(indv['sex'])
+                    indv_writer['wes_batch'] = indv['wes_batch']
+                    indv_writer['array_batch'] = indv['array_batch']
+                    num_all_samples += 1
 
-                # Check if we found additional covariates and make sure this sample has non-null values
-                found_covars = False
-                if len(add_covars) > 0:
-                    if indv['FID'] in add_covars:
+                    # Check if we found additional covariates and make sure this sample has non-null values
+                    found_covars = False
+                    if len(add_covars) > 0:
+                        if indv['FID'] in add_covars:
+                            found_covars = True
+                            for covariate in add_covars[indv['FID']]:
+                                indv_writer[covariate] = add_covars[indv['FID']][covariate]
+                    else:
                         found_covars = True
-                        for covariate in add_covars[indv['FID']]:
-                            indv_writer[covariate] = add_covars[indv['FID']][covariate]
-                else:
-                    found_covars = True
 
-                found_phenos = False
-                if len(pheno_names) == 1:
-                    pheno = pheno_names[0]
-                    if indv['FID'] in phenotypes[pheno]:
-                        found_phenos = True
-                        indv_writer[pheno] = phenotypes[pheno][indv['FID']]
-                else:
-                    found_phenos = False  # As long as this individual has ONE phenotype, write them.
-                    for pheno in pheno_names:
+                    found_phenos = False
+                    if len(pheno_names) == 1:
+                        pheno = pheno_names[0]
                         if indv['FID'] in phenotypes[pheno]:
                             found_phenos = True
                             indv_writer[pheno] = phenotypes[pheno][indv['FID']]
-                        else:
-                            indv_writer[pheno] = 'NA'
+                    else:
+                        found_phenos = False  # As long as this individual has ONE phenotype, write them.
+                        for pheno in pheno_names:
+                            if indv['FID'] in phenotypes[pheno]:
+                                found_phenos = True
+                                indv_writer[pheno] = phenotypes[pheno][indv['FID']]
+                            else:
+                                indv_writer[pheno] = 'NA'
 
-                # exclude based on sex-specific analysis if required:
-                if found_covars and found_phenos:
-                    if sex == 2:
-                        indv_written += 1
-                        combo_writer.writerow(indv_writer)
-                        include_samples.write(f'{indv["FID"]} {indv["FID"]}\n')
-                        include_samples_bcf.write(f'{indv["FID"]}\n')
-                    elif sex == indv_writer['sex']:
-                        indv_written += 1
-                        combo_writer.writerow(indv_writer)
-                        include_samples.write(f'{indv["FID"]} {indv["FID"]}\n')
-                        include_samples_bcf.write(f'{indv["FID"]}\n')
+                    # exclude based on sex-specific analysis if required:
+                    if found_covars and found_phenos:
+                        if sex == 2:
+                            indv_written += 1
+                            combo_writer.writerow(indv_writer)
+                            include_samples.write(f'{indv["FID"]} {indv["FID"]}\n')
+                        elif sex == indv_writer['sex']:
+                            indv_written += 1
+                            combo_writer.writerow(indv_writer)
+                            include_samples.write(f'{indv["FID"]} {indv["FID"]}\n')
+                        else:
+                            remove_samples.write(f'{indv["FID"]} {indv["FID"]}\n')
+                            indv_exclude += 1
                     else:
                         remove_samples.write(f'{indv["FID"]} {indv["FID"]}\n')
                         indv_exclude += 1
                 else:
                     remove_samples.write(f'{indv["FID"]} {indv["FID"]}\n')
                     indv_exclude += 1
-            else:
-                remove_samples.write(f'{indv["FID"]} {indv["FID"]}\n')
-                indv_exclude += 1
 
         # Print to ensure that total number of individuals is consistent between genetic and covariate/phenotype data
         self._logger.info(f'{"Samples with covariates after include/exclude lists applied":{65}}: {num_all_samples}')
         self._logger.info(f'{"Number of individuals WRITTEN to covariate/pheno file":{65}}: {indv_written}')
         self._logger.info(f'{"Number of individuals EXCLUDED from covariate/pheno file":{65}}: {indv_exclude}')
 
-        return Path('phenotypes_covariates.formatted.txt')
+        return Path('phenotypes_covariates.formatted.txt'), Path('samples_Include.txt'), Path('samples_Exclude.txt')
 

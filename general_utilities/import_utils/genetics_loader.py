@@ -42,21 +42,50 @@ class GeneticsLoader:
         bed_filename, bim_filename, fam_filename = self._ingest_genetic_data()
 
         if self._sparse_grm is not None:
-            self.ingest_sparse_matrix(self._sparse_grm, self._sparse_grm_sample)
+            self._sparse_grm, self._sparse_grm_sample = self._ingest_sparse_matrix()
 
         if len(sample_files) > 0:  # Only do this is sample file(s) are provided to synchronise on
             self._logger.info('Multiple sample data types detected, synchronising sample lists...')
             self._union_sample = self._write_union_sample(sample_files)
             self._synchronise_genetic_data()
-        self._generate_filtered_genetic_data(bed_filename, bim_filename, fam_filename)
+        self._filtered_bed, self._filtered_bim, self._filtered_fam = self._generate_filtered_genetic_data(bed_filename,
+                                                                                                          bim_filename,
+                                                                                                          fam_filename)
 
-    def _ingest_genetic_data(self) -> None:
+    def get_filtered_genetic_filename(self) -> str:
+        """Getter method to retrieve filtered genetic filenames.
+
+        This method simply returns the filename of the filtered genetic data.
+
+        :return: string representing the name of the filtered genetic data file.
+        """
+        return self._filtered_bed.name
+
+    def get_sparsematrix(self) -> tuple[Path, Path]:
+        """Getter method to retrieve sparse matrix filenames.
+
+        This method returns the filenames of the sparse genetic matrix and its corresponding sample file.
+
+        :return: A tuple containing the paths to the sparse genetic matrix and its sample file.
+        """
+        return self._sparse_grm, self._sparse_grm_sample
+
+    def get_low_mac_list(self) -> Path:
+        """Getter method to retrieve low MAC list filename.
+
+        This method returns the filename of the low MAC list.
+
+        :return: Path to the low MAC list file.
+        """
+        return self._low_mac_list.get_file_handle()
+
+    def _ingest_genetic_data(self) -> tuple[Path, Path, Path]:
         """Downloads provided genetic data in plink binary format to this instance.
 
         These files provided to this method should point to the processed genetic data curated by the mrcepid-makegrm
         applet of this workflow. An optional low_mac_list for BOLT can also be provided
 
-        :return: None
+        :return: a tuple of the plink binary files (bed, bim, fam) that were downloaded
         """
 
         # download the genotype data
@@ -209,7 +238,7 @@ class GeneticsLoader:
 
         new_remove_path.replace(remove_path)
 
-    def _generate_filtered_genetic_data(self, bed_filename, bim_filename, fam_filename) -> None:
+    def _generate_filtered_genetic_data(self, bed_filename, bim_filename, fam_filename) -> tuple[Path, Path, Path]:
         """Generates a genetic file plink binary dataset filtered to only individuals we want to include in association
             tests
 
@@ -234,7 +263,7 @@ class GeneticsLoader:
         # Generate a plink file to use that only has included individuals:
         cmd = f'plink2 ' \
               f'--bfile /test/{genetic_data} --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
-              f'--out /test/UKBB_470K_Autosomes_QCd_WBA'
+              f'--out /test/Autosomes_QCd_WBA'
 
         self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 
@@ -246,20 +275,25 @@ class GeneticsLoader:
                 if count_matcher:
                     self._logger.info(f'{"Plink individuals written":{65}}: {count_matcher.group(1)}')
 
-    @staticmethod
-    def ingest_sparse_matrix(sparse_grm: InputFileHandler, sparse_grm_sample: InputFileHandler) -> None:
-        """Downloads the sparse matrix for use by GLM / STAAR
+        filtered_bed = Path('Autosomes_QCd_WBA.bed')
+        filtered_bim = Path('Autosomes_QCd_WBA.bim')
+        filtered_fam = Path('Autosomes_QCd_WBA.fam')
 
-        This is included as a static method within this class to allow for easier use by modules which only require
-        the sparse matrix and NOT the plink genetics files, while also keeping it in an obvious place for
-        maintainability purposes.
+        return filtered_bed, filtered_bim, filtered_fam
 
-        :param sparse_grm: A InputFileHandler class representation of the sparse genetic matrix for GLM and STAAR
-        :param sparse_grm_sample: A InputFileHandler class representation of the corresponding sample file for the sparse genetic matrix
-        :return: None
+    def _ingest_sparse_matrix(self) -> tuple[Path, Path]:
+        """Download the sparse matrix for use by GLM/STAAR.
+
+        This method allows easier use by modules that only require the sparse matrix and not the Plink genetics files,
+        while keeping it in an obvious place for maintainability.
+
+        :return: A tuple containing the sparse genetic matrix and its corresponding sample file.
         """
 
         # Downloads the sparse matrix
-        sparse_grm.get_file_handle()
-        sparse_grm_sample.get_file_handle()
+        sparse_grm = self._sparse_grm.get_file_handle()
+        sparse_grm_sample = self._sparse_grm_sample.get_file_handle()
+
+        return sparse_grm, sparse_grm_sample
+
 

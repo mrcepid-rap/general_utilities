@@ -30,6 +30,9 @@ class InputFileHandler:
 
     The file_handle will return the local filepath of the file in question.
 
+    Note: DNA Nexus filepaths structured as project:/folder/file should encode the project as project-<24chars> rather
+    than project_name:/folder/file. This is due to an error in the dxpy library.
+
     :param input_str: The input file identifier (e.g., a DXFile object, local path, or GCS URI).
     :param download_now: If True, download the file during initialization.
     """
@@ -169,27 +172,8 @@ class InputFileHandler:
             dxfile = dxpy.DXFile(project=project, dxid=file)
             file_path = download_dxfile_by_name(dxfile)
         elif re.match('project-\\w{24}', self._input_str):
-            project_part, path_part = self._input_str.split(':', 1)
-            project = project_part.strip()
-            path = path_part.lstrip('/')  # strip leading slash
-            path_obj = Path(path)
-            file = path_obj.name
-            folder = str(path_obj.parent)
-            if folder == '.':
-                folder = ''
-            #  back leading slash for the folder
-            if folder and not folder.startswith('/'):
-                folder = '/' + folder
+            project, folder, file = self._split_dnanexus_path()
             dxfile = find_dxlink(name=file, folder=folder, project=project)
-            file_path = download_dxfile_by_name(dxfile['$dnanexus_link']['id'])
-        # if we are working with a DX filepath
-        elif isinstance(self._input_str, str):
-            dnanexus_path = Path(self._input_str)
-            name = str(dnanexus_path.name)
-            parent = str(dnanexus_path.parent)
-            if not parent.startswith('/'):
-                parent = f'/{parent}'
-            dxfile = find_dxlink(name=name, folder=parent)
             file_path = download_dxfile_by_name(dxfile['$dnanexus_link']['id'])
         else:
             raise FileNotFoundError(f"DNA Nexus input string {self._input_str} could not be resolved.")
@@ -261,6 +245,8 @@ class InputFileHandler:
         - If the input is a local path, it ensures the path is absolute and checks if it exists.
         - If the input matches the format of a DNA Nexus file ID, it validates the ID and returns the corresponding file type.
         - If the input is a file name, it attempts to locate the file on DNA Nexus and returns the corresponding `DXFile` object.
+        Note: for this last example, the input string should be in the format 'project-<24chars>:file-<24chars>'. If the format is
+        just folder path + filename, it will not work.
 
         :return: A `FileType` Enum value representing the type of the input, or a `DXFile` object if found on DNA Nexus.
         :raises FileNotFoundError: If the input is `None`, or the file is not found locally or on DNA Nexus.
@@ -309,94 +295,40 @@ class InputFileHandler:
             except dxpy.exceptions.ResourceNotFound:
                 raise TypeError(f'The input for parameter – {self._input_str} – '
                                 f'does not look like a valid DNANexus file ID.')
+
+        # The input might be project ID and the folder/filename
         elif re.match('project-\\w{24}', self._input_str):
-            try:
-                # split on the first colon
-                if ':' not in self._input_str:
-                    raise ValueError("Not a valid DNAnexus project path")
+            # split on the first colon
+            if ':' not in self._input_str:
+                raise ValueError("Not a valid DNAnexus project path")
 
-                project_part, path_part = self._input_str.split(':', 1)
-                project = project_part.strip()
-                path = path_part.lstrip('/')  # strip leading slash
+            project, folder, file = self._split_dnanexus_path()
 
-                # use Path to get folder and file
-                path_obj = Path(path)
-                file = path_obj.name
-                folder = str(path_obj.parent)
-                if folder == '.':
-                    folder = ''
-
-                #  back leading slash for the folder
-                if folder and not folder.startswith('/'):
-                    folder = '/' + folder
-
-                # have a go at finding the file
-                try:
-                    find_dxlink(name=file, folder=folder, project=project)
-                    return FileType.DNA_NEXUS_FILE
-                except:
-                    raise TypeError(f'The input for parameter – {self._input_str} – '
-                                    f'does not look like a valid DNANexus file ID.'
-                                    f'The likelihood is that the project ID is wrong. Your current'
-                                    f'project ID has been parsed as {project}, the folder as {folder},'
-                                    f' and the file as {file}. ')
-
-            except dxpy.exceptions.ResourceNotFound:
-                raise TypeError(f'Tried looking for the file object – {self._input_str} – '
-                                f'it appears that file ID is wrong. Please make sure that the input is correct by'
-                                f'running dx describe in your terminal ')
+            # have a go at finding the file
+            find_dxlink(name=file, folder=folder, project=project)
+            return FileType.DNA_NEXUS_FILE
 
         # We may have a path that is written as a string, so let's convert it to a path and see if it exists
         elif isinstance(self._input_str, str):
-            # first check if the input is a DNA Nexus file path
-            try:
-                dnanexus_path = Path(self._input_str)
-                name = str(dnanexus_path.name)
-                parent = str(dnanexus_path.parent)
-                if not parent.startswith('/'):
-                    parent = f'/{parent}'
-                try:
-                    find_dxlink(name=name, folder=parent)
-                    return FileType.DNA_NEXUS_FILE
-                except dxpy.exceptions.ResourceNotFound:
-                    self._logger.debug(f"Failed to resolve DNA Nexus path")
-            except Exception as e:
-                self._logger.debug(
-                    f'The input parameter – {e} – was searched on DNA Nexus in your current working project, '
-                    f' but was not found. Note that the input does not accept project names as strings. If you are '
-                    f'specifying a project string, you need to make sure that it is supplied as a project-ID (project-XXXXXX)'
-                    f'rather than a project name. Please check the input and try again...')
-
             # next, we check if the project is perhaps supplied along with the file path
-            try:
-                match = re.match(r'^([^:/]+):/?(.*)', self._input_str)
-                if match:
-                    project = match.group(1)
-                    rest = match.group(2)
-                    if '/' in rest:
-                        parts = rest.split('/')
-                        folder = '/'.join(parts[:-1])
-                        name = parts[-1]
-                    else:
-                        folder = ''
-                        name = rest
-                    find_dxlink(name=name, folder=folder, project=project)
-            except Exception as e:
-                self._logger.debug(
-                    f'The input parameter – {e} – was tried as a filepath, but was not found '
-                    f'in the project this applet has been executed from. Please confirm the file '
-                    f'exists in this project or use a DNANexus file ID (like: file-12345...)...'
-                    f'Note that if you are using filepaths from DNA Nexus projects, they should omit the '
-                    f'root project folder. Also ensure you are working in the correct project that the files '
-                    f'are located in ')
+            match = re.match(r'^([^:/]+):/?(.*)', self._input_str)
+            if match:
+                project = match.group(1)
+                rest = match.group(2)
+                if '/' in rest:
+                    parts = rest.split('/')
+                    folder = '/'.join(parts[:-1])
+                    name = parts[-1]
+                else:
+                    folder = ''
+                    name = rest
+                find_dxlink(name=name, folder=folder, project=project)
+                return FileType.DNA_NEXUS_FILE
 
             # lastly, check if the file exists on our local machine
-            try:
-                path = self._check_absolute_path()
-                if path.exists():
-                    return FileType.LOCAL_PATH
-            except Exception as e:
-                self._logger.debug(f"Failed to resolve as local path: {e}")
+            path = self._check_absolute_path()
+            if path.exists():
+                return FileType.LOCAL_PATH
 
         # last resort is we can't find the file so we should throw an error
         raise FileNotFoundError(f'The input parameter – {self._input_str} – could not be resolved to a file. ')
@@ -412,3 +344,26 @@ class InputFileHandler:
         if not path.is_absolute():
             path = path.resolve()
         return path
+
+    def _split_dnanexus_path(self) -> tuple:
+        """
+        Split the DNANexus path into project, folder, and file components.
+        This method takes the input string and splits it into three parts:
+        - Project ID
+        - Folder path
+        - File name
+        """
+        project_part, path_part = self._input_str.split(':', 1)
+        project = project_part.strip()
+        path = path_part.lstrip('/')  # strip leading slash
+        path_obj = Path(path)
+        file = path_obj.name
+        folder = str(path_obj.parent)
+        if folder == '.':
+            folder = ''
+        #  back leading slash for the folder
+        if folder and not folder.startswith('/'):
+            folder = '/' + folder
+
+        return project, folder, file
+

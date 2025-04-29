@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import List
-
+from pathlib import Path
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import CommandExecutor
 
@@ -59,8 +59,9 @@ class AssociationPack(ABC):
 
     def __init__(self, is_binary: bool, sex: int, threads: int, pheno_names: List[str], ignore_base_covariates: bool,
                  found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
-                 cmd_executor: CommandExecutor, low_MAC_list: InputFileHandler, sparse_grm: InputFileHandler,
-                 sparse_grm_sample: InputFileHandler):
+                 cmd_executor: CommandExecutor, covariate_file: Path, inclusion_file: Path,
+                 exclusion_file: Path
+                 ):
         self.is_binary = is_binary
         self.sex = sex
         self.threads = threads
@@ -69,6 +70,6 @@ class AssociationPack(ABC):
         self.found_quantitative_covariates = found_quantitative_covariates
         self.found_categorical_covariates = found_categorical_covariates
         self.cmd_executor = cmd_executor
-        self.low_MAC_list = low_MAC_list
-        self.sparse_grm = sparse_grm
-        self.sparse_grm_sample = sparse_grm_sample
+        self.covariate_file = covariate_file
+        self.inclusion_file = inclusion_file
+        self.exclusion_file = exclusion_file

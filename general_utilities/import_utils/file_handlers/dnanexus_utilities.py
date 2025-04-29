@@ -35,7 +35,7 @@ def find_dxlink(name: str, folder: str, project=None) -> dict:
 
 
 def download_dxfile_by_name(file: Union[dict, str, dxpy.DXFile], project_id: str = None,
-                            print_status: bool = True) -> Path:
+                            print_status: bool = False) -> Path:
     """Download a dxfile and downloads to the file 'name' as given by dxfile.describe()
 
     This method can take either:
