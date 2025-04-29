@@ -1,12 +1,4 @@
-from pathlib import Path
-
-def get_r_script_file() -> Path:
-    """
-    Generates an R script for plotting Manhattan and QQ plots.
-    The script is saved to the current working directory.
-    :return: Path to the generated R script.
-    """
-    r_script_content = """#!/usr/bin/env Rscript --vanilla
+#!/usr/bin/env Rscript --vanilla
 
 library(data.table)
 library(ggplot2)
@@ -165,7 +157,3 @@ mean_chr_pos <- fread('/test/mean_chr_pos.tsv')
 manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], as.numeric(args[5]), as.numeric(args[6]), as.logical(args[7]))
 
 ggsave('/test/manhattan_plot.png', manh_plot, units='in', width = 15, height = 6)
-"""
-    r_script_path = Path("manhattan_plotter.R")
-    r_script_path.write_text(r_script_content)
-    return r_script_path
