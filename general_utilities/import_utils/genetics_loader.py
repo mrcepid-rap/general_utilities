@@ -1,7 +1,7 @@
 import csv
 import re
 from pathlib import Path
-from typing import Set, List
+from typing import Set, List, Tuple
 
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
@@ -61,12 +61,12 @@ class GeneticsLoader:
         """
         return self._filtered_bed.name
 
-    def get_sparsematrix(self) -> tuple[Path, Path]:
+    def get_sparsematrix(self) -> Tuple[Path, Path]:
         """Getter method to retrieve sparse matrix filenames.
 
         This method returns the filenames of the sparse genetic matrix and its corresponding sample file.
 
-        :return: A tuple containing the paths to the sparse genetic matrix and its sample file.
+        :return: A Tuple containing the paths to the sparse genetic matrix and its sample file.
         """
         return self._sparse_grm, self._sparse_grm_sample
 
@@ -79,13 +79,13 @@ class GeneticsLoader:
         """
         return self._low_mac_list.get_file_handle()
 
-    def _ingest_genetic_data(self) -> tuple[Path, Path, Path]:
+    def _ingest_genetic_data(self) -> Tuple[Path, Path, Path]:
         """Downloads provided genetic data in plink binary format to this instance.
 
         These files provided to this method should point to the processed genetic data curated by the mrcepid-makegrm
         applet of this workflow. An optional low_mac_list for BOLT can also be provided
 
-        :return: a tuple of the plink binary files (bed, bim, fam) that were downloaded
+        :return: a Tuple of the plink binary files (bed, bim, fam) that were downloaded
         """
 
         # download the genotype data
@@ -238,7 +238,7 @@ class GeneticsLoader:
 
         new_remove_path.replace(remove_path)
 
-    def _generate_filtered_genetic_data(self, bed_filename, bim_filename, fam_filename) -> tuple[Path, Path, Path]:
+    def _generate_filtered_genetic_data(self, bed_filename, bim_filename, fam_filename) -> Tuple[Path, Path, Path]:
         """Generates a genetic file plink binary dataset filtered to only individuals we want to include in association
             tests
 
@@ -281,7 +281,7 @@ class GeneticsLoader:
 
         return filtered_bed, filtered_bim, filtered_fam
 
-    def _ingest_sparse_matrix(self) -> tuple[Path, Path]:
+    def _ingest_sparse_matrix(self) -> Tuple[Path, Path]:
         """Download the sparse matrix for use by GLM/STAAR.
 
         This method allows easier use by modules that only require the sparse matrix and not the Plink genetics files,

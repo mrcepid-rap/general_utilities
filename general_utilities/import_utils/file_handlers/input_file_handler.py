@@ -2,7 +2,7 @@ import re
 import shutil
 from enum import Enum, auto
 from pathlib import Path
-from typing import Union
+from typing import Union, Tuple
 
 import dxpy
 from google.cloud import storage
@@ -345,7 +345,7 @@ class InputFileHandler:
             path = path.resolve()
         return path
 
-    def _split_dnanexus_path(self) -> tuple:
+    def _split_dnanexus_path(self) -> Tuple:
         """
         Split the DNANexus path into project, folder, and file components.
         This method takes the input string and splits it into three parts:
