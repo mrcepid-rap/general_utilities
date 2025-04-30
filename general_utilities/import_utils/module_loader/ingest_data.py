@@ -298,7 +298,7 @@ class IngestData(ABC):
 
         # 1. Get a list of individuals that we ARE going to use
         include_samples = set()
-        if inclusion_filepath is True:
+        if inclusion_filepath is not None:
             with open(inclusion_filepath, 'r') as inclusion_file:
                 for indv in inclusion_file:
                     indv = indv.rstrip()
@@ -306,7 +306,7 @@ class IngestData(ABC):
 
         # 2. Get a list of individuals that we ARE NOT going to use
         exclude_samples = set()
-        if exclusion_filepath is True:
+        if exclusion_filepath is not None:
             with open(exclusion_filepath, 'r') as exclude_file:
                 for indv in exclude_file:
                     indv = indv.rstrip()
@@ -329,12 +329,12 @@ class IngestData(ABC):
 
                 # extract the variable indicating whether an individual has passed genetic data QC:
                 if genetics_status == 1:
-                    if inclusion_filepath is False and exclusion_filepath is False:
+                    if inclusion_filepath is None and exclusion_filepath is None:
                         genetics_samples.add(eid)
-                    elif inclusion_filepath is False and exclusion_filepath is True:
+                    elif inclusion_filepath is None and exclusion_filepath is not None:
                         if eid not in exclude_samples:
                             genetics_samples.add(eid)
-                    elif inclusion_filepath is True and exclusion_filepath is False:
+                    elif inclusion_filepath is not None and exclusion_filepath is None:
                         if eid in include_samples:
                             genetics_samples.add(eid)
                     else:
@@ -563,7 +563,6 @@ class IngestData(ABC):
             for indv in base_covar_csv:
                 # If genetic sex is not NA and the individual is in the genetics sample list, then we can write them
                 if indv['sex'] != "NA" and indv['FID'] in genetics_samples:
-
                     # write a correctly formatted covariate file
                     indv_writer = {'FID': indv['FID'], 'IID': indv['IID']}
                     for PC in range(1, 41):
