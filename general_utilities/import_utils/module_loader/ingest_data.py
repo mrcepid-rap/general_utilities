@@ -482,7 +482,7 @@ class IngestData(ABC):
     def _create_covariate_file(self, genetics_samples: Set[str], phenotypes: Dict[str, Dict[str, Any]],
                                pheno_names: List[str], ignore_base_options: bool,
                                found_categorical_covariates: List[str], found_quantitative_covariates: List[str],
-                               add_covars: Dict[str, Dict[str, Any]], sex: int, base_covariates_file: Path) -> tuple[
+                               add_covars: Dict[str, Dict[str, Any]], sex: int, base_covariates_file: Path) -> Tuple[
         Path, Path, Path]:
 
         """Print final covariate + phenotype file while implementing sample inclusion/exclusion
