@@ -562,7 +562,7 @@ class IngestData(ABC):
             indv_exclude = 0  # Count the nunber of samples we WONT analyse
             for indv in base_covar_csv:
                 # If genetic sex is not NA and the individual is in the genetics sample list, then we can write them
-                if indv['sex'] != "NA" and (indv['FID'], indv['IID']) in genetics_samples:
+                if indv['sex'] != "NA" and indv['FID'] in genetics_samples:
 
                     # write a correctly formatted covariate file
                     indv_writer = {'FID': indv['FID'], 'IID': indv['IID']}
