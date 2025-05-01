@@ -265,7 +265,7 @@ class IngestData(ABC):
 
     @staticmethod
     def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[
-        Union[Path, None], Union[Path, None]]:
+        Union[Path], Union[Path]]:
         """Get inclusion/exclusion sample lists
 
         If provided, inclusion and exclusion lists will be downloaded to `$HOME/INCLUSION.lst` and
