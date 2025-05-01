@@ -28,7 +28,7 @@ class BGENInformation(TypedDict):
     vepidx: Optional[InputFileHandler]
 
 
-def process_bgen_file(chrom_bgen_index: BGENInformation, chromosome: str) -> None:
+def process_bgen_file(chrom_bgen_index: BGENInformation) -> None:
     """Download and process a bgen file when requested
 
     This method is written as a helper to classes that need to access filtered and annotated WES variants. It will
