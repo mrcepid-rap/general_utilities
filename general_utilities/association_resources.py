@@ -6,6 +6,7 @@ from typing import List, Union, Tuple, IO, Dict
 import dxpy
 import pandas as pd
 import pandas.core.series
+import pysam
 
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
@@ -282,39 +283,44 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
     return found_index
 
 
-def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = None,
+def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
-    """BGZIP and TABIX a provided file path
+    """Compress a file using bgzip and create a tabix index.
 
-    This is a wrapper for bgzip and tabix. In its simplest form will take a filepath and run bgzip and tabix,
-    with default sequence, begin, and end columns. The user can modify default column specs using parameters and also
-    provide a comment character to set a header line in tabix.
+    This function uses pysam to compress a file with bgzip and create a corresponding tabix index.
+    The index parameters can be customized to match the file format.
 
-    :param file_path: A Pathlike to a file on this platform.
-    :param comment_char: A comment character to skip. MUST be a single character. Defaults to 'None'
-    :param skip_row: Number of lines at the beginning of the file to skip using tabix -S parameter
-    :param sequence_row: Row number (in base 1) of the chromosome / sequence name column
-    :param begin_row: Row number (in base 1) of the start coordinate column
-    :param end_row: Row number (in base 1) of the end coordinate column. This value can be the same as begin row for
-        files without an end coordinate but cannot be omitted.
-    :return: A Tuple consisting of the bgziped file and it's corresponding tabix index
+    NOTE: make sure you  specify the parameters (column indices) when running this. The default column numbers are in BED
+    format, please modify the command if using any non-BED format.
+
+    Args:
+        file_path: Path to the input file to be compressed and indexed
+        comment_char: Comment character to identify header lines (default: '#')
+        skip_row: Number of header lines to skip in the index (default: 0)
+        sequence_row: 1-based column number containing sequence names (default: 1)
+        begin_row: 1-based column number containing start positions (default: 2)
+        end_row: 1-based column number containing end positions (default: 3)
+
+    Returns:
+        Tuple[Path, Path]: Paths to the compressed file (.gz) and its index (.tbi)
+
     """
 
-    # Run bgzip
-    cmd_executor = build_default_command_executor()
-    bgzip_cmd = f'bgzip /test/{file_path}'
-    cmd_executor.run_cmd_on_docker(bgzip_cmd)
+    # Compress using pysam
+    outfile_compress = f'{file_path}.gz'
+    pysam.tabix_compress(str(file_path.absolute()), outfile_compress)
 
-    # Run tabix, and incorporate comment character if requested
-    tabix_cmd = 'tabix '
-    if comment_char:
-        tabix_cmd += f'-c {comment_char} '
-    if skip_row:
-        tabix_cmd += f'-S {skip_row} '
-    tabix_cmd += f'-s {sequence_row} -b {begin_row} -e {end_row} /test/{file_path}.gz'
-    cmd_executor.run_cmd_on_docker(tabix_cmd)
+    try:
+        # Run indexing via pysam, and incorporate comment character if requested
+        pysam.tabix_index(outfile_compress, seq_col=sequence_row - 1, start_col=begin_row - 1, end_col=end_row - 1,
+                          meta_char=comment_char, int_line_skip=skip_row)
+    except Exception as e:
+        LOGGER.error(f"Failed to index file {outfile_compress}: {e}. Check the bgzip_and_tabix command in "
+                     f"general_utilities - it's likely that the header settings need to be adjusted for your "
+                     f"file format")
+        raise
 
-    return Path(f'{file_path}.gz'), Path(f'{file_path}.gz.tbi')
+    return Path(outfile_compress), Path(f'{outfile_compress}.tbi')
 
 
 def get_include_sample_ids() -> List[str]:
