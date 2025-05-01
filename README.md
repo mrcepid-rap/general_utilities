@@ -2,6 +2,9 @@
 
 ## Changelog
 
+* v1.5.3
+  * Implemented a new InputFileHandler class. This class can take various types of files (e.g. local files, DNA Nexus files, GCloud files) as input, downloads these files, and returns a path to the local file.
+  * Other changes mainly in the `ingest_data.py` and `genetics_loader.py` files have been updated to work with the new InputFileHandler class.
 * v1.5.2
   * Changed the bgzip_and_tabix function in association_resources - the command is now being executed using pysam, which removes the need for Docker.
   * Cleaned up some imports
