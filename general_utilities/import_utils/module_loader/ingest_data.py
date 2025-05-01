@@ -4,8 +4,8 @@ from abc import ABC
 from pathlib import Path
 from typing import Set, Tuple, List, Any, Dict, Union
 
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
-from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler, FileType
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
 
@@ -49,7 +49,7 @@ class IngestData(ABC):
 
         # Sample inclusion / exclusion lists
         inclusion_filepath, exclusion_filepath = self._define_exclusion_lists(parsed_options.inclusion_list,
-                                                                        parsed_options.exclusion_list)
+                                                                              parsed_options.exclusion_list)
 
         # Once all data is ingested, process the covariates/phenotypes into a single file of individuals that we want
         # to analyse
@@ -62,16 +62,17 @@ class IngestData(ABC):
                                                 parsed_options.quantitative_covariates)
 
         # After all sample/phenotype/covariate processing, create the joint pheno/covariate file for testing
-        self._create_covariate_file(genetics_samples=genetics_samples,
-                                    phenotypes=phenotypes,
-                                    pheno_names=pheno_names,
-                                    ignore_base_options=parsed_options.ignore_base,
-                                    found_categorical_covariates=found_categorical_covariates,
-                                    found_quantitative_covariates=found_quantitative_covariates,
-                                    add_covars=add_covars,
-                                    sex=parsed_options.sex,
-                                    base_covariates_file=base_covariates_file
-                                    )
+        self._final_covaraites, self._inclusion_samples, self._exclusion_samples = self._create_covariate_file(
+            genetics_samples=genetics_samples,
+            phenotypes=phenotypes,
+            pheno_names=pheno_names,
+            ignore_base_options=parsed_options.ignore_base,
+            found_categorical_covariates=found_categorical_covariates,
+            found_quantitative_covariates=found_quantitative_covariates,
+            add_covars=add_covars,
+            sex=parsed_options.sex,
+            base_covariates_file=base_covariates_file
+        )
 
         # And build an object that will contain all the information we need to run some specified analysis
         self._association_pack = AssociationPack(is_binary=parsed_options.is_binary,
@@ -81,11 +82,29 @@ class IngestData(ABC):
                                                  ignore_base_covariates=parsed_options.ignore_base,
                                                  found_quantitative_covariates=found_quantitative_covariates,
                                                  found_categorical_covariates=found_categorical_covariates,
-                                                 cmd_executor=cmd_executor,
-                                                 covariate_file=base_covariates_file,
-                                                 inclusion_file=inclusion_filepath,
-                                                 exclusion_file=exclusion_filepath
+                                                 cmd_executor=cmd_executor
                                                  )
+
+    def get_base_covariates_file(self) -> Path:
+        """Getter for base_covariates_file.
+
+        :return: The base covariates file.
+        """
+        return self._final_covaraites
+
+    def get_inclusion_samples(self) -> Path:
+        """Getter for inclusion samples.
+
+        :return: The inclusion samples.
+        """
+        return self._inclusion_samples
+
+    def get_exclusion_samples(self) -> Path:
+        """Getter for exclusion samples.
+
+        :return: The exclusion samples.
+        """
+        return self._exclusion_samples
 
     def get_association_pack(self) -> AssociationPack:
         """Getter for self._association_pack
@@ -220,7 +239,8 @@ class IngestData(ABC):
         return phenotypes
 
     @staticmethod
-    def _ingest_covariates(base_covariates: InputFileHandler, covarfile: InputFileHandler) -> Tuple[Path, Union[Path, None]]:
+    def _ingest_covariates(base_covariates: InputFileHandler, covarfile: InputFileHandler) -> Tuple[
+        Path, Union[Path, None]]:
         """Download covariate data
 
         Base covariates will always be placed at `$HOME/base_covariates.covariates`. Additional covariates (if provided)
@@ -273,7 +293,8 @@ class IngestData(ABC):
 
         return inclusion_list, exclusion_list
 
-    def _select_individuals(self, inclusion_filepath: Path, exclusion_filepath: Path, base_covariates: Path) -> Set[str]:
+    def _select_individuals(self, inclusion_filepath: Path, exclusion_filepath: Path, base_covariates: Path) -> Set[
+        str]:
         """Define individuals based on exclusion/inclusion lists.
 
         Three steps to this:
@@ -626,4 +647,3 @@ class IngestData(ABC):
         self._logger.info(f'{"Number of individuals EXCLUDED from covariate/pheno file":{65}}: {indv_exclude}')
 
         return Path('phenotypes_covariates.formatted.txt'), Path('samples_Include.txt'), Path('samples_Exclude.txt')
-

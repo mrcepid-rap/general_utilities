@@ -3,9 +3,9 @@ import re
 from pathlib import Path
 from typing import Set, List, Tuple
 
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 
 
 class GeneticsLoader:
@@ -61,14 +61,23 @@ class GeneticsLoader:
         """
         return self._filtered_bed.name
 
-    def get_sparsematrix(self) -> Tuple[Path, Path]:
+    def get_sparsematrix(self) -> Path:
         """Getter method to retrieve sparse matrix filenames.
 
-        This method returns the filenames of the sparse genetic matrix and its corresponding sample file.
+        This method returns the paths of the sparse genetic matrix and its corresponding sample file.
 
         :return: A Tuple containing the paths to the sparse genetic matrix and its sample file.
         """
-        return self._sparse_grm, self._sparse_grm_sample
+        return self._sparse_grm
+
+    def get_sparsematrix_sample(self) -> Path:
+        """Getter method to retrieve sparse matrix paths.
+
+        This method returns the paths of the sparse genetic matrix and its corresponding sample file.
+
+        :return: A tuple containing the paths to the sparse genetic matrix and its sample file.
+        """
+        return self._sparse_grm_sample
 
     def get_low_mac_list(self) -> Path:
         """Getter method to retrieve low MAC list filename.
@@ -295,5 +304,3 @@ class GeneticsLoader:
         sparse_grm_sample = self._sparse_grm_sample.get_file_handle()
 
         return sparse_grm, sparse_grm_sample
-
-
