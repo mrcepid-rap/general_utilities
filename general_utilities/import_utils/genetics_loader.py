@@ -59,7 +59,7 @@ class GeneticsLoader:
 
         :return: string representing the name of the filtered genetic data file.
         """
-        return self._filtered_bed.name
+        return self._filtered_bed.stem
 
     def get_sparsematrix(self) -> Path:
         """Getter method to retrieve sparse matrix filenames.
