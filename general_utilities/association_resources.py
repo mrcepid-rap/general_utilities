@@ -310,7 +310,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
     try:
         # Run indexing via pysam, and incorporate comment character if requested
         pysam.tabix_index(outfile_compress, seq_col=sequence_row - 1, start_col=begin_row - 1, end_col=end_row - 1,
-                          meta_char=comment_char, int_line_skip=skip_row)
+                          meta_char=comment_char, line_skip=skip_row)
     except Exception as e:
         LOGGER.error(f"Failed to index file {outfile_compress}: {e}. Check the bgzip_and_tabix command in "
                      f"general_utilities - it's likely that the header settings need to be adjusted for your "
