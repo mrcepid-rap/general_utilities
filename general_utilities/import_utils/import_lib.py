@@ -46,8 +46,10 @@ def process_bgen_file(chrom_bgen_index: BGENInformation) -> None:
     chrom_bgen_index['index'].get_file_handle()
     chrom_bgen_index['sample'].get_file_handle()
     chrom_bgen_index['bgen'].get_file_handle()
-    chrom_bgen_index['vep'].get_file_handle()
-    chrom_bgen_index['vepidx'].get_file_handle()
+    # Now we need to download the VEP file if it exists
+    if chrom_bgen_index['vep'] is not None:
+        chrom_bgen_index['vep'].get_file_handle()
+        chrom_bgen_index['vepidx'].get_file_handle()
 
 
 def ingest_wes_bgen(bgen_index: Union[InputFileHandler, dict]) -> Dict[str, BGENInformation]:

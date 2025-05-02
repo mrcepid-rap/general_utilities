@@ -58,8 +58,8 @@ class AssociationPack(ABC):
     """
 
     def __init__(self, is_binary: bool, sex: int, threads: int, pheno_names: List[str], ignore_base_covariates: bool,
-                 found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
-                 cmd_executor: CommandExecutor
+                 found_quantitative_covariates: List[str], found_categorical_covariates: List[str], cmd_executor: CommandExecutor,
+                 final_covariates: Path, inclusion_samples: Path, exclusion_samples: Path
                  ):
         self.is_binary = is_binary
         self.sex = sex
@@ -69,3 +69,6 @@ class AssociationPack(ABC):
         self.found_quantitative_covariates = found_quantitative_covariates
         self.found_categorical_covariates = found_categorical_covariates
         self.cmd_executor = cmd_executor
+        self.final_covariates = final_covariates
+        self.inclusion_samples = inclusion_samples
+        self.exclusion_samples = exclusion_samples

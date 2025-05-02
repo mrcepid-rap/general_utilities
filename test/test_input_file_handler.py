@@ -17,6 +17,9 @@ from general_utilities.import_utils.file_handlers.input_file_handler import Inpu
         (Path("test_data/transcripts.tsv.gz"), FileType.LOCAL_PATH, None),
         ("gs://bucket-name/file-name", FileType.GCLOUD_FILE, None),
         ("invalid-input", None, FileNotFoundError),
+        ({'$dnanexus_link': 'file-Fx2x21QJ06f47gV73kZPjkQQ'}, FileType.DNA_NEXUS_FILE, None),
+        ({'$dnanexus_link': 'file-Fx2x21QJ06f47gXX3kZPjkQQ'}, FileType.DNA_NEXUS_FILE, dxpy.exceptions.ResourceNotFound),
+
     ],
 )
 def test_input_file_handler_get_file_type(input_file, expected_file_type, expected_exception):
@@ -60,6 +63,9 @@ def test_input_file_handler_get_file_type(input_file, expected_file_type, expect
          FileType.DNA_NEXUS_FILE, None,
          Path("hs38DH.fa.fai")),
         ("test_data/transcripts.tsv.gz", FileType.LOCAL_PATH, None, Path("transcripts.tsv.gz")),
+        ({'$dnanexus_link': 'file-Fx2x21QJ06f47gV73kZPjkQQ'}, FileType.DNA_NEXUS_FILE, None, Path("hs38DH.fa.fai")),
+        ({'$dnanexus_link': 'file-Fx2x21QJ06f4DDD73kZPjkQQ'}, FileType.DNA_NEXUS_FILE, dxpy.exceptions.ResourceNotFound, Path("hs38DH.fa.fai")),
+
     ],
 )
 def test_dna_nexus_files_explicitly(input_file, expected_file_type, expected_exception, expected_file):

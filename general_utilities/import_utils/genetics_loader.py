@@ -48,9 +48,9 @@ class GeneticsLoader:
             self._logger.info('Multiple sample data types detected, synchronising sample lists...')
             self._union_sample = self._write_union_sample(sample_files)
             self._synchronise_genetic_data()
-        self._filtered_bed, self._filtered_bim, self._filtered_fam = self._generate_filtered_genetic_data(bed_filename,
-                                                                                                          bim_filename,
-                                                                                                          fam_filename)
+        self._filtered_bed = self._generate_filtered_genetic_data(bed_filename,
+                                                                  bim_filename,
+                                                                  fam_filename)
 
     def get_filtered_genetic_filename(self) -> str:
         """Getter method to retrieve filtered genetic filenames.
@@ -59,7 +59,7 @@ class GeneticsLoader:
 
         :return: string representing the name of the filtered genetic data file.
         """
-        return self._filtered_bed.stem
+        return self._filtered_bed
 
     def get_sparsematrix(self) -> Path:
         """Getter method to retrieve sparse matrix filenames.
@@ -247,21 +247,24 @@ class GeneticsLoader:
 
         new_remove_path.replace(remove_path)
 
-    def _generate_filtered_genetic_data(self, bed_filename, bim_filename, fam_filename) -> Tuple[Path, Path, Path]:
-        """Generates a genetic file plink binary dataset filtered to only individuals we want to include in association
-            tests
+    def _generate_filtered_genetic_data(self, bed_filename: Path, bim_filename: Path, fam_filename: Path) -> str:
+        """Filters a genetic dataset in Plink binary format to include only specific individuals for association tests.
 
-        This method takes the SAMPLES_Include.txt file created by ingest_data OR re-processed using methods included
-        in this class and uses it as the --keep parameter in plink2 to filter the original set of ~500k individuals
-        to those individuals requested by the user. This method will also then return the number of individuals in the
-        final dataset to ensure filtering completed properly.
+        This method uses the `SAMPLES_Include.txt` file, either created during data ingestion or re-processed by this class,
+        as the `--keep` parameter in Plink2. It filters the original dataset of approximately 500,000 individuals to include
+        only those specified by the user. The method ensures the filtering process is completed correctly and returns the
+        filtered dataset file stem.
 
-        :return: None
+        :param bed_filename: Path to the .bed file.
+        :param bim_filename: Path to the .bim file.
+        :param fam_filename: Path to the .fam file.
+
+        :return: A stem representing the filtered genetic data.
         """
         # Extract the stems (filenames without extensions)
-        bed_stem = Path(bed_filename).stem
-        bim_stem = Path(bim_filename).stem
-        fam_stem = Path(fam_filename).stem
+        bed_stem = bed_filename.stem
+        bim_stem = bim_filename.stem
+        fam_stem = fam_filename.stem
 
         # Check if all stems are the same
         if bed_stem == bim_stem == fam_stem:
@@ -284,11 +287,9 @@ class GeneticsLoader:
                 if count_matcher:
                     self._logger.info(f'{"Plink individuals written":{65}}: {count_matcher.group(1)}')
 
-        filtered_bed = Path('Autosomes_QCd_WBA.bed')
-        filtered_bim = Path('Autosomes_QCd_WBA.bim')
-        filtered_fam = Path('Autosomes_QCd_WBA.fam')
+        filtered_bed = Path('Autosomes_QCd_WBA.bed').stem
 
-        return filtered_bed, filtered_bim, filtered_fam
+        return filtered_bed
 
     def _ingest_sparse_matrix(self) -> Tuple[Path, Path]:
         """Download the sparse matrix for use by GLM/STAAR.

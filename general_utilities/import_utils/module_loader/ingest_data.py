@@ -62,7 +62,7 @@ class IngestData(ABC):
                                                 parsed_options.quantitative_covariates)
 
         # After all sample/phenotype/covariate processing, create the joint pheno/covariate file for testing
-        self._final_covaraites, self._inclusion_samples, self._exclusion_samples = self._create_covariate_file(
+        final_covariates, inclusion_samples, exclusion_samples = self._create_covariate_file(
             genetics_samples=genetics_samples,
             phenotypes=phenotypes,
             pheno_names=pheno_names,
@@ -82,30 +82,11 @@ class IngestData(ABC):
                                                  ignore_base_covariates=parsed_options.ignore_base,
                                                  found_quantitative_covariates=found_quantitative_covariates,
                                                  found_categorical_covariates=found_categorical_covariates,
-                                                 cmd_executor=cmd_executor
+                                                 cmd_executor=cmd_executor,
+                                                 final_covariates=final_covariates,
+                                                 inclusion_samples=inclusion_samples,
+                                                 exclusion_samples=exclusion_samples,
                                                  )
-
-    def get_base_covariates_file(self) -> Path:
-        """Getter for base_covariates_file.
-
-        :return: The base covariates file.
-        """
-        return self._final_covaraites
-
-    def get_inclusion_samples(self) -> Path:
-        """Getter for inclusion samples.
-
-        :return: The inclusion samples.
-        """
-        return self._inclusion_samples
-
-    def get_exclusion_samples(self) -> Path:
-        """Getter for exclusion samples.
-
-        :return: The exclusion samples.
-        """
-        return self._exclusion_samples
-
     def get_association_pack(self) -> AssociationPack:
         """Getter for self._association_pack
 
@@ -239,8 +220,7 @@ class IngestData(ABC):
         return phenotypes
 
     @staticmethod
-    def _ingest_covariates(base_covariates: InputFileHandler, covarfile: InputFileHandler) -> Tuple[
-        Path, Union[Path, None]]:
+    def _ingest_covariates(base_covariates: InputFileHandler, covarfile: InputFileHandler) -> Tuple[Path, Path]:
         """Download covariate data
 
         Base covariates will always be placed at `$HOME/base_covariates.covariates`. Additional covariates (if provided)
@@ -264,8 +244,7 @@ class IngestData(ABC):
         return base_covariates, additional_covariates
 
     @staticmethod
-    def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[
-        Union[Path], Union[Path]]:
+    def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[Path, Path]:
         """Get inclusion/exclusion sample lists
 
         If provided, inclusion and exclusion lists will be downloaded to `$HOME/INCLUSION.lst` and
@@ -367,7 +346,7 @@ class IngestData(ABC):
         self._logger.info(f'{"Total samples after inclusion/exclusion lists applied":{65}}: {len(genetics_samples)}')
         return genetics_samples
 
-    def _process_additional_covariates(self, additional_covariates_found: Path,
+    def _process_additional_covariates(self, additional_covariates_path: Path,
                                        categorical_covariates: List[str],
                                        quantitative_covariates: List[str]
                                        ) -> Tuple[List[str], List[str], Dict[str, Dict[str, Any]]]:
@@ -382,7 +361,7 @@ class IngestData(ABC):
         iterate through the provided covariate file, ensuring that covariates that are asked for are in the provided
         file. This method will also report statistics on total / proportion of individuals missing each covariate.
 
-        :param additional_covariates_found: Was an additional covariates file provided on the command-line?
+        :param additional_covariates_path: Path to the additional covariate file, if provided.
         :param categorical_covariates: List of names of additional categorical covariates
         :param quantitative_covariates: List of names of additional quantitative covariates
         :return: A Tuple containing two lists (of categorical and quantitative covariate names, respectively) and a Dict
@@ -400,17 +379,17 @@ class IngestData(ABC):
         valid_base_covars = [f'PC{PC}' for PC in range(1, 41)] + \
                             ['age', 'age_squared', 'sex', 'wes_batch', 'array_batch']
 
-        if additional_covariates_found:
+        if additional_covariates_path:
 
             # Keep track of sample totals:
             total_missing_dict = {}
 
-            additional_covariates_file = Path(additional_covariates_found)
+            additional_covariates_file = Path(additional_covariates_path)
 
             # Determine delimiter of provided file (space or tab)
             dialect = csv.Sniffer().sniff(additional_covariates_file.open('r').readline(), delimiters=[' ', '\t'])
 
-            with additional_covariates_found.open('r') as additional_covariates_reader:
+            with additional_covariates_file.open('r') as additional_covariates_reader:
                 additional_covar_csv = csv.DictReader(additional_covariates_reader,
                                                       delimiter=dialect.delimiter)
                 field_names = list.copy(additional_covar_csv.fieldnames)
@@ -527,6 +506,11 @@ class IngestData(ABC):
         :return: None
         """
 
+        # Set the output files
+        final_covariates_file = Path('phenotypes_covariates.formatted.txt')
+        inclusion_samples = Path('SAMPLES_Include.txt')
+        exclusion_samples = Path('SAMPLES_Exclude.txt')
+
         # Print some statistics about what we found in previous ingestion classes:
         self._logger.info(f'{"Phenotype(s)":{65}}: {", ".join(pheno_names)}')
 
@@ -550,12 +534,10 @@ class IngestData(ABC):
         else:
             self._logger.info(f'No additional covariates provided/found beyond defaults...')
 
-        final_covariates_file = Path('phenotypes_covariates.formatted.txt')
-
         with base_covariates_file.open('r') as base_covar_reader, \
                 final_covariates_file.open('w', newline='\n') as final_covariates_writer, \
-                Path('SAMPLES_Include.txt').open('w') as include_samples, \
-                Path('SAMPLES_Remove.txt').open('w') as remove_samples:
+                inclusion_samples.open('w') as include_samples, \
+                exclusion_samples.open('w') as remove_samples:
 
             base_covar_csv = csv.DictReader(base_covar_reader, delimiter="\t")
 
@@ -646,4 +628,4 @@ class IngestData(ABC):
         self._logger.info(f'{"Number of individuals WRITTEN to covariate/pheno file":{65}}: {indv_written}')
         self._logger.info(f'{"Number of individuals EXCLUDED from covariate/pheno file":{65}}: {indv_exclude}')
 
-        return Path('phenotypes_covariates.formatted.txt'), Path('samples_Include.txt'), Path('samples_Exclude.txt')
+        return final_covariates_file, inclusion_samples, exclusion_samples

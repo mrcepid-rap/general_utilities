@@ -41,7 +41,7 @@ class InputFileHandler:
     # See whether we have to use blobs for GCloud or if there is something newer
     # IMPORTANT: We need to build an authenticator class for GCloud and/or other data platforms
 
-    def __init__(self, input_str: Union[str, Path, dxpy.DXFile], download_now: bool = False):
+    def __init__(self, input_str: Union[str, Path, dict, dxpy.DXFile], download_now: bool = False):
 
         # Initiate the InsmedInput class
         # For logging
@@ -162,8 +162,14 @@ class InputFileHandler:
         :raises dxpy.exceptions.DXError: If the DNA Nexus file download fails.
         """
 
-        # if we are working with a DNA Nexus file ID
-        if re.match('file-\\w{24}', self._input_str):
+        # if we are working with a DNA Nexus file ID in dict format
+        if isinstance(self._input_str, dict):
+            # if the input is a dxlink, then we should find it
+            print(self._input_str)
+            dxfile = dxpy.bindings.dxdataobject_functions.describe(self._input_str)
+            file_path = download_dxfile_by_name(dxfile, print_status=False)
+        # if we are working with a DNA Nexus file ID in string format
+        elif re.match('file-\\w{24}', self._input_str):
             file_path = download_dxfile_by_name(self._input_str)
         # if we are working with a project and file ID
         elif re.match(r'project-\w{24}:file-\w{24}', self._input_str):
@@ -261,6 +267,12 @@ class InputFileHandler:
         elif isinstance(self._input_str, dxpy.DXFile):
             return FileType.DNA_NEXUS_FILE
 
+        # Handle dictionary input of DXfiles
+        elif isinstance(self._input_str, dict):
+            # if the input is a dxlink, then we should find it
+            dxpy.bindings.dxdataobject_functions.describe(self._input_str)
+            return FileType.DNA_NEXUS_FILE
+
         # Handle local paths encoded as paths
         elif isinstance(self._input_str, Path):
             if self._input_str.exists():
@@ -337,7 +349,7 @@ class InputFileHandler:
         """
         Resolve a given input string to an absolute path.
 
-        :param input_str: The input string representing a file path.
+        :param self._input_str: The input string representing a file path.
         :return: A `Path` object representing the absolute path.
         """
         path = Path(self._input_str)
@@ -348,10 +360,14 @@ class InputFileHandler:
     def _split_dnanexus_path(self) -> Tuple:
         """
         Split the DNANexus path into project, folder, and file components.
+
         This method takes the input string and splits it into three parts:
-        - Project ID
-        - Folder path
-        - File name
+        - `project`: The project ID.
+        - `folder`: The folder path.
+        - `file`: The file name.
+
+        :param self._input_str: The input string representing a file path.
+        :return: A tuple containing the project ID, folder path, and file name.
         """
         project_part, path_part = self._input_str.split(':', 1)
         project = project_part.strip()
