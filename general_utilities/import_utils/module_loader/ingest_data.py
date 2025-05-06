@@ -44,7 +44,7 @@ class IngestData(ABC):
         pheno_names = list(phenotypes.keys())  # A list of pheno_names since we don't store phenotypes at runtime
 
         # Base and Additional covariates
-        base_covariates_file, additional_covariates_found = self._ingest_covariates(parsed_options.base_covariates,
+        base_covariates_file, additional_covariates_file = self._ingest_covariates(parsed_options.base_covariates,
                                                                                     parsed_options.covarfile)
 
         # Sample inclusion / exclusion lists
@@ -57,7 +57,7 @@ class IngestData(ABC):
 
         # Process additional covariates (check if requested in the function)
         found_categorical_covariates, found_quantitative_covariates, add_covars = \
-            self._process_additional_covariates(additional_covariates_found,
+            self._process_additional_covariates(additional_covariates_file,
                                                 parsed_options.categorical_covariates,
                                                 parsed_options.quantitative_covariates)
 

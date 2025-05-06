@@ -16,9 +16,9 @@ class GeneticsLoader:
     datatypes OTHER than WES (which is handled in mrcepid-buildgrms) this class also synchronises samples between these
     datatypes to avoid issues with various association tools.
 
-    :param bed_file: Plink .bed format file
-    :param fam_file: Plink .fam format file
-    :param bim_file: Plink .bim format file
+    :param bed_file: InputFileHandler class for the .bed file
+    :param fam_file: InputFileHandler class for the .fam file
+    :param bim_file: InputFileHandler class for the .bim file
     :param sample_files: A List of .bgen format sample files to synchronise samples on.
     :param cmd_executor: CommandExecutor class to run system calls through
     :param low_mac_list: An optional list of low minor allele count variants for exclusion when running BOLT
@@ -64,18 +64,18 @@ class GeneticsLoader:
     def get_sparsematrix(self) -> Path:
         """Getter method to retrieve sparse matrix filenames.
 
-        This method returns the paths of the sparse genetic matrix and its corresponding sample file.
+        This method returns the path of the sparse genetic matrix.
 
-        :return: A Tuple containing the paths to the sparse genetic matrix and its sample file.
+        :return: A path to the sparse genetic matrix.
         """
         return self._sparse_grm
 
     def get_sparsematrix_sample(self) -> Path:
         """Getter method to retrieve sparse matrix paths.
 
-        This method returns the paths of the sparse genetic matrix and its corresponding sample file.
+        This method returns the path of the sparse genetic matrix sample file.
 
-        :return: A tuple containing the paths to the sparse genetic matrix and its sample file.
+        :return: A path to the sparse genetic matrix sample file.
         """
         return self._sparse_grm_sample
 
