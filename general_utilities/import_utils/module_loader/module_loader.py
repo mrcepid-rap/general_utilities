@@ -1,14 +1,12 @@
-import re
-import dxpy
 import argparse
-
-from pathlib import Path
-from importlib import util, import_module
-from typing import List, Type, Optional
+import re
 from abc import ABC, abstractmethod
+from importlib import util, import_module
+from pathlib import Path
+from typing import List, Type, Optional
 
-from general_utilities.mrc_logger import MRCLogger
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 
 
 class ModuleLoader(ABC):
@@ -36,7 +34,6 @@ class ModuleLoader(ABC):
     def __init__(self, output_prefix: str, input_args: str):
 
         # Initiate logger – This can also be used by a class which implements this Interface
-        self._logger = MRCLogger(__name__).get_logger()
 
         # Set empty outputs array to hold anything a module may produce and returnable to the main() method calling this
         # class
@@ -68,49 +65,12 @@ class ModuleLoader(ABC):
         self._outputs = outputs
 
     @staticmethod
-    def dxfile_input(input_str: str) -> Optional[dxpy.DXFile]:
-        """A method that defines a 'dxfile' type for argparse. Allows for a 'None' input default for optional files
-
-        This method is to allow for a dxfile 'type' when defining arguments for argparse. This method is passed as an
-        argument to :func:`argparse.ArgumentParser().add_argument()` method as type=self.dxfile_input. This method does
-        allow for generic filepaths that live somewhere on the RAP / DNANexus filesystem, but these files MUST exist
-        in the current executing project AND be an absolute path for this functionality to work.
-
-        :param input_str: A DXFile ID in the form file-1234567890ABCDEFG or an absolute path to a file in the current
-            project.
-        :return: A 'nullable' dxpy.DXFile
-        """
-        try:
-            if input_str == 'None':
-                return None
-            else:
-                # First check if the input looks like a DXFile ID (must be 'file-' + 24 alphanumeric characters)
-                if re.match('file-\\w{24}', input_str):
-                    dxfile = dxpy.DXFile(dxid=input_str)
-                    dxfile.describe()  # This will trigger Exceptions caught below if not actually a DXFile / not found
-
-                # And then check if the file/path exists on DNANexus
-                else:
-                    file_handle = Path(input_str)
-                    found_file = dxpy.find_one_data_object(classname='file',
-                                                           project=dxpy.PROJECT_CONTEXT_ID,
-                                                           name_mode='exact',
-                                                           name=f'{file_handle.name}',
-                                                           folder=f'{file_handle.parent}',
-                                                           zero_ok=False)
-                    dxfile = dxpy.DXFile(dxid=found_file['id'], project=found_file['project'])
-
-                return dxfile
-        except dxpy.exceptions.DXSearchError:
-            raise FileNotFoundError(f'The input parameter – {input_str} – was tried as a filepath, but was not found '
-                                    f'in the project this applet has been executed from. Please confirm the file '
-                                    f'exists in this project or use a DNANexus file ID (like: file-12345...).')
-        except dxpy.exceptions.DXError:  # This just checks if the format of the input is correct
-            raise TypeError(f'The input for parameter – {input_str} – '
-                            f'does not look like a valid DNANexus file ID.')
-        except dxpy.exceptions.ResourceNotFound:
-            raise TypeError(f'The input for parameter – {input_str} – '
-                            f'does not exist on the DNANexus platform.')
+    def dxfile_input(input_str: str) -> Optional[InputFileHandler]:
+        """Return the input string as an InputFileHandler object."""
+        if input_str is None or input_str == 'None':
+            return None
+        else:
+            return InputFileHandler(input_str)
 
     @staticmethod
     def comma_str(input_str: str) -> List[str]:
@@ -165,7 +125,7 @@ class ModuleLoader(ABC):
                 end = len(input_args)
             else:
                 start = arg_indicies[i] + 1
-                end = arg_indicies[i+1]
+                end = arg_indicies[i + 1]
             split_args.append(input_args[start:end])
 
         # And finally split the flag from the argument(s) potentially further splitting the argument by whitespace if
@@ -190,7 +150,7 @@ class ModuleLoader(ABC):
                             group = group[1:len(group)]
                         elif match.end() == str_len:
                             quote_match += 1
-                            group = group[0:len(group)-1]
+                            group = group[0:len(group) - 1]
 
                     # If quote_match = 2, then the parameter was wrapped in quotes and we don't strip by whitespace,
                     # add the argument directly as-is
@@ -270,6 +230,7 @@ class ModuleLoader(ABC):
                                   help="Should base covariates be ignored? Note that individuals with missing base "
                                        "covariates will still be removed.",
                                   dest='ignore_base', action='store_true')
+
 
     @abstractmethod
     def start_module(self) -> None:

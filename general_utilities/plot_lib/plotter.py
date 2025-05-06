@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import List, Any
 
-from importlib.resources.abc import Traversable
+from importlib_resources.abc import Traversable
 
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
@@ -69,5 +69,3 @@ class Plotter(ABC):
         self._cmd_executor.run_cmd_on_docker(plot_cmd, docker_mounts=[script_mount])
 
         return out_path
-
-
