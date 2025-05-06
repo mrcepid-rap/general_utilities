@@ -283,7 +283,7 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
     return found_index
 
 
-def bgzip_and_tabix(file_path: Path, comment_char: str = ' ', skip_row: int = 0,
+def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
     """
     Compress a file using bgzip and create a tabix index.
