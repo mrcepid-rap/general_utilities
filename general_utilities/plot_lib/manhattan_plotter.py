@@ -7,7 +7,7 @@ from pathlib import Path
 
 # from importlib.resources import files
 from importlib_resources import files
-
+from general_utilities.plot_lib.R_resources.manhattan_plotter_call import get_r_plotter
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.plot_lib.cluster_plotter import ClusterPlotter
 
@@ -75,8 +75,9 @@ class ManhattanPlotter(ClusterPlotter):
 
         final_plots = []
 
-        r_script = files('general_utilities.plot_lib.R_resources').joinpath('manhattan_plotter.R')
+        r_script = get_r_plotter()
 
+        # r_script = files('general_utilities.plot_lib.R_resources').joinpath('manhattan_plotter.R')
         # Add something to invert the plot... if (curr_test == paste0('ADD-INT_', interaction_var)) {
 
         # Do plotting

@@ -1,4 +1,13 @@
-#!/usr/bin/env Rscript --vanilla
+"""
+This is a really odd script - uv does not build R files, so we need to wrap and R script as a string within a python
+function. This is a bit of a hack, but it works.
+REMINDER: fix this in the near future.
+"""
+
+from pathlib import Path
+
+def get_r_plotter():
+    r_script_content = """#!/usr/bin/env Rscript --vanilla
 
 library(data.table)
 library(ggplot2)
@@ -157,3 +166,7 @@ mean_chr_pos <- fread('/test/mean_chr_pos.tsv')
 manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], as.numeric(args[5]), as.numeric(args[6]), as.logical(args[7]))
 
 ggsave('/test/manhattan_plot.png', manh_plot, units='in', width = 15, height = 6)
+"""
+    r_script_path = Path("manhattan_plotter.R")
+    r_script_path.write_text(r_script_content)
+    return r_script_path
