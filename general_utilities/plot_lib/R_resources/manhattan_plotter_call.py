@@ -1,3 +1,9 @@
+"""
+This is a really odd script - uv does not build R files, so we need to wrap and R script as a string within a python
+function. This is a bit of a hack, but it works.
+REMINDER: fix this in the near future.
+"""
+
 from pathlib import Path
 
 def get_r_plotter():
