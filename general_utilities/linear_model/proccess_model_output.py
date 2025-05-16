@@ -1,4 +1,3 @@
-import os
 import csv
 import dxpy
 import pandas as pd
