@@ -5,7 +5,7 @@ import pandas as pd
 from typing import List
 from pathlib import Path
 
-from importlib.resources import files
+from importlib_resources import files
 
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.plot_lib.cluster_plotter import ClusterPlotter
