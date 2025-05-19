@@ -283,7 +283,7 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
     return found_index
 
 
-def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
+def bgzip_and_tabix(file_path: Path, comment_char: str = ' ', skip_row: int = 0,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
     """
     Compress a file using bgzip and create a tabix index.
@@ -303,6 +303,16 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
     :return: A tuple containing paths to the compressed file (.gz) and its index (.tbi).
     """
 
+    # Fix header if it starts with a tab
+    with file_path.open("r") as f:
+        lines = f.readlines()
+
+    if lines and lines[0].startswith('\t'):
+        # Remove leading tab from header only
+        lines[0] = lines[0].lstrip('\t')
+        with file_path.open("w") as f:
+            f.writelines(lines)
+
     # Compress using pysam
     outfile_compress = f'{file_path}.gz'
     pysam.tabix_compress(str(file_path.absolute()), outfile_compress)
@@ -315,7 +325,6 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
         LOGGER.error(f"Failed to index file {outfile_compress}: {e}. Check the bgzip_and_tabix command in "
                      f"general_utilities - it's likely that the header settings need to be adjusted for your "
                      f"file format")
-        raise
 
     return Path(outfile_compress), Path(f'{outfile_compress}.tbi')
 
