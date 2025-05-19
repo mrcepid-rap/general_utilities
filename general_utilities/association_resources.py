@@ -389,6 +389,16 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
 
     """
 
+    # Fix leading tab in header caused by index=True in DataFrame
+    with file_path.open("r") as f:
+        lines = f.readlines()
+
+    if lines and lines[0].startswith('\t'):
+        # only remove tab, not all whitespace
+        lines[0] = lines[0].lstrip('\t')
+        with file_path.open("w") as f:
+            f.writelines(lines)
+
     # Compress using pysam
     outfile_compress = f'{file_path}.gz'
     pysam.tabix_compress(str(file_path.absolute()), outfile_compress)
@@ -401,7 +411,6 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
         LOGGER.error(f"Failed to index file {outfile_compress}: {e}. Check the bgzip_and_tabix command in "
                      f"general_utilities - it's likely that the header settings need to be adjusted for your "
                      f"file format")
-        raise
 
     return Path(outfile_compress), Path(f'{outfile_compress}.tbi')
 
