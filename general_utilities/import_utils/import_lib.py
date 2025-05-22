@@ -104,13 +104,15 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
     # association_tarballs likely to be a single tarball:
     if '.tar.gz' in str(association_tarballs.get_input_str()):
         tar_files.append(association_tarballs)
+    if isinstance(association_tarballs, list):
+        # If it's a list, iterate over it
+        for tarball in association_tarballs:
+            tar_files.append(tarball)
+    elif isinstance(association_tarballs, InputFileHandler):
+        # If it's a single InputFileHandler instance, append it directly
+        tar_files.append(association_tarballs)
     else:
-        # association_tarballs likely to be a list of tarballs
-        if isinstance(association_tarballs, list):
-            for tarball in association_tarballs:
-                tar_files.append(tarball)
-        else:
-            tar_files.append(association_tarballs)
+        raise TypeError("association_tarballs must be an InputFileHandler or a list of InputFileHandler instances")
 
     # Now process them in order
     for tar_file in tar_files:
