@@ -283,24 +283,27 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
     return found_index
 
 
-def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
+def bgzip_and_tabix(file_path: Path, comment_char: str = ' ', skip_row: int = 0,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
-    """
-    Compress a file using bgzip and create a tabix index.
+    """Compress a file using bgzip and create a tabix index.
 
     This function uses pysam to compress a file with bgzip and create a corresponding tabix index.
     The index parameters can be customized to match the file format.
 
-    NOTE: Make sure to specify the parameters (column indices) when running this. The default column numbers are in BED
-    format. Please modify the command if using any non-BED format.
+    NOTE: make sure you  specify the parameters (column indices) when running this. The default column numbers are in BED
+    format, please modify the command if using any non-BED format.
 
-    :param file_path: Path to the input file to be compressed and indexed.
-    :param comment_char: Comment character to identify header lines (default: '#').
-    :param skip_row: Number of header lines to skip in the index (default: 0).
-    :param sequence_row: 1-based column number containing sequence names (default: 1).
-    :param begin_row: 1-based column number containing start positions (default: 2).
-    :param end_row: 1-based column number containing end positions (default: 3).
-    :return: A tuple containing paths to the compressed file (.gz) and its index (.tbi).
+    Args:
+        file_path: Path to the input file to be compressed and indexed
+        comment_char: Comment character to identify header lines (default: '#')
+        skip_row: Number of header lines to skip in the index (default: 0)
+        sequence_row: 1-based column number containing sequence names (default: 1)
+        begin_row: 1-based column number containing start positions (default: 2)
+        end_row: 1-based column number containing end positions (default: 3)
+
+    Returns:
+        Tuple[Path, Path]: Paths to the compressed file (.gz) and its index (.tbi)
+
     """
 
     # Compress using pysam
@@ -315,7 +318,6 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
         LOGGER.error(f"Failed to index file {outfile_compress}: {e}. Check the bgzip_and_tabix command in "
                      f"general_utilities - it's likely that the header settings need to be adjusted for your "
                      f"file format")
-        raise
 
     return Path(outfile_compress), Path(f'{outfile_compress}.tbi')
 
