@@ -106,8 +106,11 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
         tar_files.append(association_tarballs)
     else:
         # association_tarballs likely to be a list of tarballs
-        for tarball in association_tarballs:
-            tar_files.append(tarball)
+        if isinstance(association_tarballs, list):
+            for tarball in association_tarballs:
+                tar_files.append(tarball)
+        else:
+            tar_files.append(association_tarballs)
 
     # Now process them in order
     for tar_file in tar_files:
