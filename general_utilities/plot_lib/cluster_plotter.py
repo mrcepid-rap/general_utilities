@@ -129,14 +129,14 @@ class ClusterPlotter(Plotter, ABC):
         """
         # Define expected column types
         expected_types = {
-            self._chrom_column: 'int',
+            self._chrom_column: 'object ',
             self._pos_column: 'int',
-            self._alt_column: 'str',
-            self._id_column: 'str',
-            self._p_column: 'float',
-            self._csq_column: 'str',
+            self._alt_column: 'object',
+            self._id_column: 'object',
+            self._p_column: 'float128',
+            self._csq_column: 'object',
             self._maf_column: 'float',
-            self._gene_symbol_column: 'str'
+            self._gene_symbol_column: 'object'
         }
 
         # Iterate through expected types and check if the columns exist in the results table
