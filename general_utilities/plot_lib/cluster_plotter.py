@@ -1,11 +1,8 @@
-import random
 from abc import ABC
 from pathlib import Path
-from typing import Tuple, List
 
 import pandas as pd
 
-from general_utilities.association_resources import get_include_sample_ids
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.plot_lib.plotter import Plotter
 
@@ -21,6 +18,7 @@ class ClusterPlotter(Plotter, ABC):
     MUST have columns indicating:
 
     Chromosome, Position, alt, ref, some ID, p. value, and consequence
+    These columns are validated and checked to be of the correct type.
 
     These names for these columns in the underlying data can all be set when the class is instantiated. There is an
     optional column, 'TEST', that can be provided to further subset variants. This column name is not changeable via
@@ -67,6 +65,9 @@ class ClusterPlotter(Plotter, ABC):
         self._csq_column = csq_column
         self._maf_column = maf_column
         self._gene_symbol_column = gene_symbol_column
+
+        # Validate column types
+        self.validate_column_types()
 
         # Get index variants by distance (no LD clumping done)
         self._index_variants = self._cluster_variants()
@@ -120,3 +121,34 @@ class ClusterPlotter(Plotter, ABC):
                               f'results file.')
 
         return index_vars
+
+    def validate_column_types(self):
+        """
+        Validate the column types of the results table.
+        This method checks and makes sure the columns in the results table are of the expected types.
+        """
+        # Define expected column types
+        expected_types = {
+            self._chrom_column: 'object',
+            self._pos_column: 'int',
+            self._alt_column: 'object',
+            self._id_column: 'object',
+            self._p_column: 'float',
+            self._csq_column: 'object',
+            self._maf_column: 'float',
+            self._gene_symbol_column: 'object'
+        }
+
+        # Iterate through expected types and check if the columns exist in the results table
+        # and if their types match the expected types
+        for column, expected_type in expected_types.items():
+            if column in self._results_table.columns:
+                # Check if the column type matches the expected type
+                if self._results_table[column].dtype != expected_type:
+                    self._logger.warning(f"Column '{column}' has type {self._results_table[column].dtype}, "
+                                         f"expected {expected_type}. Casting...")
+                    # Cast the column to the expected type
+                    self._results_table[column] = self._results_table[column].astype(expected_type)
+            else:
+                self._logger.error(f"Column '{column}' is missing from the results table.")
+                raise ValueError(f"Missing required column: {column}")
