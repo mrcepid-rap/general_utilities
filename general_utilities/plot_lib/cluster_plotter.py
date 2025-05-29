@@ -129,7 +129,7 @@ class ClusterPlotter(Plotter, ABC):
         """
         # Define expected column types
         expected_types = {
-            self._chrom_column: 'object ',
+            self._chrom_column: 'object',
             self._pos_column: 'int',
             self._alt_column: 'object',
             self._id_column: 'object',
