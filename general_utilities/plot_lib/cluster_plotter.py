@@ -133,7 +133,7 @@ class ClusterPlotter(Plotter, ABC):
             self._pos_column: 'int',
             self._alt_column: 'object',
             self._id_column: 'object',
-            self._p_column: 'float128',
+            self._p_column: 'float',
             self._csq_column: 'object',
             self._maf_column: 'float',
             self._gene_symbol_column: 'object'
