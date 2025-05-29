@@ -149,6 +149,3 @@ class ClusterPlotter(Plotter, ABC):
                                          f"expected {expected_type}. Casting...")
                     # Cast the column to the expected type
                     self._results_table[column] = self._results_table[column].astype(expected_type)
-            else:
-                self._logger.error(f"Column '{column}' is missing from the results table.")
-                raise ValueError(f"Missing required column: {column}")
