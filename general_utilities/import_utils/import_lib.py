@@ -157,6 +157,10 @@ def process_regenie_step_one(regenie_run_location: InputFileHandler) -> bool:
 
     if regenie_run_location is None:
         return False
+    # if step one has already been run (if the files exist and are not empty)
+    elif Path('fit_out_pred.list').exists() and Path('fit_out_pred.list').stat().st_size > 0 and \
+            Path('fit_out_1.loco').exists() and Path('fit_out_1.loco').stat().st_size > 0:
+        return True
     else:
         tarball_path = regenie_run_location.get_file_handle()
         if tarfile.is_tarfile(tarball_path):
