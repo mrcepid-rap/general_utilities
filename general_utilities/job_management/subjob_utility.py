@@ -9,7 +9,7 @@ from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
 import dxpy
 
-from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
 
@@ -89,6 +89,7 @@ class JobStatus(Enum):
     TERMINATING = RunningStatus.RUNNING
     TERMINATED = RunningStatus.FAILED
     FAILED = RunningStatus.FAILED
+
 
 class Priority(Enum):
     """DNANexus-style priority levels for jobs as an Enum to enforce possible values."""
@@ -519,7 +520,7 @@ class SubjobUtility:
                             if '$dnanexus_link' in value:
 
                                 if self._download_on_complete:  # Download the file if the user wants it locally
-                                    new_values.append(download_dxfile_by_name(value, print_status=False))
+                                    new_values.append(InputFileHandler(value, download_now=True).get_file_handle())
                                 else:
                                     new_values.append(value)
 
@@ -538,8 +539,8 @@ class SubjobUtility:
                             if '$dnanexus_link' in output_value:
                                 # This is still likely a file...
                                 if self._download_on_complete:  # Download the file if the user wants it locally
-                                    output_dict[output_key] = download_dxfile_by_name(output_value,
-                                                                                      print_status=False)
+                                    output_dict[output_key] = InputFileHandler(output_value,
+                                                                               download_now=True).get_file_handle()
                                 else:
                                     output_dict[output_key] = output_value
 
@@ -631,6 +632,6 @@ def prep_current_image(required_files: List[dict]) -> CommandExecutor:
     cmd_executor = build_default_command_executor()
 
     for file in required_files:
-        download_dxfile_by_name(file, print_status=False)
+        InputFileHandler(file, download_now=True).get_file_handle()
 
     return cmd_executor
