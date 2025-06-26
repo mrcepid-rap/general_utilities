@@ -39,6 +39,8 @@ standardize_table <- function(table_path, p_val_col) {
     some_table[,chrom:=as.character(chrom)]
   }
   some_table[,chrom:=factor(chrom, levels = mean_chr_pos[,chrom])] # Make sure chromosomes are standardised to those in transcripts
+  
+  some_table <- merge(some_table, mean_chr_pos, by = "chrom", all.x = TRUE)
 
   return(some_table)
 
