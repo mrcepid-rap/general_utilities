@@ -200,7 +200,10 @@ class InputFileHandler:
         if path.is_file():
             # copy path from wherever it is to the current working directory
             destination = Path.cwd() / path.name
-            shutil.copyfile(path, destination)
+            try:
+                shutil.copyfile(path, destination)
+            except shutil.SameFileError:
+                pass
             return Path(destination)
         else:
             raise FileNotFoundError(f"Local file not found: {self._input_str}")
