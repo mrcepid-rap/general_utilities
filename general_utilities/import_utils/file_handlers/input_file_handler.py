@@ -165,22 +165,22 @@ class InputFileHandler:
         # if we are working with a DNA Nexus file ID in dict format
         if isinstance(self._input_str, dict):
             # if the input is a dxlink, then we should find it
-            print(self._input_str)
             dxfile = dxpy.bindings.dxdataobject_functions.describe(self._input_str)
             file_path = download_dxfile_by_name(dxfile, print_status=False)
         # if we are working with a DNA Nexus file ID in string format
         elif re.match('file-\\w{24}', self._input_str):
-            file_path = download_dxfile_by_name(self._input_str)
+            dxfile = dxpy.bindings.dxdataobject_functions.describe(self._input_str)
+            file_path = download_dxfile_by_name(file=dxfile['id'], project_id=dxfile['project'], print_status=False)
         # if we are working with a project and file ID
         elif re.match(r'project-\w{24}:file-\w{24}', self._input_str):
             project = (m := re.findall(r'(project-\w{24})', self._input_str)) and m[0]
             file = (m := re.findall(r'(file-\w{24})', self._input_str)) and m[0]
             dxfile = dxpy.DXFile(project=project, dxid=file)
-            file_path = download_dxfile_by_name(dxfile)
+            file_path = download_dxfile_by_name(file=dxfile, project_id=project, print_status=False)
         elif re.match('project-\\w{24}', self._input_str):
             project, folder, file = self._split_dnanexus_path()
             dxfile = find_dxlink(name=file, folder=folder, project=project)
-            file_path = download_dxfile_by_name(dxfile['$dnanexus_link']['id'])
+            file_path = download_dxfile_by_name(file=dxfile['$dnanexus_link']['id'], project_id=project, print_status=False)
         else:
             raise FileNotFoundError(f"DNA Nexus input string {self._input_str} could not be resolved.")
 
