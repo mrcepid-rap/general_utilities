@@ -162,8 +162,12 @@ class InputFileHandler:
         :raises dxpy.exceptions.DXError: If the DNA Nexus file download fails.
         """
 
+        # if the file format has already been parsed as a DXFile object, then we should use it
+        if isinstance(self._input_str, dxpy.bindings.dxfile.DXFile):
+            dxfile = self._input_str
+            file_path = download_dxfile_by_name(file=dxfile.id, project_id=dxfile.project, print_status=False)
         # if we are working with a DNA Nexus file ID in dict format
-        if isinstance(self._input_str, dict):
+        elif isinstance(self._input_str, dict):
             # if the input is a dxlink, then we should find it
             dxfile = dxpy.bindings.dxdataobject_functions.describe(self._input_str)
             file_path = download_dxfile_by_name(dxfile, print_status=False)
