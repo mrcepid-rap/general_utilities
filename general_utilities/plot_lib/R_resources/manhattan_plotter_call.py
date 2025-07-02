@@ -30,7 +30,7 @@ standardize_table <- function(table_path, p_val_col) {
 
   setnames(some_table, names(some_table), str_to_lower(names(some_table)))
   setnames(some_table, p_val_col, "p_value_selected")
-  
+
   some_table$p_value_selected <- as.numeric(some_table$p_value_selected)
 
   some_table[,log_p:=-log10(p_value_selected)] # Add -log10 p value
@@ -39,8 +39,6 @@ standardize_table <- function(table_path, p_val_col) {
     some_table[,chrom:=as.character(chrom)]
   }
   some_table[,chrom:=factor(chrom, levels = mean_chr_pos[,chrom])] # Make sure chromosomes are standardised to those in transcripts
-  
-  some_table <- merge(some_table, mean_chr_pos, by = "chrom", all.x = TRUE)
 
   return(some_table)
 
