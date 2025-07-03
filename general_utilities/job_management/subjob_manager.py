@@ -1,8 +1,6 @@
 import platform
 import re
-import socket
 from enum import Enum
-from socket import socket
 
 import requests
 
@@ -131,3 +129,7 @@ class SubjobUtilityInterface:
 
         return self._gcp_check_result
 
+    @property
+    def platform(self) -> Platform:
+        """Return the detected platform (DX, LOCAL, or GCP)."""
+        return self._platform
