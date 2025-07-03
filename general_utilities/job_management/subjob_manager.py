@@ -125,23 +125,9 @@ class SubjobUtilityInterface:
                     response.headers.get('Metadata-Flavor') == 'Google'
             )
             self._logger.info(f"GCP VM detection result: {self._gcp_check_result}")
-        except (requests.exceptions.RequestException, socket.timeout):
-            self._logger.info("GCP VM detection failed due to request exception.")
+        except Exception as e:
+            self._logger.info(f"GCP VM detection failed")
             self._gcp_check_result = False
 
         return self._gcp_check_result
 
-    @property
-    def platform(self) -> Platform:
-        """Return the detected platform."""
-        return self._platform
-
-    @property
-    def is_dx(self) -> bool:
-        """Return True if running on DNAnexus."""
-        return self._platform == Platform.DX
-
-    @property
-    def is_local(self) -> bool:
-        """Return True if running locally."""
-        return self._platform == Platform.LOCAL
