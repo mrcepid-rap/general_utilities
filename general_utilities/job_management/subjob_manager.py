@@ -112,6 +112,7 @@ class SubjobUtilityInterface:
         """
         Detects if the script is running on a Google Compute Engine VM.
         Memoized to avoid repeated metadata server queries.
+        Returns False silently if detection fails.
         """
         if self._gcp_check_result is not None:
             return self._gcp_check_result
@@ -122,9 +123,7 @@ class SubjobUtilityInterface:
                     response.status_code == 200 and
                     response.headers.get('Metadata-Flavor') == 'Google'
             )
-            self._logger.info(f"GCP VM detection result: {self._gcp_check_result}")
-        except Exception as e:
-            self._logger.info(f"GCP VM detection failed: {type(e).__name__}: {e}")
+        except Exception:
             self._gcp_check_result = False
 
         return self._gcp_check_result
