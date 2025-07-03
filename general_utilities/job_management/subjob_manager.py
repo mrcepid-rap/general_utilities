@@ -22,12 +22,17 @@ class Platform(Enum):
 
 
 class SubjobUtilityInterface:
+    """
+    Interface class that launches jobs using the appropriate backend based on the detected platform.
+    Supports DNAnexus subjobs (DX) and local threading.
+    """
+
     def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
                  log_update_time: int = 60, download_on_complete: bool = False, thread_factor: int = 1,
                  threads: int = None):
 
         self._logger = MRCLogger(__name__).get_logger()
-        self._is_gcp = self._is_running_on_gcp_vm()
+        self._gcp_check_result = None  # for memoization
         self._platform_uname = self._detect_platform_uname()
         self._platform = self._platform_identifier()
 
@@ -51,18 +56,11 @@ class SubjobUtilityInterface:
         else:
             raise RuntimeError("GCP not supported for job/thread launching.")
 
-    def queue_subjob(self, function, inputs: dict, outputs: list = None, name: str = None, instance_type: str = None) -> None:
+    def queue_subjob(self, function, inputs: dict, outputs: list = None, name: str = None,
+                     instance_type: str = None) -> None:
         """
-        Launch a subjob (DX) or a thread (local) using a unified interface.
-
-        :param function: The function or class to be executed as a subjob.
-        :param inputs: A dictionary of inputs to be passed to the function.
-        :param outputs: A list of outputs expected from the function (DX only).
-        :param name: The name of the job (DX only).
-        :param instance_type: The instance type for the job (DX only).
-        :return: None
+        Queue a subjob (DX) or a thread (local) using a unified interface.
         """
-        # Launch a subjob or thread based on the platform
         if self._platform == Platform.DX:
             self._launcher.launch_job(
                 function=function,
@@ -80,8 +78,6 @@ class SubjobUtilityInterface:
     def submit_and_monitor(self) -> None:
         """
         Submit the queued jobs and monitor their execution.
-        This method is used to finalize the job submission process and wait for the jobs to complete.
-        :return: None
         """
         if self._platform == Platform.DX:
             self._launcher.submit_queue()
@@ -90,17 +86,14 @@ class SubjobUtilityInterface:
 
     def get_outputs(self) -> list:
         """
-        Retrieve the outputs of the completed jobs.
-        :return: A list of outputs from the completed jobs.
+        Retrieve outputs of completed jobs.
         """
         return list(self._launcher)
 
     def _platform_identifier(self) -> Platform:
         """
         Identifies the platform based on the environment and system information.
-        :return: An instance of Platform enum representing the detected platform.
         """
-
         if re.match(r'job-\w{24}', self._platform_uname):
             return Platform.DX
 
@@ -112,7 +105,6 @@ class SubjobUtilityInterface:
     def _detect_platform_uname(self) -> str:
         """
         Detects the platform by checking the system's uname information.
-        :return: A string representing the platform.
         """
         uname_info = platform.uname().node.lower()
         self._logger.info(f"Platform uname info: {uname_info}")
@@ -121,13 +113,35 @@ class SubjobUtilityInterface:
     def _is_running_on_gcp_vm(self) -> bool:
         """
         Detects if the script is running on a Google Compute Engine VM.
-        :return: True if running on a GCP VM, False otherwise.
+        Memoized to avoid repeated metadata server queries.
         """
+        if self._gcp_check_result is not None:
+            return self._gcp_check_result
+
         try:
             response = requests.get('http://metadata.google.internal', timeout=0.5)
-            result = response.status_code == 200 and response.headers.get('Metadata-Flavor') == 'Google'
-            self._logger.info(f"GCP VM detection result: {result}")
-            return result
+            self._gcp_check_result = (
+                    response.status_code == 200 and
+                    response.headers.get('Metadata-Flavor') == 'Google'
+            )
+            self._logger.info(f"GCP VM detection result: {self._gcp_check_result}")
         except (requests.exceptions.RequestException, socket.timeout):
             self._logger.info("GCP VM detection failed due to request exception.")
-            return False
+            self._gcp_check_result = False
+
+        return self._gcp_check_result
+
+    @property
+    def platform(self) -> Platform:
+        """Return the detected platform."""
+        return self._platform
+
+    @property
+    def is_dx(self) -> bool:
+        """Return True if running on DNAnexus."""
+        return self._platform == Platform.DX
+
+    @property
+    def is_local(self) -> bool:
+        """Return True if running locally."""
+        return self._platform == Platform.LOCAL
