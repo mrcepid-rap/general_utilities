@@ -104,18 +104,23 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
     # association_tarballs likely to be a single tarball:
     if '.tar.gz' in str(association_tarballs.get_input_str()):
         tar_files.append(association_tarballs)
-    else:
-        # association_tarballs likely to be a list of tarballs
+    if isinstance(association_tarballs, list):
+        # If it's a list, iterate over it
         for tarball in association_tarballs:
-            tar_files.append(tarball)
+            unzipped = tarball.get_file_handle()
+            tar_files.append(unzipped)
+    elif isinstance(association_tarballs, InputFileHandler):
+        # If it's a single InputFileHandler instance, append it directly
+        tar_files = [association_tarballs.get_file_handle()]
+    else:
+        raise TypeError("association_tarballs must be an InputFileHandler or a list of InputFileHandler instances")
 
     # Now process them in order
     for tar_file in tar_files:
-        current_tar = tar_file.get_file_handle()
-        if tarfile.is_tarfile(current_tar):
-            tarball_prefix = current_tar.name.replace('.tar.gz', '')
+        if tarfile.is_tarfile(tar_file):
+            tarball_prefix = tar_file.name.replace('.tar.gz', '')
             tarball_prefixes.append(tarball_prefix)
-            tar = tarfile.open(current_tar, 'r:gz')
+            tar = tarfile.open(tar_file, 'r:gz')
             tar.extractall()
 
             # Construct regex dynamically from tarball_prefixes

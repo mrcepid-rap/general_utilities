@@ -31,6 +31,8 @@ standardize_table <- function(table_path, p_val_col) {
   setnames(some_table, names(some_table), str_to_lower(names(some_table)))
   setnames(some_table, p_val_col, "p_value_selected")
 
+  some_table$p_value_selected <- as.numeric(some_table$p_value_selected)
+
   some_table[,log_p:=-log10(p_value_selected)] # Add -log10 p value
   if ('chr' %in% names(some_table)) {  # Account for BOLT-LMM results...
     setnames(some_table, 'chr', 'chrom')
