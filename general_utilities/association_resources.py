@@ -283,7 +283,7 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
     return found_index
 
 
-def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
+def bgzip_and_tabix(file_path: Path, comment_char: str = ' ', skip_row: int = 0,
                     sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
     """Compress a file using bgzip and create a tabix index.
 
@@ -295,7 +295,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
 
     Args:
         file_path: Path to the input file to be compressed and indexed
-        comment_char: Comment character to identify header lines (default: None, which must be converted to a space to work)
+        comment_char: Comment character to identify header lines (default: '#')
         skip_row: Number of header lines to skip in the index (default: 0)
         sequence_row: 1-based column number containing sequence names (default: 1)
         begin_row: 1-based column number containing start positions (default: 2)
@@ -305,9 +305,6 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
         Tuple[Path, Path]: Paths to the compressed file (.gz) and its index (.tbi)
 
     """
-    # this is a weird workaround the pysam module which has a bug to do with comment_char
-    if comment_char is None:
-        comment_char = ' '
 
     # Compress using pysam
     outfile_compress = f'{file_path}.gz'
