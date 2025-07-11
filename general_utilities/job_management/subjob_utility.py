@@ -9,7 +9,7 @@ from datetime import datetime
 from importlib import import_module
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
-from general_utilities.association_resources import download_dxfile_by_name
+from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
 
