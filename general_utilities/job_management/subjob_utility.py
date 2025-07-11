@@ -1,15 +1,14 @@
-import os
-import math
-import dxpy
 import inspect
-
-from enum import Enum, auto
-from time import sleep, time
+import math
+import os
 from datetime import datetime
+from enum import Enum, auto
 from importlib import import_module
+from time import sleep, time
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
-from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
+import dxpy
+
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
@@ -90,6 +89,14 @@ class JobStatus(Enum):
     TERMINATING = RunningStatus.RUNNING
     TERMINATED = RunningStatus.FAILED
     FAILED = RunningStatus.FAILED
+
+class Priority(Enum):
+    """DNANexus-style priority levels for jobs as an Enum to enforce possible values."""
+
+    LOW = 'low'
+    NORMAL = 'normal'
+    HIGH = 'high'
+
 
 class Priority(Enum):
     """DNANexus-style priority levels for jobs as an Enum to enforce possible values."""
@@ -202,7 +209,8 @@ class SubjobUtility:
         self._retries = retries
         if 'DX_JOB_ID' in os.environ:
             parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
-            self._default_instance_type = parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
+            self._default_instance_type = \
+                parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
         else:
             self._default_instance_type = None
 
@@ -517,11 +525,9 @@ class SubjobUtility:
                         for value in output_value:
                             # This is possibly (likely) a file
                             if '$dnanexus_link' in value:
-                                if value['$dnanexus_link'].startswith('file-'):
-                                    if self._download_on_complete:  # Download the file if the user wants it locally
-                                        new_values.append(download_dxfile_by_name(value, print_status=False))
-                                    else:
-                                        new_values.append(value)
+
+                                if self._download_on_complete:  # Download the file if the user wants it locally
+                                    new_values.append(InputFileHandler(value, download_now=True).get_file_handle())
                                 else:
                                     new_values.append(value)
 
@@ -539,14 +545,12 @@ class SubjobUtility:
                         if type(output_value) is dict:
                             if '$dnanexus_link' in output_value:
                                 # This is still likely a file...
-                                if output_value['$dnanexus_link'].startswith('file-'):
-                                    if self._download_on_complete:  # Download the file if the user wants it locally
-                                        output_dict[output_key] = download_dxfile_by_name(output_value,
-                                                                                          print_status=False)
-                                    else:
-                                        output_dict[output_key] = output_value
-                                else:  # This is something else that I don't think actually exists in DNANexus...
+                                if self._download_on_complete:  # Download the file if the user wants it locally
+                                    output_dict[output_key] = InputFileHandler(output_value,
+                                                                               download_now=True).get_file_handle()
+                                else:
                                     output_dict[output_key] = output_value
+
                             else:  # I don't think this else can happen, but adding it just to be sure
                                 output_dict[output_key] = output_value
                         # This is unlikely to be a file
