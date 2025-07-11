@@ -163,7 +163,7 @@ class InputFileHandler:
         """
 
         # if the file format has already been parsed as a DXFile object, then we should use it
-        if isinstance(self._input_str, dxpy.DXFile):
+        if isinstance(self._input_str, dxpy.bindings.dxfile.DXFile):
             dxfile = self._input_str
             file_path = download_dxfile_by_name(file=dxfile.id, project_id=dxfile.project, print_status=False)
         # if we are working with a DNA Nexus file ID in dict format
@@ -205,7 +205,6 @@ class InputFileHandler:
             # copy path from wherever it is to the current working directory
             destination = Path.cwd() / path.name
             try:
-                # path.rename(target=destination)
                 shutil.copyfile(path, destination)
             except shutil.SameFileError:
                 pass
