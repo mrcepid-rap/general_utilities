@@ -1,14 +1,15 @@
-import inspect
-import math
 import os
-from datetime import datetime
+import math
+import dxpy
+import inspect
+
 from enum import Enum, auto
-from importlib import import_module
 from time import sleep, time
+from datetime import datetime
+from importlib import import_module
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
 
-import dxpy
-
+from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
@@ -91,14 +92,6 @@ class JobStatus(Enum):
     FAILED = RunningStatus.FAILED
 
 
-class Priority(Enum):
-    """DNANexus-style priority levels for jobs as an Enum to enforce possible values."""
-
-    LOW = 'low'
-    NORMAL = 'normal'
-    HIGH = 'high'
-
-
 class SubjobUtility:
     """A class that contains information on, launches, and monitors subjobs on the DNANexus platform.
 
@@ -166,11 +159,10 @@ class SubjobUtility:
     :param download_on_complete: Should ALL file outputs be downloaded on subjob completion? Setting this
         option to 'True' will download all files to the current instance and provide a :func:Path. If 'False'
         (default), the value in the output dictionary will be a :func:dxpy.dxlink(). [False]
-    :param priority: The priority of the job. This is a string that can be 'low', 'normal', or 'high'. [low]
     """
 
     def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
-                 log_update_time: int = 60, download_on_complete: bool = False, priority: Priority = Priority.LOW):
+                 log_update_time: int = 60, download_on_complete: bool = False):
 
         self._logger = MRCLogger(__name__).get_logger()
 
@@ -179,7 +171,6 @@ class SubjobUtility:
         self._incrementor = incrementor
         self._log_update_time = log_update_time
         self._download_on_complete = download_on_complete
-        self._priority = priority
 
         # We define three difference queues for use during runtime:
         # job_queue   – jobs waiting to be submitted
@@ -202,8 +193,7 @@ class SubjobUtility:
         self._retries = retries
         if 'DX_JOB_ID' in os.environ:
             parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
-            self._default_instance_type = \
-                parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
+            self._default_instance_type = parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
         else:
             self._default_instance_type = None
 
@@ -464,7 +454,7 @@ class SubjobUtility:
             elif job['job_type'] == Environment.LOCAL:
                 dxapplet = job['job_type'].value(job['function'])
                 dxjob = dxapplet.run(applet_input=job['input'], folder=job['destination'], name=job['name'],
-                                     instance_type=job['instance_type'], priority=self._priority.value)
+                                     instance_type=job['instance_type'], priority='low')
 
             else:
                 raise RuntimeError('Job does not have type DX or LOCAL, which should be impossible')
@@ -518,9 +508,11 @@ class SubjobUtility:
                         for value in output_value:
                             # This is possibly (likely) a file
                             if '$dnanexus_link' in value:
-
-                                if self._download_on_complete:  # Download the file if the user wants it locally
-                                    new_values.append(InputFileHandler(value, download_now=True).get_file_handle())
+                                if value['$dnanexus_link'].startswith('file-'):
+                                    if self._download_on_complete:  # Download the file if the user wants it locally
+                                        new_values.append(download_dxfile_by_name(value, print_status=False))
+                                    else:
+                                        new_values.append(value)
                                 else:
                                     new_values.append(value)
 
@@ -538,12 +530,14 @@ class SubjobUtility:
                         if type(output_value) is dict:
                             if '$dnanexus_link' in output_value:
                                 # This is still likely a file...
-                                if self._download_on_complete:  # Download the file if the user wants it locally
-                                    output_dict[output_key] = InputFileHandler(output_value,
-                                                                               download_now=True).get_file_handle()
-                                else:
+                                if output_value['$dnanexus_link'].startswith('file-'):
+                                    if self._download_on_complete:  # Download the file if the user wants it locally
+                                        output_dict[output_key] = download_dxfile_by_name(output_value,
+                                                                                          print_status=False)
+                                    else:
+                                        output_dict[output_key] = output_value
+                                else:  # This is something else that I don't think actually exists in DNANexus...
                                     output_dict[output_key] = output_value
-
                             else:  # I don't think this else can happen, but adding it just to be sure
                                 output_dict[output_key] = output_value
                         # This is unlikely to be a file
