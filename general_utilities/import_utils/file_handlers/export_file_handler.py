@@ -9,7 +9,7 @@ import requests
 from dxpy import DXFile
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import generate_linked_dx_file
-from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler, FileType
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.mrc_logger import MRCLogger
 
 
@@ -24,8 +24,20 @@ class Platform(Enum):
 
 
 class ExportFileHandler:
+    """
+    This class is designed to recognize the platform on which it is running (Local, DNANexus, or GCP) and then
+    upload files accordingly.
+
+    For DNA Nexus, it converts the input files to DX links using the `dxpy.dxlink` function, and returns a
+    dictionary or list of dictionaries containing the DX links.
+
+    For GCP, the upload logic is not implemented yet, but it can be extended in the future.
+
+    For Local, it simply returns an empty dictionary, as no upload is performed.
+    """
+
     def __init__(self):
-        """Initialize the ExportFileHandler"""
+
         self._logger = MRCLogger(__name__).get_logger()
         self._gcp_check_result = None
         self.platform = self._detect_platform()
@@ -70,47 +82,58 @@ class ExportFileHandler:
         return self._gcp_check_result
 
     def _convert_file_to_dxlink(self, file: Union[str, Path, DXFile, dict]) -> dict:
-        # If it's already a DXFile, just wrap it
-        if isinstance(file, DXFile):
-            return dxpy.dxlink(file)
+        """
+        Converts a file input to a DX link.
+        This method handles different types of inputs robustly by using the InputFileHandler class.
 
-        # If it's a dictionary, we expect 'file' to be a key
-        if isinstance(file, dict):
-            if 'file' not in file:
-                raise ValueError("Expected a key 'file' in the dict to specify the path to the file")
-            return dxpy.dxlink(generate_linked_dx_file(**file))
-
-        # For str/Path, use InputFileHandler to check type and upload
+        :param file: The input file to be converted to a DX link.
+        :return: A DX link dictionary for the file.
+        """
+        # Treat everything else via InputFileHandler
         handler = InputFileHandler(file)
-        if handler.get_file_type() == FileType.DNA_NEXUS_FILE:
-            return dxpy.dxlink(generate_linked_dx_file(handler.get_file_handle()))
-
-        return dxpy.dxlink(generate_linked_dx_file(handler.get_file_handle()))
+        handle = handler.get_file_handle()
+        return dxpy.dxlink(generate_linked_dx_file(handle))
 
     def export_files(self, files_input: Union[str, Path, dict, List[Union[str, Path, dict]], Dict[
         str, Union[str, Path, dict, List[Union[str, Path, dict]]]]]) -> Union[
         dict, List[dict], Dict[str, Union[dict, List[dict]]], str, Path, DXFile]:
         """
         Export files according to platform
+
+        This method handles the export of files based on the detected platform:
+        - For Local platform, it does not perform any upload and returns an empty dictionary.
+        - For GCP platform, it currently logs a message that upload logic is not implemented.
+        - For DNANexus platform, it converts the input files to DX links using the `_convert_file_to_dxlink` method.
+
+        :param files_input: The input files to be exported. Can be a single file path, a list of file paths,
+            a dictionary with file paths, or a list of dictionaries.
+        :return: A dictionary or list of dictionaries containing the DX links for the files.
         """
+        # Check if if the platform is Local, in which case no upload is performed
         if self.platform == Platform.LOCAL:
             if self._logger:
                 self._logger.info("Local platform detected: no upload performed.")
             return {}
 
+        # Check if the platform is GCP, in which case upload logic is not implemented yet
         if self.platform == Platform.GCP:
             if self._logger:
                 self._logger.info("GCP platform detected: upload logic not implemented yet.")
             return {}
 
-        # Platform.DX
+        # Check if the platform is DNANexus, in which case we convert files to DX links
+        # Note that the input can be a single file, a list of files, or a dictionary of files
+        # The output will be a DX link or a list/dictionary of DX links, so that it can be used in DNANexus jobs.
         if self.platform == Platform.DX:
+            # If the input is a single file, convert it to a DX link
             if isinstance(files_input, (str, Path)):
                 return self._convert_file_to_dxlink(files_input)
 
+            # If the input is a list of files, convert each file to a DX link
             if isinstance(files_input, list):
                 return [self._convert_file_to_dxlink(f) for f in files_input]
 
+            # If the input is a dictionary, convert each file to a DX link and return a dictionary
             if isinstance(files_input, dict):
                 output = {}
                 for k, v in files_input.items():
@@ -120,8 +143,10 @@ class ExportFileHandler:
                         output[k] = self._convert_file_to_dxlink(v)
                 return output
 
+            # If the input is not a recognized type, raise an error
             raise TypeError(f"Unsupported input type for export_files: {type(files_input)}")
 
         else:
+            # If the platform is not recognized, log an error
             if self._logger:
                 self._logger.error(f"Unsupported platform: {self.platform}")

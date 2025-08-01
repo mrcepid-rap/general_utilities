@@ -5,7 +5,8 @@ import pytest
 from dxpy import DXFile
 
 from general_utilities.import_utils.file_handlers.export_file_handler import ExportFileHandler, \
-    Platform, generate_linked_dx_file
+    Platform
+from general_utilities.import_utils.file_handlers.input_file_handler import FileType
 
 
 @pytest.mark.parametrize(
@@ -17,6 +18,9 @@ from general_utilities.import_utils.file_handlers.export_file_handler import Exp
     ],
 )
 def test_platform_detection_parametrized(uname_value, gcp_check, expected_platform):
+    """
+    Test the platform detection logic in ExportFileHandler._detect_platform method.
+    """
     handler = ExportFileHandler()
 
     with patch.object(handler, "_detect_platform_uname", return_value=uname_value), \
@@ -38,6 +42,9 @@ def test_platform_detection_parametrized(uname_value, gcp_check, expected_platfo
     ],
 )
 def test_export_files_dnaxexus_mock_upload(input_data, expected_structure):
+    """
+    Test the export_files method of ExportFileHandler for DNANexus platform.
+    """
     handler = ExportFileHandler()
     handler.platform = Platform.DX  # Force DNAnexus platform for the test
 
@@ -73,33 +80,41 @@ def test_export_files_dnaxexus_mock_upload(input_data, expected_structure):
 
 
 @pytest.mark.parametrize(
-    "input_obj, is_dxfile, expected_calls",
+    "input_obj, file_type, expected_generate_call",
     [
-        (MagicMock(spec=DXFile, dxid="file-123"), True, 0),  # Already DXFile, no calls expected
-        (Path("/path/to/file1.txt"), False, 2),              # Normal path triggers 2 calls
-        ("string_path.txt", False, 2),                        # String path also triggers calls
+        (MagicMock(spec=DXFile), FileType.DNA_NEXUS_FILE, True),  # still wrapped via handler
+        (Path("/fake/path.txt"), FileType.LOCAL_PATH, True),
+        ("fake_path.txt", FileType.LOCAL_PATH, True),
+        ({"file": Path("myfile.txt"), "delete_on_upload": False}, FileType.LOCAL_PATH, True),
     ],
 )
-def test_convert_file_to_dxlink_parametrized(input_obj, is_dxfile, expected_calls):
+def test_convert_file_to_dxlink_parametrized(input_obj, file_type, expected_generate_call):
     handler = ExportFileHandler()
+    mock_linked_file = MagicMock(spec=DXFile)
 
-    with patch('general_utilities.import_utils.file_handlers.export_file_handler.generate_linked_dx_file', return_value="linked_file") as mock_generate, \
-         patch('general_utilities.import_utils.file_handlers.export_file_handler.dxpy.dxlink', return_value="dxlink_object") as mock_dxlink:
+    with patch('general_utilities.import_utils.file_handlers.export_file_handler.generate_linked_dx_file',
+               return_value=mock_linked_file) as mock_generate, \
+            patch('general_utilities.import_utils.file_handlers.export_file_handler.dxpy.dxlink',
+                  return_value="dxlink_object") as mock_dxlink, \
+            patch('general_utilities.import_utils.file_handlers.input_file_handler.InputFileHandler.get_file_type',
+                  return_value=file_type), \
+            patch('general_utilities.import_utils.file_handlers.input_file_handler.InputFileHandler.get_file_handle',
+                  return_value=input_obj), \
+            patch('general_utilities.import_utils.file_handlers.input_file_handler.InputFileHandler.__init__',
+                  return_value=None):
 
-        result = handler._convert_file_to_dxlink(input_obj)
+        # ensure handler instance has required attributes
+        with patch.object(handler, '_convert_file_to_dxlink', wraps=handler._convert_file_to_dxlink) as wrapped:
+            result = handler._convert_file_to_dxlink(input_obj)
 
-        print(result)
+        assert result == "dxlink_object"
 
-        if is_dxfile:
-            assert result is input_obj
-            assert mock_generate.call_count == 0
-            assert mock_dxlink.call_count == 0
+        if expected_generate_call:
+            mock_generate.assert_called_once_with(input_obj)
+            mock_dxlink.assert_called_once_with(mock_linked_file)
         else:
-            assert result == "dxlink_object"
-            assert mock_generate.call_count == 1
-            assert mock_generate.call_args[0][0] == input_obj
-            assert mock_dxlink.call_count == 1
-            assert mock_dxlink.call_args[0][0] == "linked_file"
+            mock_generate.assert_not_called()
+            mock_dxlink.assert_called_once_with(input_obj)
 
 
 @pytest.mark.parametrize(
@@ -114,6 +129,9 @@ def test_convert_file_to_dxlink_parametrized(input_obj, is_dxfile, expected_call
     ],
 )
 def test_convert_file_to_dxlink_failsafe(bad_input):
+    """
+    Test the _convert_file_to_dxlink method of ExportFileHandler with invalid inputs.
+    """
     handler = ExportFileHandler()
 
     with pytest.raises(Exception):
