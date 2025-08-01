@@ -68,7 +68,7 @@ class ExportFileHandler:
 
         return self._gcp_check_result
 
-    def _convert_file_to_dxlink(self, file: Union[str, Path, DXFile, dict]) -> dict | str | Path | DXFile | None:
+    def _convert_file_to_dxlink(self, file: Union[str, Path, DXFile, dict]) -> dict:
         """
         Convert a file (path, DXFile, or config dict) to a DNAnexus dxlink.
         Always returns a dxlink.
