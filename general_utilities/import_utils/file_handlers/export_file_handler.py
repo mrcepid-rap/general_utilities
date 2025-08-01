@@ -9,6 +9,7 @@ import requests
 from dxpy import DXFile
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import generate_linked_dx_file
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler, FileType
 from general_utilities.mrc_logger import MRCLogger
 
 
@@ -69,15 +70,22 @@ class ExportFileHandler:
         return self._gcp_check_result
 
     def _convert_file_to_dxlink(self, file: Union[str, Path, DXFile, dict]) -> dict:
-        """
-        Convert a file (path, DXFile, or config dict) to a DNAnexus dxlink.
-        Always returns a dxlink.
-        """
+        # If it's already a DXFile, just wrap it
+        if isinstance(file, DXFile):
+            return dxpy.dxlink(file)
+
+        # If it's a dictionary, we expect 'file' to be a key
         if isinstance(file, dict):
-            # Handle dicts like {'file': path, 'delete_on_upload': False}
+            if 'file' not in file:
+                raise ValueError("Expected a key 'file' in the dict to specify the path to the file")
             return dxpy.dxlink(generate_linked_dx_file(**file))
 
-        return dxpy.dxlink(generate_linked_dx_file(file))
+        # For str/Path, use InputFileHandler to check type and upload
+        handler = InputFileHandler(file)
+        if handler.get_file_type() == FileType.DNA_NEXUS_FILE:
+            return dxpy.dxlink(generate_linked_dx_file(handler.get_file_handle()))
+
+        return dxpy.dxlink(generate_linked_dx_file(handler.get_file_handle()))
 
     def export_files(self, files_input: Union[str, Path, dict, List[Union[str, Path, dict]], Dict[
         str, Union[str, Path, dict, List[Union[str, Path, dict]]]]]) -> Union[
