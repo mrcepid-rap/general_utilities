@@ -46,8 +46,6 @@ class ExportFileHandler:
         Detects the platform by checking the system's uname information.
         """
         uname_info = platform.uname().node.lower()
-        if self._logger:
-            self._logger.info(f"Platform uname info: {uname_info}")
         return uname_info
 
     def _is_running_on_gcp_vm(self) -> bool:
@@ -70,14 +68,20 @@ class ExportFileHandler:
 
         return self._gcp_check_result
 
-    def _convert_file_to_dxlink(self, file: Union[str, Path, DXFile]) -> DXFile:
-        if hasattr(file, 'dxid'):
-            return file
+    def _convert_file_to_dxlink(self, file: Union[str, Path, DXFile, dict]) -> dict | str | Path | DXFile | None:
+        """
+        Convert a file (path, DXFile, or config dict) to a DNAnexus dxlink.
+        Always returns a dxlink.
+        """
+        if isinstance(file, dict):
+            # Handle dicts like {'file': path, 'delete_on_upload': False}
+            return dxpy.dxlink(generate_linked_dx_file(**file))
+
         return dxpy.dxlink(generate_linked_dx_file(file))
 
-    def export_files(self, files_input: Union[
-        str, Path, List[Union[str, Path]], Dict[str, Union[str, Path, List[Union[str, Path]]]]]) -> Union[
-        DXFile, List[DXFile], Dict[str, Union[DXFile, List[DXFile]]], dict]:
+    def export_files(self, files_input: Union[str, Path, dict, List[Union[str, Path, dict]], Dict[
+        str, Union[str, Path, dict, List[Union[str, Path, dict]]]]]) -> Union[
+        dict, List[dict], Dict[str, Union[dict, List[dict]]], str, Path, DXFile]:
         """
         Export files according to platform
         """
