@@ -141,6 +141,7 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         }
 
         # convert this to a csr matrix
+        print(variant_n)
         final_genotypes = csr_matrix(stacked_variants, shape=(len(bgen_reader.samples), variant_n))
 
     return final_genotypes, summary_dict
