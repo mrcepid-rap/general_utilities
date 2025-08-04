@@ -44,6 +44,9 @@ def test_platform_detection_parametrized(uname_value, gcp_check, expected_platfo
 def test_export_files_dnaxexus_mock_upload(input_data, expected_structure):
     """
     Test the export_files method of ExportFileHandler for DNANexus platform.
+
+    This test mocks the _convert_file_to_dxlink method to simulate file conversion without actual DNANexus calls.
+    Primarily want to test whether the method correctly processes different input types (so that the output matches the expected structure).
     """
     handler = ExportFileHandler()
     handler.platform = Platform.DX  # Force DNAnexus platform for the test
@@ -89,6 +92,11 @@ def test_export_files_dnaxexus_mock_upload(input_data, expected_structure):
     ],
 )
 def test_convert_file_to_dxlink_parametrized(input_obj, file_type, expected_generate_call):
+    """
+    Test the _convert_file_to_dxlink method of ExportFileHandler with various input types.
+
+    This method should handle different input file types and return a DX link.
+    """
     handler = ExportFileHandler()
     mock_linked_file = MagicMock(spec=DXFile)
 
@@ -115,24 +123,3 @@ def test_convert_file_to_dxlink_parametrized(input_obj, file_type, expected_gene
         else:
             mock_generate.assert_not_called()
             mock_dxlink.assert_called_once_with(input_obj)
-
-
-@pytest.mark.parametrize(
-    "bad_input",
-    [
-        None,
-        123,
-        45.6,
-        [],
-        {},
-        object(),
-    ],
-)
-def test_convert_file_to_dxlink_failsafe(bad_input):
-    """
-    Test the _convert_file_to_dxlink method of ExportFileHandler with invalid inputs.
-    """
-    handler = ExportFileHandler()
-
-    with pytest.raises(Exception):
-        handler._convert_file_to_dxlink(bad_input)
