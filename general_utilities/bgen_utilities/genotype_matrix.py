@@ -138,7 +138,8 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         # record the collapsing stats in a dict
         summary_dict = {
             'allele_count': np.sum(stacked_variants),  # use np.sum to get total of all values
-            'n_variants': len(variant_arrays),  # get number of variants, based on pre-collapse number of variants!
+            'n_variants': len(variant_arrays), # get number of variants, based on pre-collapse number of variants!
+            'n_columns': variant_n
         }
 
         # convert this to a csr matrix
