@@ -23,9 +23,22 @@ class ThreadUtility(JobLauncherInterface):
         self._num_jobs = 0
         self._total_finished_models = 0
 
-        available_workers = math.floor(threads / thread_factor)
+        available_workers = math.floor(self._threads / thread_factor)
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
         self._future_pool = []
+
+    # I have a feeling the sleep() part is VERY inefficient but I am unsure of how to fix at the moment...
+    # Due to how futures work, most of the time a next() call will receive a 'None' return. We need to create a
+    # waiter that will hold until we get something OTHER than None, so we can return it to the main class.
+    def __next__(self) -> Any:
+
+        curr_future = next(self._future_iterator)
+        while curr_future is None:
+            curr_future = next(self._future_iterator)
+            sleep(0.1)
+
+        result = curr_future.result()
+        return result
 
     def __iter__(self) -> Iterator:
 
@@ -39,7 +52,7 @@ class ThreadUtility(JobLauncherInterface):
         self._future_iterator = futures.as_completed(self._future_pool)
         return self
 
-    def submit_queue(self) -> Iterator[Future]:
+    def submit_and_monitor(self) -> Iterator[Future]:
         """
         Submit the queued jobs and return an iterator over the futures.
         """

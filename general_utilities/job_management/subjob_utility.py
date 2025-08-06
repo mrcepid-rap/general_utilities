@@ -347,7 +347,7 @@ class SubjobUtility(JobLauncherInterface):
 
         self._job_queue.append(input_parameters)
 
-    def submit_queue(self) -> None:
+    def submit_and_monitor(self) -> None:
         """Submit the job queue created by adding jobs to launch_applet / launch_job and wait for submitted jobs to
         finish executing.
 
