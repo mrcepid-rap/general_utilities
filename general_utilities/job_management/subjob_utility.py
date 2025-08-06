@@ -1,13 +1,12 @@
-import os
-import math
-import dxpy
 import inspect
-
+import math
+import os
 from enum import Enum, auto
-from time import sleep, time
-from datetime import datetime
 from importlib import import_module
+from time import sleep, time
 from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
+
+import dxpy
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
@@ -35,7 +34,6 @@ class DXJobInfo(TypedDict):
     :cvar input: The inputs as defined in the Applet / Function specification
     :cvar outputs: The outputs as defined in the Applet / Function specification
     :cvar job_type: A :func:`Environment()` enum defining where subjobs have been launched from
-    :cvar retries: Current number of retries for this job. Will be incremented whenever a job fails
     :cvar destination: The output folder for :cvar outputs:. Only used by Environment.DXApplet jobs
     :cvar name: The name for a job
     :cvar instance_type: The requested instance_type for a job. Must conform to available DNANexus instance_types.
@@ -45,7 +43,6 @@ class DXJobInfo(TypedDict):
     input: Dict[str, Any]
     outputs: List[str]
     job_type: Environment
-    retries: int
     destination: Optional[str]
     name: Optional[str]
     instance_type: Optional[str]
@@ -150,25 +147,21 @@ class SubjobUtility:
     :param concurrent_job_limit: Number of jobs that can be run at once. Default of 100 is the actual limit for
         concurrent jobs on the DNANexus platform. It is also wishful in that you will rarely be able to have 100
         jobs simultaneously running. [100]
-    :param retries: Number of times to retry a job before marking it as a fail. Default is intended to let jobs
-        interrupted by the cloud provider to restart, NOT to fix broken code. [1]
     :param incrementor: This class will print a status method for every :param:incrementor jobs completed with a
         percentage of total jobs completed. [500]
-    :param log_update_time: How often should the log of current jobs be printed in seconds. [60]
     :param download_on_complete: Should ALL file outputs be downloaded on subjob completion? Setting this
         option to 'True' will download all files to the current instance and provide a :func:Path. If 'False'
         (default), the value in the output dictionary will be a :func:dxpy.dxlink(). [False]
     """
 
-    def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
-                 log_update_time: int = 60, download_on_complete: bool = False):
+    def __init__(self, instance_type, threads=100, download_on_complete: bool = False, **kwargs) -> None:
+
+        super().__init__(threads=threads, **kwargs)
 
         self._logger = MRCLogger(__name__).get_logger()
 
         # Dereference class parameters
-        self._concurrent_job_limit = concurrent_job_limit
-        self._incrementor = incrementor
-        self._log_update_time = log_update_time
+        self._instance_type = instance_type
         self._download_on_complete = download_on_complete
 
         # We define three difference queues for use during runtime:
@@ -176,8 +169,7 @@ class SubjobUtility:
         # job_running – jobs currently running, with a dict keyed on the DX job-id and with a value of DXJobDict class
         #   which contains the job class from instantiation and information about the job
         #   and information about the job
-        # job_failed  – A list of jobs which failed during runtime which, if the job has additional retries, can
-        #   be resubmitted
+        # job_failed  – A list of jobs which failed during runtime which
         self._job_queue: List[DXJobInfo] = []
         self._job_running: Dict[str, DXJobDict] = dict()
         self._job_failed: List[DXJobInfo] = []
@@ -189,10 +181,10 @@ class SubjobUtility:
         self._num_completed_jobs = 0
 
         # Set default job instance type
-        self._retries = retries
         if 'DX_JOB_ID' in os.environ:
             parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
-            self._default_instance_type = parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
+            self._default_instance_type = \
+            parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
         else:
             self._default_instance_type = None
 
@@ -283,7 +275,6 @@ class SubjobUtility:
                                        'input': inputs,
                                        'outputs': outputs,
                                        'job_type': Environment.LOCAL,
-                                       'retries': 0,
                                        'destination': f'/{destination}',
                                        'name': f'subjob_{self._total_jobs}' if name is None else None,
                                        'instance_type': instance_type if instance_type else self._default_instance_type}
@@ -349,7 +340,6 @@ class SubjobUtility:
                                        'input': inputs,
                                        'outputs': outputs,
                                        'job_type': Environment.DX,
-                                       'retries': 0,
                                        'destination': None,
                                        'name': None if name is None else name,
                                        'instance_type': instance_type if instance_type else self._default_instance_type}
@@ -363,10 +353,9 @@ class SubjobUtility:
         This method submits all jobs added to self._job_queue to the DNANexus job scheduler. It also manages watching
         jobs and checking when they complete or fail. To note: when subjob spot instances generated from a currently
         running DNANexus job fail due to a SpotInstanceInterruption, they bypass this checking process and will
-        always fail the parent process, which effectively bypasses the retries parameter defined in this class.
+        always fail the parent process
 
         Importantly, when all jobs finish, this method waits until the next iteration period as defined by
-        log_update_time parameter provided to the class constructor; therefore, it is best to avoid long update times.
         """
 
         # Close the queue to future job submissions to save my sanity for weird edge cases
@@ -382,13 +371,13 @@ class SubjobUtility:
         # Keep going until we get every job submitted or finished...
         while len(self._job_queue) > 0 or len(self._job_running.keys()) > 0:
 
-            # We only want to print the status when the log_update_time has passed. To do this we keep track of the time
+            # We only want to print the status when 60min has passed. To do this we keep track of the time
             # passed since the last iteration and add it to last_log_time. If last_log_time is greater than
-            # self._log_update_time, then we print the log and reset last_log_time to 0.
+            # 60, then we print the log and reset last_log_time to 0.
             current_time = time()
             last_log_time += current_time - last_time
             last_time = current_time
-            if last_log_time >= self._log_update_time:
+            if last_log_time >= 60:
                 last_log_time = 0
                 self._print_status()
 
@@ -402,17 +391,6 @@ class SubjobUtility:
                 self._logger.error(f'FAILED: {failed_job}')
         else:
             self._logger.info('All jobs completed, No failed jobs...')
-
-    def _print_status(self) -> None:
-        """Print a time-stamped log of jobs waiting in the queue to be submitted, currently running jobs, and failed
-        jobs.
-        """
-        self._logger.info(f'{"Jobs currently in the queue":{65}}: {len(self._job_queue)}')
-        self._logger.info(f'{"Jobs currently running":{65}}: {len(self._job_running.keys())}')
-        self._logger.info(f'{"Jobs failed":{65}}: {len(self._job_failed)}')
-
-        curr_time = datetime.today()
-        self._logger.info(f'{curr_time.isoformat("|", "seconds"):{"-"}^{65}}')
 
     def _monitor_subjobs(self) -> None:
         """This method is the primary monitoring point for queued, submitted, and finished jobs.
@@ -561,8 +539,7 @@ class SubjobUtility:
 
         * Completed: remove the (completed) job from the job_running dict
 
-        * Failed: Remove the failed job from the job_running_dict and, if the job has retries, add the job pack to
-        self._job_queue
+        * Failed: Remove the failed job from the job_running_dict
 
         * Running: Continue to monitor the job until completed
         """
@@ -575,11 +552,7 @@ class SubjobUtility:
             elif job_status is RunningStatus.FAILED:
                 job = self._job_running[job_id]['job_info']
                 del self._job_running[job_id]
-                if job['retries'] < self._retries:
-                    job['retries'] += 1
-                    self._job_queue.append(job)
-                else:
-                    self._job_failed.append(job)
+                self._job_failed.append(job)
 
 
 def check_subjob_decorator() -> Optional[str]:
