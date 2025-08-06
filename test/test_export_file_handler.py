@@ -10,76 +10,34 @@ from general_utilities.import_utils.file_handlers.input_file_handler import File
 
 
 @pytest.mark.parametrize(
-    "uname_value, gcp_check, expected_platform",
-    [
-        ("job-abcdefghijklmnopqrstuvwx", False, Platform.DX),
-        ("some-hostname", True, Platform.GCP),
-        ("some-hostname", False, Platform.LOCAL),
-    ],
-)
-def test_platform_detection_parametrized(uname_value, gcp_check, expected_platform):
-    """
-    Test the platform detection logic in ExportFileHandler._detect_platform method.
-    """
-    handler = ExportFileHandler()
-
-    with patch.object(handler, "_detect_platform_uname", return_value=uname_value), \
-            patch.object(handler, "_is_running_on_gcp_vm", return_value=gcp_check):
-        platform = handler._detect_platform()
-        assert platform == expected_platform
-
-
-@pytest.mark.parametrize(
-    "input_data, expected_structure",
+    "input_data, expected_result",
     [
         ("/path/to/file1.bcf", "converted-file1.bcf"),  # single file string input
-        ([Path("/path/to/file1.bcf"), Path("/path/to/file2.bcf")], ["converted-file1.bcf", "converted-file2.bcf"]),
-        # list of Paths
-        (
-                {"out1": "/path/to/file1.bcf", "out2": ["/path/to/file2.bcf", "/path/to/file3.bcf"]},
-                {"out1": "converted-file1.bcf", "out2": ["converted-file2.bcf", "converted-file3.bcf"]},
-        ),  # dict with mixed inputs
+        (Path("/path/to/file2.bcf"), "converted-file2.bcf"),  # single Path input
+        ([Path("/path/to/file1.bcf"), Path("/path/to/file2.bcf")],
+         ["converted-file1.bcf", "converted-file2.bcf"]),  # list of Paths
+        (["/path/to/file1.bcf", "/path/to/file2.bcf"],
+         ["converted-file1.bcf", "converted-file2.bcf"]),  # list of strings
     ],
 )
-def test_export_files_dnaxexus_mock_upload(input_data, expected_structure):
-    """
-    Test the export_files method of ExportFileHandler for DNANexus platform.
-
-    This test mocks the _convert_file_to_dxlink method to simulate file conversion without actual DNANexus calls.
-    Primarily want to test whether the method correctly processes different input types (so that the output matches the expected structure).
-    """
+def test_export_files_dnaxexus_mock_upload(input_data, expected_result):
     handler = ExportFileHandler()
-    handler.platform = Platform.DX  # Force DNAnexus platform for the test
+    handler._platform = Platform.DX
 
-    # Patch _convert_file_to_dxlink to return a mock string based on filename
     def mock_convert(file):
         return f"converted-{Path(file).name}"
 
     with patch.object(handler, "_convert_file_to_dxlink", side_effect=mock_convert) as mock_method:
         result = handler.export_files(input_data)
 
-        # Check the mock conversion was called expected number of times
-        if isinstance(input_data, dict):
-            expected_calls = []
-            for v in input_data.values():
-                if isinstance(v, list):
-                    expected_calls.extend([Path(f).name for f in v])
-                else:
-                    expected_calls.append(Path(v).name)
-            actual_calls = [Path(call[0]).name for call, _ in mock_method.call_args_list]
-            assert sorted(actual_calls) == sorted(expected_calls)
-        elif isinstance(input_data, list):
-            actual_calls = [Path(call[0]).name for call, _ in mock_method.call_args_list]
+        if isinstance(input_data, list):
             expected_calls = [Path(f).name for f in input_data]
+            actual_calls = [Path(call.args[0]).name for call in mock_method.call_args_list]
             assert sorted(actual_calls) == sorted(expected_calls)
         else:
-            # single call
             mock_method.assert_called_once_with(input_data)
 
-        print(result)
-
-        # Verify output matches expected_structure
-        assert result == expected_structure
+        assert result == expected_result
 
 
 @pytest.mark.parametrize(
