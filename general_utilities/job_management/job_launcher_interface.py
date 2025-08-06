@@ -1,7 +1,6 @@
 import math
 import os
 from abc import ABC, abstractmethod
-from asyncio import sleep
 
 from general_utilities.mrc_logger import MRCLogger
 
@@ -32,7 +31,6 @@ class JobLauncherInterface(ABC):
         self._num_jobs = 0
         self._output_array = []
 
-
     def _get_threads(self, requested_threads: int) -> int:
         """
         Get the number of threads to use for job execution.
@@ -41,8 +39,8 @@ class JobLauncherInterface(ABC):
         """
         threads = requested_threads if requested_threads else os.cpu_count()
         if threads is None or threads < 1:
-            raise ValueError('Not enough threads on machine to complete task. Number of threads on this machine '
-                             f'({threads}) is less than 1.')
+            self._logger.error('Not enough threads on machine to complete task. Number of threads on this machine '
+                               f'({threads}) is less than 1.')
         return threads
 
     def _print_status(self) -> None:
