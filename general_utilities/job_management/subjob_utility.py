@@ -10,6 +10,7 @@ import dxpy
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
+from general_utilities.job_management.job_launcher_interface import JobLauncherInterface
 from general_utilities.mrc_logger import MRCLogger
 
 
@@ -88,7 +89,7 @@ class JobStatus(Enum):
     FAILED = RunningStatus.FAILED
 
 
-class SubjobUtility:
+class SubjobUtility(JobLauncherInterface):
     """A class that contains information on, launches, and monitors subjobs on the DNANexus platform.
 
     This class functions in two ways, depending on the methods used to queue jobs:

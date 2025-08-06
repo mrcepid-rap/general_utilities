@@ -7,10 +7,11 @@ from typing import Any, Iterator, Callable
 
 import dxpy
 
+from general_utilities.job_management.job_launcher_interface import JobLauncherInterface
 from general_utilities.mrc_logger import MRCLogger
 
 
-class ThreadUtility:
+class ThreadUtility(JobLauncherInterface):
 
     def __init__(self, threads: int = None, thread_factor: int = 1, **kwargs):
 
