@@ -40,6 +40,8 @@ class ExportFileHandler:
 
         if isinstance(file, dxpy.DXFile):
             converted_file = file
+        elif isinstance(file, dict):
+            converted_file = file
         else:
             converted_file = dxpy.dxlink(generate_linked_dx_file(file))
         return converted_file
