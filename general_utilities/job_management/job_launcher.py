@@ -26,9 +26,6 @@ class JobLauncher:
         self._platform = PlatformFactory().get_platform()
         self._logger.info(f"Detected platform: {self._platform.value}")
 
-        super().__init__(incrementor=kwargs.get('incrementor', 500),
-                         threads=kwargs.get('threads'))
-
         if self._platform == Platform.DX:
             self._backend = SubjobUtility(**kwargs)
         elif self._platform == Platform.LOCAL:
