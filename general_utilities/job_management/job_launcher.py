@@ -1,13 +1,12 @@
 from typing import Iterator
 
-from general_utilities.job_management.job_launcher_interface import JobLauncherInterface
 from general_utilities.job_management.subjob_utility import SubjobUtility
 from general_utilities.job_management.thread_utility import ThreadUtility
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.platform_utils.platform_factory import Platform, PlatformFactory
 
 
-class JobLauncher(JobLauncherInterface):
+class JobLauncher:
     """
     Job launcher that uses either SubjobUtility for DX or ThreadUtility for local execution.
     GCP is not supported in this implementation.
