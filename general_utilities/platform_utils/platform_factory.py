@@ -41,12 +41,15 @@ class PlatformFactory:
         Identifies the platform based on the environment and system information.
         """
         if re.match(r'job-\w{24}', self._detect_platform_uname()):
-            return Platform.DX
+            platform_type = Platform.DX
 
-        if self._is_running_on_gcp_vm():
-            return Platform.GCP
+        elif self._is_running_on_gcp_vm():
+            platform_type = Platform.GCP
 
-        return Platform.LOCAL
+        else:
+            platform_type = Platform.LOCAL
+
+        return platform_type
 
     def _detect_platform_uname(self) -> str:
         """
@@ -62,16 +65,15 @@ class PlatformFactory:
         Memoized to avoid repeated metadata server queries.
         Returns False silently if detection fails.
         """
-        if self._gcp_check_result is not None:
-            return self._gcp_check_result
-
-        try:
-            response = requests.get('http://metadata.google.internal', timeout=0.5)
-            self._gcp_check_result = (
-                    response.status_code == 200 and
-                    response.headers.get('Metadata-Flavor') == 'Google'
-            )
-        except Exception:
-            self._gcp_check_result = False
-
-        return self._gcp_check_result
+        result = self._gcp_check_result
+        if result is None:
+            try:
+                response = requests.get('http://metadata.google.internal', timeout=0.5)
+                result = (
+                        response.status_code == 200 and
+                        response.headers.get('Metadata-Flavor') == 'Google'
+                )
+            except Exception:
+                result = False
+            self._gcp_check_result = result
+        return result
