@@ -26,7 +26,7 @@ class ExportFileHandler:
 
         self._logger = MRCLogger(__name__).get_logger()
 
-        self._platform = PlatformFactory()
+        self._platform = PlatformFactory().get_platform()
         self._gcp_check_result = None
 
     def _convert_file_to_dxlink(self, file: Union[str, Path, DXFile, dict]) -> dict:
