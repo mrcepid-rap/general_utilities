@@ -5,7 +5,6 @@ import dxpy
 from dxpy import DXFile
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import generate_linked_dx_file
-from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
 
@@ -38,10 +37,12 @@ class ExportFileHandler:
         :param file: The input file to be converted to a DX link.
         :return: A DX link dictionary for the file.
         """
-        # Treat everything via InputFileHandler
-        handler = InputFileHandler(file)
-        handle = handler.get_file_handle()
-        return dxpy.dxlink(generate_linked_dx_file(handle))
+
+        if isinstance(file, dxpy.DXFile):
+            converted_file = file
+        else:
+            converted_file = dxpy.dxlink(generate_linked_dx_file(file))
+        return converted_file
 
     def export_files(self, files_input: Union[str, Path, List[Union[str, Path]]]) -> Union[
         Union[str, Path], List[Union[str, Path]], List[dict], dict]:
