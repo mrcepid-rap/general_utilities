@@ -155,7 +155,7 @@ class SubjobUtility(JobLauncherInterface):
         (default), the value in the output dictionary will be a :func:dxpy.dxlink(). [False]
     """
 
-    def __init__(self, instance_type, threads=100, download_on_complete: bool = False, **kwargs) -> None:
+    def __init__(self, instance_type=None, threads=100, download_on_complete: bool = False, **kwargs) -> None:
 
         super().__init__(threads=threads, **kwargs)
 
