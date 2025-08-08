@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import List, Union
 
@@ -40,7 +41,7 @@ class ExportFileHandler:
 
         if isinstance(file, dxpy.DXFile):
             converted_file = file
-        elif isinstance(file, dict):
+        elif isinstance(file, dict) and dxpy.is_dxlink(file):
             converted_file = file
         else:
             converted_file = dxpy.dxlink(generate_linked_dx_file(file))
