@@ -1,4 +1,3 @@
-import re
 from pathlib import Path
 from typing import List, Union
 
@@ -40,7 +39,7 @@ class ExportFileHandler:
         """
 
         if isinstance(file, dxpy.DXFile):
-            converted_file = file
+            converted_file = dxpy.dxlink(file)
         elif isinstance(file, dict) and dxpy.is_dxlink(file):
             converted_file = file
         else:
@@ -66,8 +65,7 @@ class ExportFileHandler:
         # Check if the platform is Local, in which case no upload is performed
         if self._platform == Platform.LOCAL:
             self._logger.info("Local platform detected: returning raw file paths.")
-            result = files_input if isinstance(files_input, list) else [files_input]
-
+            result = [Path(f) for f in files_input] if isinstance(files_input, list) else [Path(files_input)]
         # Check if the platform is GCP, in which case upload logic is not implemented yet
         elif self._platform == Platform.GCP:
             self._logger.info("GCP platform detected: upload logic not implemented yet.")
@@ -84,6 +82,6 @@ class ExportFileHandler:
 
         else:
             # If the above didn't work then we have an error somewhere
-            self._logger.error(f"Unsupported input type for export_files: {type(files_input)}")
+            raise RuntimeError(f"Unsupported input type for export_files: {type(files_input)}")
 
         return result

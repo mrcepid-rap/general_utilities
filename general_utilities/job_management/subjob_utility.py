@@ -165,10 +165,11 @@ class SubjobUtility:
     :param download_on_complete: Should ALL file outputs be downloaded on subjob completion? Setting this
         option to 'True' will download all files to the current instance and provide a :func:Path. If 'False'
         (default), the value in the output dictionary will be a :func:dxpy.dxlink(). [False]
+    :param priority: The priority of the job. This is a string that can be 'low', 'normal', or 'high'. [low]
     """
 
     def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
-                 log_update_time: int = 60, download_on_complete: bool = False):
+                 log_update_time: int = 60, download_on_complete: bool = False, priority: Priority = Priority.LOW):
 
         self._logger = MRCLogger(__name__).get_logger()
 
@@ -177,6 +178,7 @@ class SubjobUtility:
         self._incrementor = incrementor
         self._log_update_time = log_update_time
         self._download_on_complete = download_on_complete
+        self._priority = priority
 
         # We define three difference queues for use during runtime:
         # job_queue   – jobs waiting to be submitted
@@ -460,7 +462,7 @@ class SubjobUtility:
             elif job['job_type'] == Environment.LOCAL:
                 dxapplet = job['job_type'].value(job['function'])
                 dxjob = dxapplet.run(applet_input=job['input'], folder=job['destination'], name=job['name'],
-                                     instance_type=job['instance_type'], priority='low')
+                                     instance_type=job['instance_type'], priority=self._priority.value)
 
             else:
                 raise RuntimeError('Job does not have type DX or LOCAL, which should be impossible')
