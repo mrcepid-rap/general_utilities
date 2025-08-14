@@ -11,6 +11,7 @@ uv.lock
 .venv
 general_utilities/__pycache__/
 general_utilities/import_utils/__pycache__/
+general_utilities/platform_utils/__pycache__/
 general_utilities/import_utils/file_handlers/__pycache__/
 test/__pycache__/
 test/dx_run.log
