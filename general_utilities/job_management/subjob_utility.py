@@ -185,7 +185,7 @@ class SubjobUtility(JobLauncherInterface):
         if 'DX_JOB_ID' in os.environ:
             parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
             self._default_instance_type = \
-            parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
+                parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
         else:
             self._default_instance_type = None
 
@@ -554,6 +554,13 @@ class SubjobUtility(JobLauncherInterface):
                 job = self._job_running[job_id]['job_info']
                 del self._job_running[job_id]
                 self._job_failed.append(job)
+
+
+    def get_outputs(self) -> Iterator:
+        """
+        Return an iterator over completed job outputs
+        """
+        return iter(self._output_array)
 
 
 def check_subjob_decorator() -> Optional[str]:

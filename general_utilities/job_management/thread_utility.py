@@ -81,6 +81,6 @@ class ThreadUtility(JobLauncherInterface):
     # It just makes it so if one does not need to access the futures, there is no need to implement an empty for loop
     # in your code. Since 'self' represents this class, and this class implements __iter__, it will run the code in
     # the __iter__ class, which will hold until all jobs are completed.
-    def collect_futures(self) -> None:
+    def get_outputs(self) -> None:
         for _ in self:
             pass
