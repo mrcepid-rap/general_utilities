@@ -43,9 +43,13 @@ def test_export_files_dnaxexus_mock_upload(input_data, expected_result):
 @pytest.mark.parametrize(
     "input_obj, file_type, expected_generate_call",
     [
-        (MagicMock(spec=DXFile), FileType.DNA_NEXUS_FILE, True),  # still wrapped via handler
+        # DXFile → direct dxlink, do nothing (pass the DXFile object)
+        (MagicMock(spec=DXFile), FileType.DNA_NEXUS_FILE, False),
+        # Path → create a linked DX file, then dxlink
         (Path("/fake/path.txt"), FileType.LOCAL_PATH, True),
+        # str path → create a linked DX file, then dxlink
         ("fake_path.txt", FileType.LOCAL_PATH, True),
+        # dict with file → create a linked DX file, then dxlink
         ({"file": Path("myfile.txt"), "delete_on_upload": False}, FileType.LOCAL_PATH, True),
     ],
 )
