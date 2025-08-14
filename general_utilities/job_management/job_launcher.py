@@ -1,4 +1,4 @@
-from typing import Iterator, Union
+from typing import Union
 
 from general_utilities.job_management.subjob_utility import SubjobUtility
 from general_utilities.job_management.thread_utility import ThreadUtility
@@ -26,21 +26,20 @@ class JobLauncher:
         self._platform = PlatformFactory().get_platform()
         self._logger.info(f"Detected platform: {self._platform.value}")
         self._kwargs = kwargs
-        self._backend = None
-        self._backend = self._get_backend()
 
-    def _get_backend(self) -> Union[SubjobUtility, ThreadUtility]:
+        # Build the backend once
+        if self._platform == Platform.DX:
+            self._backend = SubjobUtility(**self._kwargs)
+        elif self._platform == Platform.LOCAL:
+            self._backend = ThreadUtility(**self._kwargs)
+        else:
+            raise RuntimeError("Unsupported platform")
+
+    def get_backend(self) -> Union[SubjobUtility, ThreadUtility]:
         """
-        Get the backend utility for job management based on the detected platform.
-        :return: An instance of SubjobUtility for DX or ThreadUtility for local execution.
+        Get the backend utility for job management.
+        :return: The backend utility instance.
         """
-        if self._backend is None:
-            if self._platform == Platform.DX:
-                self._backend = SubjobUtility(**self._kwargs)
-            elif self._platform == Platform.LOCAL:
-                self._backend = ThreadUtility(**self._kwargs)
-            else:
-                raise RuntimeError("Unsupported platform")
         return self._backend
 
     def launch_job(self, function, inputs, outputs=None, name=None, instance_type=None) -> None:
@@ -59,20 +58,6 @@ class JobLauncher:
                                      name=name, instance_type=instance_type)
         elif self._platform == Platform.LOCAL:
             self._backend.launch_job(function=function, **inputs)
-
-    def submit_and_monitor(self) -> None:
-        """
-        Submit the queued jobs and monitor their execution.
-        :return: None
-        """
-        self._get_backend().submit_and_monitor()
-
-    def get_outputs(self) -> Iterator:
-        """
-        Retrieve outputs of completed jobs.
-        :return: An iterator over the outputs from the subjobs.
-        """
-        return iter(self._get_backend())
 
     @property
     def platform(self) -> Platform:
