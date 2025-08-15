@@ -66,21 +66,23 @@ class ThreadUtility(JobLauncherInterface):
 
         return futures.as_completed(self._future_pool)
 
-    def launch_job(self, function: Callable, **kwargs) -> None:
+    def launch_job(self, function: Callable, inputs: dict, outputs = None, name = None, instance_type = None, **kwargs) -> None:
         """
         Launch a job by submitting it to the thread executor.
         """
         if self._already_collected:
             raise dxpy.AppError("Thread executor has already been collected from!")
-        else:
-            self._num_jobs += 1
-            self._future_pool.append(self._executor.submit(function,
-                                                           **kwargs))
+
+        # Track job count for status reporting
+        self._num_jobs += 1
+
+        # Unpack `inputs` so the function signature matches what it expects.
+        # e.g., `process_batch(min_af=0.001, ancestry_file="eid.txt", ...)`
+        self._future_pool.append(self._executor.submit(function, **inputs))
 
     # This is a utility method that will essentially 'hold' until all threads added to this class are completed.
     # It just makes it so if one does not need to access the futures, there is no need to implement an empty for loop
     # in your code. Since 'self' represents this class, and this class implements __iter__, it will run the code in
     # the __iter__ class, which will hold until all jobs are completed.
-    def get_outputs(self) -> None:
-        for _ in self:
-            pass
+    def get_outputs(self) -> Iterator:
+        return self
