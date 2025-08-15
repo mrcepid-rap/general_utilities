@@ -1,3 +1,5 @@
+from dataclasses import dataclass, asdict, field
+
 import dxpy
 import numpy as np
 import pandas as pd
@@ -6,7 +8,6 @@ import statsmodels.api as sm
 from pathlib import Path
 from typing import Tuple, List
 
-# from importlib.resources import files
 from importlib_resources import files
 from general_utilities.association_resources import get_chromosomes
 from general_utilities.mrc_logger import MRCLogger
@@ -14,75 +15,81 @@ from general_utilities.job_management.command_executor import DockerMount, build
 
 LOGGER = MRCLogger(__name__).get_logger()
 
-
+@dataclass
 class LinearModelPack:
+    """
+    This is a helper class to store information for running linear models
 
-    # This is a helper class to store information for running linear models
-    #
-    # phenotypes: Phenotypes/covariates for every individual in a Pandas df
-    # phenoname: name of the phenotype of interest
-    # model_family: family from statsmodels families
-    # model_formula: Formatted formula for all linear models
-    # null_model: a null model containing just IID and residuals
-    # n_model: Number of individuals with values in the pheno/covariate file (do this here to save compute)
+    :attr phenotypes: Phenotypes/covariates for every individual in a Pandas df
+    :attr pheno_name: name of the phenotype of interest
+    :attr model_family: family from statsmodels families
+    :attr model_formula: Formatted formula for all linear models
+    :attr null_model: a null model containing just IID and residuals
+    :attr n_model: Number of individuals with values in the pheno/covariate file (do this here to save compute)
+    """
 
-    def __init__(self, phenotypes: pd.DataFrame, phenoname: str, model_family: sm.families, model_formula: str,
-                 null_model: pd.DataFrame):
+    phenotypes: pd.DataFrame
+    pheno_name: str
+    model_family: sm.families
+    model_formula: str
+    null_model: pd.DataFrame
+    n_model: int = field(init=False)
 
-        self.phenotypes = phenotypes
-        self.phenoname = phenoname
-        self.model_family = model_family
-        self.model_formula = model_formula
-        self.null_model = null_model
+    def __post_init__(self):
         self.n_model = len(self.phenotypes)
 
 
-# Class that holds results from linear models
+@dataclass
 class LinearModelResult:
+    """
+    Class that holds results from linear models
 
-    def __init__(self, n_car: int, cMAC: int, n_model: int, ENST: str, maskname: str,
-                 pheno_name: str,
-                 p_val_init: float = float('nan'), p_val_full: float = float('nan'),
-                 effect: float = float('nan'), std_err: float = float('nan')):
+    :attr n_car: Number of carriers of the variant
+    :attr cMAC: Carrier minor allele count
+    :attr n_model: Number of individuals in the model
+    :attr ENST: ENST ID of the gene tested
+    :attr maskname: Name of the mask used for this gene (e.g., PTV)
+    :attr pheno_name: Name of the phenotype tested
+    :attr p_val_init: Initial p-value from the null model
+    :attr p_val_full: Full model p-value (if p_val_init < nominal significance of 1e-4)
+    :attr effect: Effect size of the variant on the phenotype
+    :attr std_err: Standard error of the effect size
+    :attr n_noncar_affected: Number of non-carriers affected by the phenotype
+    :attr n_noncar_unaffected: Number of non-carriers unaffected by the phenotype
+    :attr n_car_affected: Number of carriers affected by the phenotype
+    :attr n_car_unaffected: Number of carriers unaffected by the phenotype
+    """
 
-        self.p_val_init = p_val_init
-        self.n_car = n_car
-        self.cMAC = cMAC
-        self.n_model = n_model
-        self.ENST = ENST
-        self.maskname = maskname
-        self.pheno_name = pheno_name
-        self.p_val_full = p_val_full
-        self.effect = effect
-        self.std_err = std_err
-        self.n_noncar_affected = 0
-        self.n_noncar_unaffected = 0
-        self.n_car_affected = 0
-        self.n_car_unaffected = 0
+    n_car: int
+    cMAC: int
+    n_model: int
+    ENST: str
+    maskname: str
+    pheno_name: str
+    p_val_init: float = float('nan')
+    p_val_full: float = float('nan')
+    effect: float = float('nan')
+    std_err: float = float('nan')
+    n_noncar_affected: int = 0
+    n_noncar_unaffected: int = 0
+    n_car_affected: int = 0
+    n_car_unaffected: int = 0
 
     def set_carrier_stats(self, n_noncar_affected: int, n_noncar_unaffected: int,
-                          n_car_affected: int, n_car_unaffected: int):
+                          n_car_affected: int, n_car_unaffected: int) -> None:
+        """Setter function to set carrier stats for the linear model result all in one function call
+
+        :param n_noncar_affected: Number of non-carriers affected by the phenotype
+        :param n_noncar_unaffected: Number of non-carriers unaffected by the phenotype
+        :param n_car_affected: Number of carriers affected by the phenotype
+        :param n_car_unaffected: Number of carriers unaffected by the phenotype
+        :return: None
+        """
 
         self.n_noncar_affected = n_noncar_affected
         self.n_noncar_unaffected = n_noncar_unaffected
         self.n_car_affected = n_car_affected
         self.n_car_unaffected = n_car_unaffected
-
-    def todict(self):
-        return {'p_val_init': self.p_val_init,
-                'n_car': self.n_car,
-                'cMAC': self.cMAC,
-                'n_model': self.n_model,
-                'ENST': self.ENST,
-                'maskname': self.maskname,
-                'pheno_name': self.pheno_name,
-                'p_val_full': self.p_val_full,
-                'effect': self.effect,
-                'std_err': self.std_err,
-                'n_noncar_affected': self.n_noncar_affected,
-                'n_noncar_unaffected': self.n_noncar_unaffected,
-                'n_car_affected': self.n_car_affected,
-                'n_car_unaffected': self.n_car_unaffected}
 
 
 # Setup linear models:
