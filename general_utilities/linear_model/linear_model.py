@@ -12,6 +12,7 @@ from importlib_resources import files
 from general_utilities.association_resources import get_chromosomes
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
+from import_utils.file_handlers.input_file_handler import InputFileHandler
 
 LOGGER = MRCLogger(__name__).get_logger()
 
@@ -92,13 +93,15 @@ class LinearModelResult:
         self.n_car_unaffected = n_car_unaffected
 
 
-# Setup linear models:
-def linear_model_null(phenotype: str, is_binary: bool, ignore_base: bool,
+def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bool,
                       found_quantitative_covariates: List[str],
                       found_categorical_covariates: List[str]) -> LinearModelPack:
+    """Perform initial linear model setup.
+
+    """
 
     # load covariates and phenotypes
-    pheno_covars = pd.read_csv("phenotypes_covariates.formatted.txt",
+    pheno_covars = pd.read_csv(phenofile,
                                sep=" ",
                                index_col="FID",
                                dtype={'IID': str})
@@ -146,7 +149,7 @@ def linear_model_null(phenotype: str, is_binary: bool, ignore_base: bool,
 
         # Start building a set of models we want to test.
         return LinearModelPack(phenotypes=pheno_covars,
-                               phenoname=phenotype,
+                               pheno_name=phenotype,
                                model_family=family,
                                model_formula=form_full,
                                null_model=null_table)
@@ -161,8 +164,6 @@ def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar
 
     LOGGER.info(f'Loading tarball prefix: {tarball_prefix}')
     geno_tables = []
-
-    r_script = files('general_utilities.linear_model.R_resources').joinpath('sparseMatrixProcessor.R')
 
     script_mount = DockerMount(r_script.parent,
                                Path('/scripts/'))
