@@ -155,7 +155,8 @@ class SubjobUtility(JobLauncherInterface):
         (default), the value in the output dictionary will be a :func:dxpy.dxlink(). [False]
     """
 
-    def __init__(self, instance_type=None, threads=100, download_on_complete: bool = False, **kwargs) -> None:
+    def __init__(self, instance_type=None, threads=100, download_on_complete: bool = False,
+                 concurrent_job_limit: int = 100, **kwargs) -> None:
 
         super().__init__(threads=threads, **kwargs)
 
@@ -180,6 +181,7 @@ class SubjobUtility(JobLauncherInterface):
         self._queue_closed = False
         self._total_jobs = 0
         self._num_completed_jobs = 0
+        self._concurrent_job_limit = int(concurrent_job_limit)
 
         # Set default job instance type
         if 'DX_JOB_ID' in os.environ:
@@ -266,6 +268,7 @@ class SubjobUtility(JobLauncherInterface):
             self._queue_type = Environment.LOCAL
 
         self._total_jobs += 1
+        self._num_jobs += 1
 
         # Lists are immutable, so if None is provided, set to empty
         if outputs is None:
@@ -331,6 +334,7 @@ class SubjobUtility(JobLauncherInterface):
             self._queue_type = Environment.DX
 
         self._total_jobs += 1
+        self._num_jobs += 1
 
         # Lists are immutable, so if None is provided, set to empty
         if outputs is None:
@@ -560,6 +564,7 @@ class SubjobUtility(JobLauncherInterface):
         """
         Return an iterator over completed job outputs
         """
+        self.submit_and_monitor()
         return iter(self._output_array)
 
 
