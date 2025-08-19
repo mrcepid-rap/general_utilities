@@ -167,7 +167,6 @@ class SubjobUtility(JobLauncherInterface):
                  error_message: str = "An error occurred",
                  instance_type=None,
                  download_on_complete: bool = False,
-                 concurrent_job_limit: int = 100,
                  **kwargs) -> None:
 
         super().__init__(incrementor=incrementor,
@@ -176,7 +175,7 @@ class SubjobUtility(JobLauncherInterface):
                          **kwargs)
 
         # Dereference class parameters
-        self._concurrent_job_limit = concurrent_job_limit
+        self._concurrent_job_limit = threads
         self._instance_type = instance_type
         self._download_on_complete = download_on_complete
 
