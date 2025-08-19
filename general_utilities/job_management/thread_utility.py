@@ -8,21 +8,27 @@ from typing import Any, Iterator, Callable
 import dxpy
 
 from general_utilities.job_management.job_launcher_interface import JobLauncherInterface
-from general_utilities.mrc_logger import MRCLogger
 
 
 class ThreadUtility(JobLauncherInterface):
 
-    def __init__(self, threads: int = None, thread_factor: int = 1, **kwargs):
+    def __init__(self, incrementor: int = 500,
+                 threads: int = None,
+                 error_message: str = "An error occurred",
+                 thread_factor: int = 1,
+                 **kwargs):
 
-        super().__init__(threads=threads, **kwargs)
+        super().__init__(incrementor=incrementor,
+                         threads=threads,
+                         error_message=error_message,
+                         **kwargs)
 
-        self._logger = MRCLogger(__name__).get_logger()
-
-        self._already_collected = False  # A flag to make sure we don't submit jobs to a closed executor
-        self._num_jobs = 0
+        # Thread lifecycle flags and counters
+        self._queue_closed = False  # A flag to make sure we don't submit jobs to a closed executor
+        self._total_jobs = 0
         self._total_finished_models = 0
 
+        # pools
         available_workers = math.floor(self._threads / thread_factor)
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
         self._future_pool = []
@@ -42,47 +48,56 @@ class ThreadUtility(JobLauncherInterface):
 
     def __iter__(self) -> Iterator:
 
-        self._already_collected = True
+        self._queue_closed = True
 
         if len(self._future_pool) == 0:
             raise dxpy.AppError('No jobs submitted to future pool!')
 
-        self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._num_jobs))
+        self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
 
         self._future_iterator = futures.as_completed(self._future_pool)
         return self
+
+    def __len__(self) -> int:
+        """
+        Get the number of jobs in the queue.
+        :return: The total number of jobs in the queue.
+        """
+        return len(self._future_pool)
+
+    def launch_job(self, function: Callable, inputs: dict, outputs=None, name=None, instance_type=None,
+                   **kwargs) -> None:
+        """
+        Launch a job by submitting it to the thread executor.
+        """
+        if self._queue_closed:
+            raise dxpy.AppError("Thread executor has already been collected from!")
+
+        # Track job count for status reporting
+        self._total_jobs += 1
+
+        # Collect the job details in a queue
+        self._future_pool.append((function, inputs))
 
     def submit_and_monitor(self) -> Iterator[Future]:
         """
         Submit the queued jobs and return an iterator over the futures.
         """
 
-        self._already_collected = True
+        self._queue_closed = True
 
         if len(self._future_pool) == 0:
             raise dxpy.AppError('No jobs submitted to future pool!')
 
-        self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._num_jobs))
+        self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
 
-        return futures.as_completed(self._future_pool)
+        self._print_status()
 
-    def launch_job(self, function: Callable, inputs: dict, outputs = None, name = None, instance_type = None, **kwargs) -> None:
-        """
-        Launch a job by submitting it to the thread executor.
-        """
-        if self._already_collected:
-            raise dxpy.AppError("Thread executor has already been collected from!")
+        # Submit the collected jobs to the executor
+        submitted_futures = [
+            self._executor.submit(function, **inputs) for function, inputs in self._future_pool
+        ]
 
-        # Track job count for status reporting
-        self._num_jobs += 1
-
-        # Unpack `inputs` so the function signature matches what it expects.
-        # e.g., `process_batch(min_af=0.001, ancestry_file="eid.txt", ...)`
-        self._future_pool.append(self._executor.submit(function, **inputs))
-
-    # This is a utility method that will essentially 'hold' until all threads added to this class are completed.
-    # It just makes it so if one does not need to access the futures, there is no need to implement an empty for loop
-    # in your code. Since 'self' represents this class, and this class implements __iter__, it will run the code in
-    # the __iter__ class, which will hold until all jobs are completed.
-    def get_outputs(self) -> Iterator:
-        return self
+        # Monitor and yield results
+        for future in futures.as_completed(submitted_futures):
+            yield future.result()

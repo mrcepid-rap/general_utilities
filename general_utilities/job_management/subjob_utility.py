@@ -11,7 +11,6 @@ import dxpy
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.job_management.job_launcher_interface import JobLauncherInterface
-from general_utilities.mrc_logger import MRCLogger
 
 
 class Environment(Enum):
@@ -92,6 +91,13 @@ class JobStatus(Enum):
 class SubjobUtility(JobLauncherInterface):
     """A class that contains information on, launches, and monitors subjobs on the DNANexus platform.
 
+    This class implements the JobLauncherInterface, meaning it provides consistent behavior
+    across multiple backends (e.g., SubjobUtility, ThreadUtility). In particular, it defines:
+
+    - Iteration protocol methods (__iter__, __next__, __len__) so that completed job outputs
+      can be consumed directly in for-loops or converted to lists.
+    - The _print_status() method for periodic job status reporting.
+
     This class functions in two ways, depending on the methods used to queue jobs:
 
     1. If run from a local machine (e.g., a macbook) via :func:launch_applet() – Will launch new jobs that are
@@ -155,14 +161,22 @@ class SubjobUtility(JobLauncherInterface):
         (default), the value in the output dictionary will be a :func:dxpy.dxlink(). [False]
     """
 
-    def __init__(self, instance_type=None, threads=100, download_on_complete: bool = False,
-                 concurrent_job_limit: int = 100, **kwargs) -> None:
+    def __init__(self,
+                 incrementor: int = 500,
+                 threads: int = 100,
+                 error_message: str = "An error occurred",
+                 instance_type=None,
+                 download_on_complete: bool = False,
+                 concurrent_job_limit: int = 100,
+                 **kwargs) -> None:
 
-        super().__init__(threads=threads, **kwargs)
-
-        self._logger = MRCLogger(__name__).get_logger()
+        super().__init__(incrementor=incrementor,
+                         threads=threads,
+                         error_message=error_message,
+                         **kwargs)
 
         # Dereference class parameters
+        self._concurrent_job_limit = concurrent_job_limit
         self._instance_type = instance_type
         self._download_on_complete = download_on_complete
 
@@ -171,7 +185,8 @@ class SubjobUtility(JobLauncherInterface):
         # job_running – jobs currently running, with a dict keyed on the DX job-id and with a value of DXJobDict class
         #   which contains the job class from instantiation and information about the job
         #   and information about the job
-        # job_failed  – A list of jobs which failed during runtime which
+        # job_failed  – A list of jobs which failed during runtime which, if the job has additional retries, can
+        #   be resubmitted
         self._job_queue: List[DXJobInfo] = []
         self._job_running: Dict[str, DXJobDict] = dict()
         self._job_failed: List[DXJobInfo] = []
@@ -180,19 +195,16 @@ class SubjobUtility(JobLauncherInterface):
         self._queue_type: Optional[Environment] = None
         self._queue_closed = False
         self._total_jobs = 0
-        self._num_completed_jobs = 0
         self._concurrent_job_limit = int(concurrent_job_limit)
 
         # Set default job instance type
-        if 'DX_JOB_ID' in os.environ:
-            parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
-            self._default_instance_type = \
-                parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
-        else:
-            self._default_instance_type = None
+        self._default_instance_type = self._set_default_instance_type
 
         # Manage returned outputs
         self._output_array = []
+
+        # This is used to keep track of the current index in the output array when iterating over outputs
+        self._iter_index = 0
 
     def __iter__(self) -> Iterator[Dict[str, Any]]:
         """Return an iterator over the outputs collected when jobs finish.
@@ -235,6 +247,20 @@ class SubjobUtility(JobLauncherInterface):
         """
         return len(self._output_array)
 
+    def __next__(self) -> Any:
+        """Return the next output in the output queue.
+
+        This method will return the next output in the output queue, which is a dictionary of outputs for a given job.
+        If there are no more outputs, it will raise a StopIteration exception.
+
+        :return: The next output in the output queue
+        """
+        if self._iter_index < len(self._output_array):
+            result = self._output_array[self._iter_index]
+            self._iter_index += 1
+            return result
+        raise StopIteration
+
     def launch_applet(self, applet_hash: str, inputs: Dict[str, Any], outputs: List[str] = None,
                       destination: str = None, instance_type: str = None, name: str = None) -> None:
         """Launch a DNANexus job with the given parameters from a LOCAL machine.
@@ -268,7 +294,6 @@ class SubjobUtility(JobLauncherInterface):
             self._queue_type = Environment.LOCAL
 
         self._total_jobs += 1
-        self._num_jobs += 1
 
         # Lists are immutable, so if None is provided, set to empty
         if outputs is None:
@@ -334,7 +359,6 @@ class SubjobUtility(JobLauncherInterface):
             self._queue_type = Environment.DX
 
         self._total_jobs += 1
-        self._num_jobs += 1
 
         # Lists are immutable, so if None is provided, set to empty
         if outputs is None:
@@ -559,13 +583,14 @@ class SubjobUtility(JobLauncherInterface):
                 del self._job_running[job_id]
                 self._job_failed.append(job)
 
-
-    def get_outputs(self) -> Iterator:
-        """
-        Return an iterator over completed job outputs
-        """
-        self.submit_and_monitor()
-        return iter(self._output_array)
+    def _set_default_instance_type(self) -> None:
+        """Set the default instance type from the parent DNANexus job if available."""
+        if 'DX_JOB_ID' in os.environ:
+            parent_job = dxpy.DXJob(dxid=os.getenv('DX_JOB_ID'))
+            self._default_instance_type = \
+                parent_job.describe(fields={'systemRequirements': True})['systemRequirements']['*']['instanceType']
+        else:
+            self._default_instance_type = None
 
 
 def check_subjob_decorator() -> Optional[str]:
