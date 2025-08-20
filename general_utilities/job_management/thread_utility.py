@@ -1,7 +1,6 @@
 import math
-from asyncio import Future
 from concurrent import futures
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
 from time import sleep
 from typing import Any, Iterator, Callable
 
@@ -14,23 +13,17 @@ class ThreadUtility(JobLauncherInterface):
 
     def __init__(self, incrementor: int = 500,
                  threads: int = None,
-                 error_message: str = "An error occurred",
-                 thread_factor: int = 1,
-                 **kwargs):
+                 thread_factor: int = 1):
 
         super().__init__(incrementor=incrementor,
-                         threads=threads,
-                         error_message=error_message,
-                         **kwargs)
-
-        # Thread lifecycle flags and counters
-        self._queue_closed = False  # A flag to make sure we don't submit jobs to a closed executor
-        self._total_jobs = 0
-        self._total_finished_models = 0
+                         threads=threads)
 
         # pools
+        # NOTE: make concurent job limit be defined in the interface ???
         available_workers = math.floor(self._threads / thread_factor)
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
+
+        ### NOTE: re-factor the use of future_pool to output_array
         self._future_pool = []
 
     # I have a feeling the sleep() part is VERY inefficient but I am unsure of how to fix at the moment...
@@ -79,12 +72,10 @@ class ThreadUtility(JobLauncherInterface):
         # Collect the job details in a queue
         self._future_pool.append((function, inputs))
 
-    def submit_and_monitor(self) -> Iterator[Future]:
+    def submit_and_monitor(self) -> list[Future]:
         """
         Submit the queued jobs and return an iterator over the futures.
         """
-
-        self._queue_closed = True
 
         if len(self._future_pool) == 0:
             raise dxpy.AppError('No jobs submitted to future pool!')
@@ -98,6 +89,7 @@ class ThreadUtility(JobLauncherInterface):
             self._executor.submit(function, **inputs) for function, inputs in self._future_pool
         ]
 
-        # Monitor and yield results
-        for future in futures.as_completed(submitted_futures):
-            yield future.result()
+        # Mark the queue as closed after successful submission
+        self._queue_closed = True
+
+        return submitted_futures

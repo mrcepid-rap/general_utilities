@@ -23,17 +23,20 @@ class JobLauncherInterface(ABC):
     :raises RuntimeError: If an unsupported platform is detected.
     """
 
-    def __init__(self, incrementor: int = 500, threads: int = None, error_message="An error occurred", **kwargs):
+    def __init__(self, incrementor: int = 500, threads: int = None, concurrent_job_limit: int = 100, **kwargs):
 
         self._logger = MRCLogger(__name__).get_logger()
 
         self._threads = self._get_threads(threads)
         self._incrementor = incrementor
-        self._error_message = error_message
+
+        self._concurrent_job_limit = concurrent_job_limit
 
         self._num_completed_jobs = 0
         self._total_jobs = 0
         self._output_array = []
+
+        self._queue_closed = False  # A flag to make sure we don't submit jobs to a closed executor
 
     def _get_threads(self, requested_threads: int) -> int:
         """
@@ -109,8 +112,8 @@ class JobLauncherInterface(ABC):
         pass
 
 
-def joblauncher_factory(concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
-                        log_update_time: int = 60, download_on_complete: bool = False, thread_factor: int = 1,
+def joblauncher_factory(concurrent_job_limit: int = 100, incrementor: int = 500,
+                        download_on_complete: bool = False, thread_factor: int = 1,
                         threads: int = None, **kwargs) -> JobLauncherInterface:
     """
     Job launcher that uses either SubjobUtility for DX or ThreadUtility for local execution.
@@ -122,7 +125,6 @@ def joblauncher_factory(concurrent_job_limit: int = 100, retries: int = 1, incre
     :param concurrent_job_limit: The maximum number of concurrent jobs to run, default is 100.
     :param retries: The number of retries for job submission, default is 1.
     :param incrementor: The incrementor for job submission, default is 500.
-    :param log_update_time: The time interval for logging job status updates, default is 60 seconds.
     :param download_on_complete: Whether to download outputs on job completion, default is False.
     :param thread_factor: The factor to multiply the number of threads by for local execution, default is 1.
     :param threads: The number of threads to use for local execution, default is None.
@@ -133,16 +135,13 @@ def joblauncher_factory(concurrent_job_limit: int = 100, retries: int = 1, incre
 
     if platform == Platform.DX:
         backend = SubjobUtility(concurrent_job_limit=concurrent_job_limit,
-                                retries=retries,
                                 incrementor=incrementor,
-                                log_update_time=log_update_time,
                                 download_on_complete=download_on_complete,
                                 **kwargs)
     elif platform == Platform.LOCAL:
         backend = ThreadUtility(threads=threads,
                                 incrementor=incrementor,
-                                thread_factor=thread_factor,
-                                **kwargs)
+                                thread_factor=thread_factor)
     else:
         raise RuntimeError("Unsupported platform")
     return backend

@@ -164,18 +164,15 @@ class SubjobUtility(JobLauncherInterface):
     def __init__(self,
                  incrementor: int = 500,
                  threads: int = 100,
-                 error_message: str = "An error occurred",
+                 concurrent_job_limit: int = 100,
                  instance_type=None,
-                 download_on_complete: bool = False,
-                 **kwargs) -> None:
+                 download_on_complete: bool = False) -> None:
 
         super().__init__(incrementor=incrementor,
                          threads=threads,
-                         error_message=error_message,
-                         **kwargs)
+                         concurrent_job_limit=concurrent_job_limit)
 
         # Dereference class parameters
-        self._concurrent_job_limit = threads
         self._instance_type = instance_type
         self._download_on_complete = download_on_complete
 
@@ -192,9 +189,6 @@ class SubjobUtility(JobLauncherInterface):
 
         # Job type & count monitoring
         self._queue_type: Optional[Environment] = None
-        self._queue_closed = False
-        self._total_jobs = 0
-        self._concurrent_job_limit = int(concurrent_job_limit)
 
         # Set default job instance type
         self._default_instance_type = self._set_default_instance_type
