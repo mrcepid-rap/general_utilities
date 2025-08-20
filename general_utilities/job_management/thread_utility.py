@@ -18,13 +18,8 @@ class ThreadUtility(JobLauncherInterface):
         super().__init__(incrementor=incrementor,
                          threads=threads)
 
-        # pools
-        # NOTE: make concurent job limit be defined in the interface ???
         available_workers = math.floor(self._threads / thread_factor)
         self._executor = ThreadPoolExecutor(max_workers=available_workers)
-
-        ### NOTE: re-factor the use of future_pool to output_array
-        self._future_pool = []
 
     # I have a feeling the sleep() part is VERY inefficient but I am unsure of how to fix at the moment...
     # Due to how futures work, most of the time a next() call will receive a 'None' return. We need to create a
@@ -43,12 +38,12 @@ class ThreadUtility(JobLauncherInterface):
 
         self._queue_closed = True
 
-        if len(self._future_pool) == 0:
+        if len(self._output_array) == 0:
             raise dxpy.AppError('No jobs submitted to future pool!')
 
         self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
 
-        self._future_iterator = futures.as_completed(self._future_pool)
+        self._future_iterator = futures.as_completed(self._output_array)
         return self
 
     def __len__(self) -> int:
@@ -56,7 +51,7 @@ class ThreadUtility(JobLauncherInterface):
         Get the number of jobs in the queue.
         :return: The total number of jobs in the queue.
         """
-        return len(self._future_pool)
+        return len(self._output_array)
 
     def launch_job(self, function: Callable, inputs: dict, outputs=None, name=None, instance_type=None,
                    **kwargs) -> None:
@@ -70,14 +65,14 @@ class ThreadUtility(JobLauncherInterface):
         self._total_jobs += 1
 
         # Collect the job details in a queue
-        self._future_pool.append((function, inputs))
+        self._output_array.append((function, inputs))
 
     def submit_and_monitor(self) -> list[Future]:
         """
         Submit the queued jobs and return an iterator over the futures.
         """
 
-        if len(self._future_pool) == 0:
+        if len(self._output_array) == 0:
             raise dxpy.AppError('No jobs submitted to future pool!')
 
         self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
@@ -86,7 +81,7 @@ class ThreadUtility(JobLauncherInterface):
 
         # Submit the collected jobs to the executor
         submitted_futures = [
-            self._executor.submit(function, **inputs) for function, inputs in self._future_pool
+            self._executor.submit(function, **inputs) for function, inputs in self._output_array
         ]
 
         # Mark the queue as closed after successful submission

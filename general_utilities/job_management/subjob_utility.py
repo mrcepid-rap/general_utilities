@@ -193,9 +193,6 @@ class SubjobUtility(JobLauncherInterface):
         # Set default job instance type
         self._default_instance_type = self._set_default_instance_type
 
-        # Manage returned outputs
-        self._output_array = []
-
         # This is used to keep track of the current index in the output array when iterating over outputs
         self._iter_index = 0
 
