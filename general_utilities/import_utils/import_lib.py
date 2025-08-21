@@ -78,10 +78,13 @@ def ingest_wes_bgen(bgen_index: Union[InputFileHandler, dict]) -> Dict[str, BGEN
 
 class TarballType(Enum):
 
-    """An Enum to represent the type of tarball being processed"""
-    SNP = auto()
-    GENE = auto()
-    GENOMEWIDE = auto()
+    """An Enum to represent the type of tarball being processed
+
+    The value of the enum is the dummy gene ID expected by downstream linear models.
+    """
+    SNP = 'ENST00000000000'
+    GENE = 'ENST99999999999'
+    GENOMEWIDE = None
 
 
 def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFileHandler]]) -> Tuple[TarballType, List[str]]:
