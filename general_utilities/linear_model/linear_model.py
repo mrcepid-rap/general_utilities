@@ -1,5 +1,4 @@
-from dataclasses import dataclass, asdict, field
-
+import bgen
 import dxpy
 import numpy as np
 import pandas as pd
@@ -7,12 +6,12 @@ import statsmodels.api as sm
 
 from pathlib import Path
 from typing import Tuple, List
+from scipy.io import mmread
+from dataclasses import dataclass, field
 
-from importlib_resources import files
-from general_utilities.association_resources import get_chromosomes
+from association_resources import replace_multi_suffix
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
-from import_utils.file_handlers.input_file_handler import InputFileHandler
+from import_utils.import_lib import TarballType
 
 LOGGER = MRCLogger(__name__).get_logger()
 
@@ -98,6 +97,16 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
                       found_categorical_covariates: List[str]) -> LinearModelPack:
     """Perform initial linear model setup.
 
+    This function loads the phenotype and covariate data, checks if the phenotype is binary, and sets up the
+    appropriate model family and formula. It also builds a null model to extract residuals for further analysis.
+
+    :param phenofile: Path to the phenotype and covariate file.
+    :param phenotype: Name of the phenotype to analyze.
+    :param is_binary: Boolean indicating if the phenotype is binary.
+    :param ignore_base: Boolean indicating if base covariates should be ignored.
+    :param found_quantitative_covariates: List of additional quantitative covariates to include in the model.
+    :param found_categorical_covariates: List of additional categorical covariates to include in the model.
+    :return: A LinearModelPack object containing the model setup.
     """
 
     # load covariates and phenotypes
@@ -157,59 +166,129 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
         raise dxpy.AppError(f'Phenotype {phenotype} has no individuals after filtering, exiting...')
 
 
-# load genes/genetic data we want to test/use:
-# For each tarball prefix, we want to make ONE dict for efficient querying of variants
-def load_tarball_linear_model(tarball_prefix: str, is_snp_tar: bool, is_gene_tar: bool,
-                              chromosome: str = None) -> Tuple[str, pd.DataFrame]:
+def load_tarball_linear_model(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[str, pd.DataFrame]:
+    """Load a tarball containing BGEN files for linear model association testing.
+
+    This method decides which function to call (either :func:'load_mask_linear_model' or
+    :func:'load_gene_or_snp_linear_model') based on the type of tarball provided. For each tarball prefix,
+    we want to make ONE pandas DataFrame for efficient querying of variants. The format of the DataFrame is:
+
+    {
+    'ENST': [ENST IDs],
+    'FID': [Sample IDs],
+    'gts': [genotype values]
+    }
+
+    And is indexed by both ENST and FID.
+
+    :param tarball_prefix: The prefix of the tarball to load.
+    :param tarball_type: The type of the tarball (SNP, GENE, or GENOMEWIDE).
+    :param bgen_prefix: Optional prefix to filter BGEN files by. If None, all BGEN files in the tarball are loaded.
+    :return: A tuple containing the tarball name and a pandas DataFrame with genetic data indexed by ENST and FID.
+    """
 
     LOGGER.info(f'Loading tarball prefix: {tarball_prefix}')
+
+    # Convert to a path object to allow for file operations.
+    tarball_path = Path(tarball_prefix)
+
+    if tarball_type == TarballType.GENOMEWIDE:
+        genetic_data = load_mask_linear_model(tarball_path, bgen_prefix=bgen_prefix)
+    elif tarball_type == TarballType.GENE:
+        genetic_data = load_gene_or_snp_linear_model(replace_multi_suffix(tarball_path, '.GENE.STAAR.mtx'), tarball_type.value)
+    elif tarball_type == TarballType.SNP:
+        genetic_data = load_gene_or_snp_linear_model(replace_multi_suffix(tarball_path, '.SNP.STAAR.mtx'), tarball_type.value)
+    else:
+        raise ValueError(f'Unexpected tarball type {tarball_type} encountered for tarball prefix {tarball_prefix}')
+
+    LOGGER.info(f'Finished loading tarball prefix: {tarball_prefix}')
+
+    return tarball_path.name, genetic_data
+
+
+def load_mask_linear_model(tarball_path: Path, bgen_prefix: str = None) -> pd.DataFrame:
+    """Load a genome-wide burden mask with multiple genes into the required format.
+
+    Note that the prefix of the tarball is used to identify the BGEN files within the tarball. The tarball should
+    contain BGEN files for all 'chunks' processed during a run of CollapseVariants.
+
+    :param tarball_path: The path to the tarball containing BGEN files.
+    :param bgen_prefix: Optional prefix to filter BGEN files by. If None, all BGEN files in the tarball are loaded.
+    :return: A pandas DataFrame with genetic data indexed by ENST and FID.
+    """
+
     geno_tables = []
 
-    script_mount = DockerMount(r_script.parent,
-                               Path('/scripts/'))
-    cmd_executor = build_default_command_executor()
+    bolt_bgen_list = tarball_path.parent.glob(replace_multi_suffix(tarball_path, '.*.BOLT.bgen').name)
+    # If requested to load a single bgen prefix, filter the list to only include that prefix
+    if bgen_prefix is not None:
+        if tarball_path.parent / f'{tarball_path.name}.{bgen_prefix}.BOLT.bgen' in bolt_bgen_list:
+            bolt_bgen_list = [tarball_path.parent / f'{tarball_path.name}.{bgen_prefix}.BOLT.bgen']
+        else:
+            raise ValueError(
+                f'BGEN prefix {bgen_prefix} not found in tarball {tarball_path.name}.tar.gz. Please check the input.')
 
-    for chromosome in get_chromosomes(is_snp_tar, is_gene_tar, chromosome=chromosome):
-        # This handles the genes that we need to test:
-        tarball_path = Path(f'{tarball_prefix}.{chromosome}.STAAR.matrix.rds')
-        if tarball_path.exists():
-            # The R script (sparseMatrixProcessor.R) just makes a sparse matrix with columns:
-            # sample_id, gene name, genotype, ENST
-            # All information is derived from the sparse STAAR matrix files
+    for bolt_bgen in bolt_bgen_list:
 
-            cmd = f'Rscript /scripts/{r_script.name} ' \
-                  f'/test/{tarball_prefix}.{chromosome}.STAAR.matrix.rds ' \
-                  f'/test/{tarball_prefix}.{chromosome}.variants_table.STAAR.tsv ' \
-                  f'{tarball_prefix} ' \
-                  f'{chromosome}'
-            cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
+        with bgen.BgenReader(bolt_bgen, sample_path=replace_multi_suffix(bolt_bgen, '.sample'),
+                             delay_parsing=False) as bgen_reader:
 
-            # And read in the resulting table
-            geno_table = pd.read_csv(tarball_prefix + "." + chromosome + ".lm_sparse_matrix.tsv",
-                                     sep="\t",
-                                     dtype={'FID': str})
+            for variant in bgen_reader:
+                gene_name = variant.varid
+                probability_array = variant.probabilities
 
-            # What I understand here is that 'sum()' will only sum on numeric columns, so I don't have to worry
-            # about the varID column being drawn in.
-            # Note: This assumption is now broken and I have slightly changed the order of this function to spell out
-            # which column we sum by as pandas stopped assuming the correct column ~vers1.5.
-            # No idea why I am commenting that here instead of in commit messages?
-            geno_table = geno_table.groupby(['ENST', 'FID'])
-            geno_table = geno_table['gt'].sum()
-            geno_tables.append(geno_table)
+                gt_filter = probability_array.max(axis=1) < 0.8
+                gts = probability_array.argmax(axis=1)
+                gts = np.where(gt_filter, np.nan, gts)
+
+                geno_table = pd.DataFrame(data={'ENST': gene_name, 'FID': bgen_reader.samples, 'gt': gts})
+                geno_tables.append(geno_table)
 
     # And concatenate the final data_frame together:
     # The structure is a multi-indexed pandas DataFrame, where:
     # Index 0 = ENST
     # Index 1 = FID
     genetic_data = pd.concat(geno_tables)
-    LOGGER.info(f'Finished loading tarball prefix: {tarball_prefix}')
+    genetic_data.set_index(keys=['ENST', 'FID'], inplace=True)
 
-    return tarball_prefix, genetic_data
+    return genetic_data
 
 
-# Helper function for run_linear_model() that makes a copy of a model and adds individuals w or w/o a variant
+def load_gene_or_snp_linear_model(matrix_file: Path, dummy_gene_name: str) -> pd.DataFrame:
+    """Load a collapsed gene or SNP-based mask into the required format
+
+    :param matrix_file: The path to the matrix file containing the collapsed gene or SNP data.
+    :param dummy_gene_name: A dummy gene name to use for the ENST index in the DataFrame.
+    :return: A pandas DataFrame with genetic data indexed by ENST and FID.
+    """
+
+
+    samples_table = matrix_file.with_suffix('.samples_table.tsv')
+    variants_table = matrix_file.with_suffix('.variants_table.tsv')
+
+    # read and collapse the variant matrix
+    variant_matrix = mmread(matrix_file)
+    variant_matrix = variant_matrix.todense().sum(axis=1)
+    variant_matrix = np.reshape(variant_matrix, (-1, len(variant_matrix)))
+    variant_matrix = variant_matrix.tolist()[0]
+
+    # Load the samples table
+    samples = pd.read_csv(samples_table, sep='\t', dtype={'sampID': str})
+
+    genetic_data = pd.DataFrame(data={'ENST': dummy_gene_name, 'FID': samples['sampID'], 'gt': variant_matrix})
+    genetic_data.set_index(keys=['ENST', 'FID'], inplace=True)
+
+    return genetic_data
+
+
 def add_individuals_with_variant(model_frame: pd.DataFrame, indv_w_var: pd.DataFrame):
+    """Helper function for run_linear_model() that makes a copy of a model and adds individuals w/ or w/o a variant as a
+    binary 0/1 columns called 'has_var'.
+
+    :param model_frame: A pandas DataFrame containing the model frame with residuals.
+    :param indv_w_var: A pandas DataFrame containing individuals with variants, indexed by FID.
+    :return: A pandas DataFrame with the 'has_var' column added, indicating whether each individual has the variant.
+    """
 
     internal_frame = pd.DataFrame.copy(model_frame)
 
@@ -221,28 +300,34 @@ def add_individuals_with_variant(model_frame: pd.DataFrame, indv_w_var: pd.DataF
     return internal_frame
 
 
-# Run association testing using GLMs
 def run_linear_model(linear_model_pack: LinearModelPack, genotype_table: pd.DataFrame, gene: str,
                      mask_name: str, is_binary: bool, always_run_corrected: bool = False) -> LinearModelResult:
+    """Run association testing using a GLM
 
-    # Now successively iterate through each gene and run our model:
-    # I think this is straight-forward?
-    # This just extracts the pandas dataframe that is relevant to this particular gene:
-    # First if is to ensure that the gene is actually in the index.
-    # Note that the typing error is due to pandas having two instances of DataFrame, one with multiple indices, and
-    # one with a single index. The former allows 'levels' calls, the latter does not.
+    Successively iterate through each gene and run our model. This method extracts the pandas dataframe that is
+    relevant to this particular gene, if it is actually in the index. Note that the typing error is due to pandas
+    having two instances of DataFrame, one with multiple indices, and one with a single index. The former allows
+    'levels' calls, the latter does not.
+
+    :param linear_model_pack: A LinearModelPack object containing the model setup.
+    :param genotype_table: A pandas DataFrame containing the genotype data indexed by ENST and FID.
+    :param gene: The ENST ID of the gene to test.
+    :param mask_name: The name of the mask used for this gene (e.g., PTV).
+    :param is_binary: A boolean indicating if the phenotype is binary.
+    :param always_run_corrected: A boolean indicating if the full model should always be run, even if the initial p-value is not significant.
+    :return: A LinearModelResult object containing the results of the association test for this gene.
+    """
     if gene in genotype_table.index.levels[0]:
         indv_w_var = genotype_table.loc[gene]
 
-        # We have to make an internal copy as this pandas.DataFrame is NOT threadsafe...
-        # (psssttt... I still am unsure if it is...)
+        # We have to make an internal copy as this pandas.DataFrame is NOT threadsafe
         internal_frame = add_individuals_with_variant(linear_model_pack.null_model, indv_w_var)
         n_car = len(internal_frame.loc[internal_frame['has_var'] >= 1])
         cMAC = internal_frame['has_var'].sum()
 
-        if n_car <= 2:
+        if n_car <= 2: # Don't run models that won't converge
             gene_dict = LinearModelResult(n_car, cMAC, linear_model_pack.n_model, gene, mask_name,
-                                          linear_model_pack.phenoname)
+                                          linear_model_pack.pheno_name)
         else:
             sm_results = sm.GLM.from_formula('resid ~ has_var',
                                              data=internal_frame,
@@ -259,13 +344,13 @@ def run_linear_model(linear_model_pack: LinearModelPack, genotype_table: pd.Data
                                                       family=linear_model_pack.model_family).fit()
 
                 gene_dict = LinearModelResult(n_car, cMAC, sm_results.nobs, gene, mask_name,
-                                              linear_model_pack.phenoname,
+                                              linear_model_pack.pheno_name,
                                               sm_results.pvalues['has_var'], sm_results_full.pvalues['has_var'],
                                               sm_results_full.params['has_var'], sm_results_full.bse['has_var'])
 
                 # If we are dealing with a binary phenotype we also want to provide the "Fisher's" table
                 if is_binary:
-                    phenoname = linear_model_pack.phenoname
+                    phenoname = linear_model_pack.pheno_name
                     gene_dict.set_carrier_stats(
                         n_noncar_affected=len(internal_frame.query(f'has_var == 0 & {phenoname} == 1')),
                         n_noncar_unaffected=len(internal_frame.query(f'has_var == 0 & {phenoname} == 0')),
@@ -274,12 +359,12 @@ def run_linear_model(linear_model_pack: LinearModelPack, genotype_table: pd.Data
 
             else:
                 gene_dict = LinearModelResult(n_car, cMAC, sm_results.nobs, gene, mask_name,
-                                              linear_model_pack.phenoname,
+                                              linear_model_pack.pheno_name,
                                               p_val_init=sm_results.pvalues['has_var'])
 
                 # If we are dealing with a binary phenotype we also want to provide the "Fisher's" table
                 if is_binary:
-                    phenoname = linear_model_pack.phenoname
+                    phenoname = linear_model_pack.pheno_name
                     gene_dict.set_carrier_stats(
                         n_noncar_affected=len(internal_frame.query(f'has_var == 0 & {phenoname} == 1')),
                         n_noncar_unaffected=len(internal_frame.query(f'has_var == 0 & {phenoname} == 0')),
@@ -287,6 +372,6 @@ def run_linear_model(linear_model_pack: LinearModelPack, genotype_table: pd.Data
                         n_car_unaffected=len(internal_frame.query(f'has_var >= 1 & {phenoname} == 0')))
     else:
         gene_dict = LinearModelResult(0, 0, linear_model_pack.n_model, gene, mask_name,
-                                      linear_model_pack.phenoname)
+                                      linear_model_pack.pheno_name)
 
     return gene_dict
