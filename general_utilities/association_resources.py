@@ -61,18 +61,23 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False,
     return chromosomes
 
 
-def build_transcript_table() -> pd.DataFrame:
+def build_transcript_table(transcripts_path: Path = Path('transcripts.tsv.gz'), filter_genes: bool = True) -> pd.DataFrame:
     """A wrapper around pd.read_csv to load transcripts.tsv.gz into a pd.DataFrame
 
-    Here we just read the transcripts.tsv.gz file downloaded during ingest_data into a pd.DataFrame. There is some
+    Read the transcripts.tsv.gz file downloaded during ingest_data into a pd.DataFrame. This file contains information
+    about all transcripts that can be burden tested for. The index of the resulting pd.DataFrame is the ENST ID.
 
+    :param transcripts_path: A Path to the transcripts.tsv.gz file. Defaults to hardcoded 'transcripts.tsv.gz' for
+        backwards compatibility.
+    :param filter_genes: If True, filter out transcripts that have failed QC. Defaults to True.
     :return: A pd.DataFrame representation of all transcripts that can be burden tested for.
     """
 
-    transcripts_table = pd.read_csv('transcripts.tsv.gz', sep="\t", index_col='ENST')
-    transcripts_table = transcripts_table[transcripts_table['fail'] == False]
-    transcripts_table = transcripts_table.drop(columns=['syn.count', 'fail.cat', 'fail'])
-    transcripts_table = transcripts_table[transcripts_table['chrom'] != 'Y']
+    transcripts_table = pd.read_csv(transcripts_path, sep="\t", index_col='ENST')
+    if filter_genes:
+        transcripts_table = transcripts_table[transcripts_table['fail'] == False]
+        transcripts_table = transcripts_table.drop(columns=['syn.count', 'fail.cat', 'fail'])
+        transcripts_table = transcripts_table[transcripts_table['chrom'] != 'Y']
 
     # ensure columns are in the expected order:
     transcripts_table = transcripts_table[['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
@@ -174,20 +179,36 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
     return gene_info, chromosomes
 
 
-# These two methods help the different tools in defining the correct field names to include in outputs
-def define_field_names_from_pandas(field_one: pd.Series) -> List[str]:
+def define_field_names_from_pandas(id_field: str, default_fields: List[str] = None) -> List[str]:
+    """These two methods help the different tools in defining the correct field names to include in outputs
+
+    This method will search a dash(-)-delimited string of the format <CSQ>-<FREQ>, where CSQ is a vep CSQ and <FREQ> is
+    some frequency definition that MUST include either 'MAF' or 'AC'. This is the standard format used by
+    mrcepid-collapsevariants.
+
+    The user can extend this search to additional fields using the :param: default_fields parameter, which will
+    be amended to the front of the list by naming additional fields found before the above. For example, for an input
+    of 'ENST00000000001-HC_PTV-MAF_01' and default field of ['ENST'], the output field names will be:
+
+    [ENST, MASK, MAF]
+
+    :param id_field: A string that should be searched for information on mask names
+    :param default_fields: A list of additional fields to include in the output.
+    :return: A List of field string names to use for outputs
+    """
     # Test what columns we have in the 'SNP' field, so we can name them...
-    field_one = field_one['SNP'].split("-")
-    field_names = ['ENST']
-    if len(field_one) == 2:  # This is the bare minimum, always name first column ENST, and second column 'var1'
+    split_id_field = id_field.split("-")
+    field_names = [] if default_fields is None else default_fields
+    num_default = len(field_names)
+    if len(split_id_field) == num_default + 1:  # This is the bare minimum; we found 1 additional field to the default
         field_names.append('var1')
-    elif len(field_one) == 3:  # This could be the standard naming format... check that column [2] is MAF/AC
-        if 'MAF' in field_one[2] or 'AC' in field_one[2]:
+    elif len(split_id_field) == num_default + 2:  # This could be the standard naming format... check that column [2] is MAF/AC
+        if 'MAF' in split_id_field[num_default + 1] or 'AC' in split_id_field[num_default + 1]:
             field_names.extend(['MASK', 'MAF'])
         else:  # This means we didn't hit on MAF in column [2] and a different naming convention is used...
             field_names.extend(['var1', 'var2'])
     else:
-        for i in range(2, len(field_one) + 1):
+        for i in range(2, len(split_id_field) + 1):
             field_names.append('var%i' % i)
 
     return field_names
@@ -250,7 +271,7 @@ def gt_to_float(gt: str) -> float:
     """
     if gt == '0/0':
         return 0
-    elif gt == '0/1':
+    elif gt == '0/1' or gt == '1/0':
         return 1
     elif gt == '1/1':
         return 2
