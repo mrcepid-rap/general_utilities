@@ -2,7 +2,7 @@ import math
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor, Future
 from time import sleep
-from typing import Any, Iterator, Callable
+from typing import Any, Iterator, Callable, List, Dict, Optional
 
 import dxpy
 
@@ -14,6 +14,8 @@ class ThreadUtility(JobLauncherInterface):
     def __init__(self, incrementor: int = 500,
                  threads: int = None,
                  thread_factor: int = 1):
+
+        self._submitted_futures: List[Future] = []
 
         super().__init__(incrementor=incrementor,
                          threads=threads)
@@ -43,7 +45,7 @@ class ThreadUtility(JobLauncherInterface):
 
         self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
 
-        self._future_iterator = futures.as_completed(self._output_array)
+        self._future_iterator = futures.as_completed(self._submitted_futures)
         return self
 
     def __len__(self) -> int:
@@ -53,8 +55,8 @@ class ThreadUtility(JobLauncherInterface):
         """
         return len(self._output_array)
 
-    def launch_job(self, function: Callable, inputs: dict, outputs=None, name=None, instance_type=None,
-                   **kwargs) -> None:
+    def launch_job(self, function: Callable, inputs: Optional[Dict[str, Any]] = None,
+                   outputs=None, name=None, instance_type=None, **kwargs) -> None:
         """
         Launch a job by submitting it to the thread executor.
         """
@@ -64,10 +66,10 @@ class ThreadUtility(JobLauncherInterface):
         # Track job count for status reporting
         self._total_jobs += 1
 
-        # Collect the job details in a queue
-        self._output_array.append((function, inputs))
+        params: Dict[str, Any] = inputs if inputs is not None else dict(kwargs)
+        self._output_array.append((function, params))
 
-    def submit_and_monitor(self) -> list[Future]:
+    def submit_and_monitor(self) -> List[Future]:
         """
         Submit the queued jobs and return an iterator over the futures.
         """
@@ -80,11 +82,11 @@ class ThreadUtility(JobLauncherInterface):
         self._print_status()
 
         # Submit the collected jobs to the executor
-        submitted_futures = [
+        self._submitted_futures = [
             self._executor.submit(function, **inputs) for function, inputs in self._output_array
         ]
 
         # Mark the queue as closed after successful submission
         self._queue_closed = True
 
-        return submitted_futures
+        return self._submitted_futures

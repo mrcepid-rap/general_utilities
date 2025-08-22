@@ -1,7 +1,7 @@
 import math
 import os
 from abc import ABC, abstractmethod
-from typing import Iterator, Any
+from typing import Iterator, Any, Optional, Dict, List
 
 from general_utilities.mrc_logger import MRCLogger
 
@@ -87,8 +87,9 @@ class JobLauncherInterface(ABC):
         pass
 
     @abstractmethod
-    def launch_job(self, function, inputs: dict, outputs: list = None, name: str = None,
-                   instance_type: str = None) -> None:
+    def launch_job(self, function, inputs: Optional[Dict[str, Any]] = None,
+                   outputs: Optional[List] = None, name: Optional[str] = None,
+                   instance_type: Optional[str] = None, **kwargs) -> None:
         """
         Queue a subjob with the given parameters.
         :param function: The function to execute as a subjob.
