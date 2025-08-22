@@ -1,5 +1,4 @@
 import math
-import os
 from abc import ABC, abstractmethod
 from typing import Iterator, Any, Optional, Dict, List
 
@@ -20,11 +19,10 @@ class JobLauncherInterface(ABC):
     :raises RuntimeError: If an unsupported platform is detected.
     """
 
-    def __init__(self, incrementor: int = 500, threads: int = None, concurrent_job_limit: int = 100, **kwargs):
+    def __init__(self, incrementor: int = 500, concurrent_job_limit: int = 100):
 
         self._logger = MRCLogger(__name__).get_logger()
 
-        self._threads = self._get_threads(threads)
         self._incrementor = incrementor
 
         self._concurrent_job_limit = concurrent_job_limit
@@ -34,18 +32,6 @@ class JobLauncherInterface(ABC):
         self._output_array = []
 
         self._queue_closed = False  # A flag to make sure we don't submit jobs to a closed executor
-
-    def _get_threads(self, requested_threads: int) -> int:
-        """
-        Get the number of threads to use for job execution.
-        :param requested_threads: The number of threads requested by the user.
-        :return: The number of threads to use for job execution.
-        """
-        threads = requested_threads if requested_threads else os.cpu_count()
-        if threads is None or threads < 1:
-            self._logger.error('Not enough threads on machine to complete task. Number of threads on this machine '
-                               f'({threads}) is less than 1.')
-        return threads
 
     def _print_status(self) -> None:
         """

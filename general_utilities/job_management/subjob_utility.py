@@ -163,13 +163,11 @@ class SubjobUtility(JobLauncherInterface):
 
     def __init__(self,
                  incrementor: int = 500,
-                 threads: int = 100,
                  concurrent_job_limit: int = 100,
                  instance_type=None,
                  download_on_complete: bool = False) -> None:
 
         super().__init__(incrementor=incrementor,
-                         threads=threads,
                          concurrent_job_limit=concurrent_job_limit)
 
         # Dereference class parameters
