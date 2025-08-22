@@ -1,4 +1,3 @@
-import os
 import csv
 import dxpy
 import pandas as pd
@@ -8,71 +7,6 @@ from pathlib import Path
 
 from general_utilities.association_resources import build_transcript_table, define_field_names_from_pandas, \
     bgzip_and_tabix
-
-
-def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False,
-                                 gene_infos: list = None) -> List[Path]:
-
-    if gene_infos is not None:
-        valid_genes = []
-        for gene_info in gene_infos:
-            valid_genes.append(gene_info.name)
-    else:
-        valid_genes = None
-
-    tmp_output = Path(f'{output_prefix}.lm_stats.tmp')
-    outputs = []
-
-    if is_snp_tar:
-        snp_output = Path(f'{output_prefix}.SNP.glm.stats.tsv')
-        tmp_output.rename(snp_output)
-        outputs.append(snp_output)
-    elif is_gene_tar:
-        gene_output = Path(f'{output_prefix}.GENE.glm.stats.tsv')
-        tmp_output.rename(gene_output)
-        outputs.append(gene_output)
-    else:
-        # read in the GLM stats file:
-        glm_table = pd.read_csv(tmp_output, sep="\t")
-
-        # Now process the gene table into a useable format:
-        # First read in the transcripts file
-        transcripts_table = build_transcript_table()
-
-        # Limit to genes we care about if running only a subset:
-        if valid_genes is not None:
-            transcripts_table = transcripts_table.loc[valid_genes]
-
-        # Test what columns we have in the 'SNP' field so we can name them...
-        field_one = glm_table.iloc[0]
-        field_one = field_one['maskname'].split("-")
-        field_names = []
-        if len(field_one) == 2:  # This could be the standard naming format... check that column [1] is MAF/AC
-            if 'MAF' in field_one[1] or 'AC' in field_one[1]:
-                field_names.extend(['MASK', 'MAF'])
-            else:  # This means we didn't hit on MAF/AC in column [2] and a different naming convention is used...
-                field_names.extend(['var1', 'var2'])
-        else:
-            for i in range(2, len(field_one) + 1):
-                field_names.append('var%i' % i)
-
-        # Process the 'SNP' column into separate fields and remove
-        glm_table[field_names] = glm_table['maskname'].str.split("-", expand=True)
-        glm_table = glm_table.drop(columns=['maskname'])
-
-        # Now merge the transcripts table into the gene table to add annotation and write
-        glm_table = pd.merge(transcripts_table, glm_table, on='ENST', how="left")
-
-        # Sort just in case
-        glm_table = glm_table.sort_values(by=['chrom', 'start', 'end'])
-
-        glm_tsv = Path(f'{output_prefix}.genes.glm.stats.tsv')
-        with glm_tsv.open('w') as glm_out:
-            glm_table.to_csv(path_or_buf=glm_out, index=False, sep="\t", na_rep='NA')
-
-        outputs.extend(bgzip_and_tabix(glm_tsv, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
-
-    return outputs
 
 
 # Helper method to just write STAAR outputs from the 'process_staar_outputs' function below
