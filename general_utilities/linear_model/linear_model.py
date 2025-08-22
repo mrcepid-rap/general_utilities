@@ -1,15 +1,19 @@
+import csv
+import dataclasses
+
 import bgen
 import dxpy
 import numpy as np
 import pandas as pd
+import pysam
 import statsmodels.api as sm
 
 from pathlib import Path
 from typing import Tuple, List
 from scipy.io import mmread
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 
-from association_resources import replace_multi_suffix
+from general_utilities.association_resources import replace_multi_suffix, bgzip_and_tabix, define_field_names_from_pandas
 from general_utilities.mrc_logger import MRCLogger
 from import_utils.import_lib import TarballType
 
@@ -44,12 +48,13 @@ class LinearModelResult:
     """
     Class that holds results from linear models
 
-    :attr n_car: Number of carriers of the variant
-    :attr cMAC: Carrier minor allele count
-    :attr n_model: Number of individuals in the model
     :attr ENST: ENST ID of the gene tested
     :attr maskname: Name of the mask used for this gene (e.g., PTV)
     :attr pheno_name: Name of the phenotype tested
+    :attr n_car: Number of carriers of the variant
+    :attr cMAC: Carrier minor allele count
+    :attr n_model: Number of individuals in the model
+    :attr model_run: Boolean indicating if the model was run successfully
     :attr p_val_init: Initial p-value from the null model
     :attr p_val_full: Full model p-value (if p_val_init < nominal significance of 1e-4)
     :attr effect: Effect size of the variant on the phenotype
@@ -60,12 +65,13 @@ class LinearModelResult:
     :attr n_car_unaffected: Number of carriers unaffected by the phenotype
     """
 
-    n_car: int
-    cMAC: int
-    n_model: int
     ENST: str
     maskname: str
     pheno_name: str
+    n_car: int
+    cMAC: int
+    n_model: int
+    model_run: bool
     p_val_init: float = float('nan')
     p_val_full: float = float('nan')
     effect: float = float('nan')
@@ -262,9 +268,7 @@ def load_gene_or_snp_linear_model(matrix_file: Path, dummy_gene_name: str) -> pd
     :return: A pandas DataFrame with genetic data indexed by ENST and FID.
     """
 
-
     samples_table = matrix_file.with_suffix('.samples_table.tsv')
-    variants_table = matrix_file.with_suffix('.variants_table.tsv')
 
     # read and collapse the variant matrix
     variant_matrix = mmread(matrix_file)
@@ -326,8 +330,8 @@ def run_linear_model(linear_model_pack: LinearModelPack, genotype_table: pd.Data
         cMAC = internal_frame['has_var'].sum()
 
         if n_car <= 2: # Don't run models that won't converge
-            gene_dict = LinearModelResult(n_car, cMAC, linear_model_pack.n_model, gene, mask_name,
-                                          linear_model_pack.pheno_name)
+            gene_dict = LinearModelResult(gene, mask_name, linear_model_pack.pheno_name,
+                                          n_car, cMAC, linear_model_pack.n_model, False)
         else:
             sm_results = sm.GLM.from_formula('resid ~ has_var',
                                              data=internal_frame,
@@ -343,35 +347,98 @@ def run_linear_model(linear_model_pack: LinearModelPack, genotype_table: pd.Data
                                                       data=internal_frame,
                                                       family=linear_model_pack.model_family).fit()
 
-                gene_dict = LinearModelResult(n_car, cMAC, sm_results.nobs, gene, mask_name,
-                                              linear_model_pack.pheno_name,
+                gene_dict = LinearModelResult(gene, mask_name, linear_model_pack.pheno_name,
+                                              n_car, cMAC, sm_results.nobs, True,
                                               sm_results.pvalues['has_var'], sm_results_full.pvalues['has_var'],
                                               sm_results_full.params['has_var'], sm_results_full.bse['has_var'])
 
                 # If we are dealing with a binary phenotype we also want to provide the "Fisher's" table
                 if is_binary:
-                    phenoname = linear_model_pack.pheno_name
+                    pheno_name = linear_model_pack.pheno_name
                     gene_dict.set_carrier_stats(
-                        n_noncar_affected=len(internal_frame.query(f'has_var == 0 & {phenoname} == 1')),
-                        n_noncar_unaffected=len(internal_frame.query(f'has_var == 0 & {phenoname} == 0')),
-                        n_car_affected=len(internal_frame.query(f'has_var >= 1 & {phenoname} == 1')),
-                        n_car_unaffected=len(internal_frame.query(f'has_var >= 1 & {phenoname} == 0')))
+                        n_noncar_affected=len(internal_frame.query(f'has_var == 0 & {pheno_name} == 1')),
+                        n_noncar_unaffected=len(internal_frame.query(f'has_var == 0 & {pheno_name} == 0')),
+                        n_car_affected=len(internal_frame.query(f'has_var >= 1 & {pheno_name} == 1')),
+                        n_car_unaffected=len(internal_frame.query(f'has_var >= 1 & {pheno_name} == 0')))
 
             else:
-                gene_dict = LinearModelResult(n_car, cMAC, sm_results.nobs, gene, mask_name,
-                                              linear_model_pack.pheno_name,
+                gene_dict = LinearModelResult(gene, mask_name, linear_model_pack.pheno_name,
+                                              n_car, cMAC, sm_results.nobs, True,
                                               p_val_init=sm_results.pvalues['has_var'])
 
                 # If we are dealing with a binary phenotype we also want to provide the "Fisher's" table
                 if is_binary:
-                    phenoname = linear_model_pack.pheno_name
+                    pheno_name = linear_model_pack.pheno_name
                     gene_dict.set_carrier_stats(
-                        n_noncar_affected=len(internal_frame.query(f'has_var == 0 & {phenoname} == 1')),
-                        n_noncar_unaffected=len(internal_frame.query(f'has_var == 0 & {phenoname} == 0')),
-                        n_car_affected=len(internal_frame.query(f'has_var >= 1 & {phenoname} == 1')),
-                        n_car_unaffected=len(internal_frame.query(f'has_var >= 1 & {phenoname} == 0')))
+                        n_noncar_affected=len(internal_frame.query(f'has_var == 0 & {pheno_name} == 1')),
+                        n_noncar_unaffected=len(internal_frame.query(f'has_var == 0 & {pheno_name} == 0')),
+                        n_car_affected=len(internal_frame.query(f'has_var >= 1 & {pheno_name} == 1')),
+                        n_car_unaffected=len(internal_frame.query(f'has_var >= 1 & {pheno_name} == 0')))
     else:
         gene_dict = LinearModelResult(0, 0, linear_model_pack.n_model, gene, mask_name,
                                       linear_model_pack.pheno_name)
 
     return gene_dict
+
+
+def process_linear_model_outputs(input_models: List[LinearModelResult], output_prefix: str, tarball_type: TarballType,
+                                 transcripts_table: pd.DataFrame, is_binary: bool) -> List[Path]:
+
+    outputs = []
+
+    glm_tsv = Path(f'{output_prefix}.genes.glm.stats.tsv')
+    with glm_tsv.open('w') as glm_out:
+
+        # Determine table fieldnames
+        fieldnames = []
+        # Add gene information, if genomewide mask
+        if tarball_type == TarballType.GENOMEWIDE:
+            fieldnames.append('ENST')
+            fieldnames.extend(transcripts_table.columns)
+
+        # Build the fieldnames programatically from available data
+        linear_model_fieldnames = [linear_field.name for linear_field in dataclasses.fields(LinearModelResult)]
+        if tarball_type == TarballType.GENOMEWIDE:
+            linear_model_fieldnames.remove('ENST')  # Remove ENST as we add it above if genomewide
+        fieldnames.extend(linear_model_fieldnames)
+        mask_maf_fields = define_field_names_from_pandas(input_models[0].maskname)
+        fieldnames[fieldnames.index('maskname'):fieldnames.index('maskname')] = mask_maf_fields
+        fieldnames.pop(fieldnames.index('maskname'))
+
+        if not is_binary:
+            fieldnames.remove('n_noncar_affected')
+            fieldnames.remove('n_noncar_unaffected')
+            fieldnames.remove('n_car_affected')
+            fieldnames.remove('n_car_unaffected')
+
+        # Note: We append to a list and then write to the file at once so that we can sort. This should never
+        # result in too much in memory as the number of genes is relatively small
+        gene_rows = []
+        for model in input_models:
+            mask_maf_columns = (dict(zip(mask_maf_fields, model.maskname.split('-'))))
+
+            model_dict = asdict(model)
+            model_dict.update(mask_maf_columns)
+            gene_info = transcripts_table.loc[model.ENST].to_dict() if tarball_type == TarballType.GENOMEWIDE else {}
+            model_dict.update(gene_info)
+
+            gene_rows.append(model_dict)
+
+        glm_csv = csv.DictWriter(glm_out, delimiter='\t', fieldnames=fieldnames, extrasaction='ignore')
+        glm_csv.writeheader()
+
+        # Sort if we are dealing with a genomewide mask
+        if tarball_type == TarballType.GENOMEWIDE:
+            # Sort by chromosome, start, and end for genomewide masks
+            gene_rows = sorted(gene_rows, key=lambda row: (row['chrom'], row['start']))
+
+        glm_csv.writerows(gene_rows)
+
+    if tarball_type == TarballType.GENOMEWIDE:
+        outputs.extend(bgzip_and_tabix(glm_tsv, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
+    else:
+        glm_compress = glm_tsv.with_suffix('.tsv.gz')
+        pysam.tabix_compress(str(glm_tsv.absolute()), str(glm_compress))
+        outputs.append(glm_compress)
+
+    return outputs
