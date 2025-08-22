@@ -6,7 +6,7 @@ from typing import Any, Iterator, Callable
 
 import dxpy
 
-from general_utilities.job_management.job_launcher_interface import JobLauncherInterface
+from general_utilities.job_management.joblauncher_interface import JobLauncherInterface
 
 
 class ThreadUtility(JobLauncherInterface):

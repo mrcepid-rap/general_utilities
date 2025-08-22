@@ -10,7 +10,7 @@ import dxpy
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
-from general_utilities.job_management.job_launcher_interface import JobLauncherInterface
+from general_utilities.job_management.joblauncher_interface import JobLauncherInterface
 
 
 class Environment(Enum):
