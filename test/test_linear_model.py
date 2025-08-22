@@ -8,17 +8,20 @@ import statsmodels.api as sm
 
 from pathlib import Path
 
-from general_utilities.linear_model.linear_model import linear_model_null, run_linear_model
+from association_resources import build_transcript_table
+from general_utilities.linear_model.linear_model import linear_model_null, run_linear_model, \
+    process_linear_model_outputs
 from import_utils.import_lib import TarballType
 from linear_model.linear_model import load_tarball_linear_model
 
-test_data_dir = Path(__file__).parent / "test_data/linear_model/"
+test_data_dir = Path(__file__).parent / "test_data"
+linear_model_test_data_dir = test_data_dir / "linear_model/"
 
 @pytest.fixture
 def phenofile(tmp_path) -> Path:
-    phenofile = test_data_dir / 'phenotype.tsv'
-    base_covars = test_data_dir / 'base_covariates.covariates'
-    add_covars = test_data_dir / 'other_covariates.covariates'
+    phenofile = linear_model_test_data_dir / 'phenotype.tsv'
+    base_covars = linear_model_test_data_dir / 'base_covariates.covariates'
+    add_covars = linear_model_test_data_dir / 'other_covariates.covariates'
 
     test_pheno_covars = tmp_path / 'test_phenotype.tsv'
 
@@ -63,11 +66,16 @@ def unpacked_tarball(tmp_path, request) -> Path:
     """Unpacks the tarball to a temporary directory."""
 
     import tarfile
-    tarball = tarfile.open(test_data_dir / f'{request.param}.tar.gz', 'r:gz')
+    tarball = tarfile.open(linear_model_test_data_dir / f'{request.param}.tar.gz', 'r:gz')
     tarball.extractall(path=tmp_path)
     tarball.close()
     return tmp_path / request.param
 
+@pytest.fixture
+def transcripts_table() -> pd.DataFrame:
+    """Returns a DataFrame with ENST and gene names."""
+    transcripts_path = test_data_dir / 'transcripts.tsv.gz'
+    return build_transcript_table(transcripts_path, False)
 
 def test_linear_model_null(phenofile):
 
@@ -93,7 +101,7 @@ def test_linear_model_null(phenofile):
 @pytest.mark.parametrize("unpacked_tarball, expected_genes_path, bgen_prefix, tarball_type",
                          zip(
                              ("HC_PTV-MAF_001", "HC_PTV-MAF_001", "HC_PTV-MAF_001_GENE", "HC_PTV-MAF_001_SNP"),
-                             (test_data_dir / 'expt_genes.PTV.tsv', test_data_dir / 'expt_genes.PTV_chunk1.tsv', test_data_dir / 'expt_genes.GENE.tsv', test_data_dir / 'expt_genes.SNP.tsv'),
+                             (linear_model_test_data_dir / 'expt_genes.PTV.tsv', linear_model_test_data_dir / 'expt_genes.PTV_chunk1.tsv', linear_model_test_data_dir / 'expt_genes.GENE.tsv', linear_model_test_data_dir / 'expt_genes.SNP.tsv'),
                              (None, 'chr1_chunk1', None, None),
                              (TarballType.GENOMEWIDE, TarballType.GENOMEWIDE, TarballType.GENE, TarballType.SNP)
                          ), indirect=["unpacked_tarball"])
@@ -107,13 +115,14 @@ def test_load_tarball_linear_model(unpacked_tarball, expected_genes_path, bgen_p
     assert len(genetic_data.index.get_level_values('FID').unique()) == 10000
     assert set(genetic_data.index.get_level_values('ENST').unique()) == set(expected_genes[0])
 
-@pytest.mark.parametrize("unpacked_tarball, expected_genes_path, tarball_type",
+@pytest.mark.parametrize("unpacked_tarball, expected_genes_path, tarball_type, is_binary",
                          zip(
                              ("HC_PTV-MAF_001", "HC_PTV-MAF_001", "HC_PTV-MAF_001_GENE", "HC_PTV-MAF_001_SNP"),
-                             (test_data_dir / 'expt_genes.PTV.tsv', test_data_dir / 'expt_genes.PTV_chunk1.tsv', test_data_dir / 'expt_genes.GENE.tsv', test_data_dir / 'expt_genes.SNP.tsv'),
-                             (TarballType.GENOMEWIDE, TarballType.GENOMEWIDE, TarballType.GENE, TarballType.SNP)
+                             (linear_model_test_data_dir / 'expt_genes.PTV.tsv', linear_model_test_data_dir / 'expt_genes.PTV_chunk1.tsv', linear_model_test_data_dir / 'expt_genes.GENE.tsv', linear_model_test_data_dir / 'expt_genes.SNP.tsv'),
+                             (TarballType.GENOMEWIDE, TarballType.GENOMEWIDE, TarballType.GENE, TarballType.SNP),
+                             (False, False, False, False)
                          ), indirect=["unpacked_tarball"])
-def test_run_linear_model(phenofile, unpacked_tarball, expected_genes_path, tarball_type):
+def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarball, expected_genes_path, tarball_type, is_binary):
 
     null_model = linear_model_null(phenofile,
                                    phenotype='phenotype',
@@ -130,10 +139,11 @@ def test_run_linear_model(phenofile, unpacked_tarball, expected_genes_path, tarb
         for gene in expected_genes_reader:
             expected_genes.add(gene.rstrip())
 
-    found_genes = set()
+    final_models = []
 
     for gene in genetic_data.index.get_level_values('ENST').unique():
         result = run_linear_model(null_model, genetic_data, gene, tarball_name, is_binary=False, always_run_corrected=False)
+        final_models.append(result)
 
         assert result.pheno_name == 'phenotype'
         assert result.ENST == gene
@@ -141,13 +151,13 @@ def test_run_linear_model(phenofile, unpacked_tarball, expected_genes_path, tarb
         assert result.n_model == 10000
         assert result.n_noncar_unaffected == 0  #TODO: Implement binary models!
 
-        found_genes.add(result.ENST)
-
         #TODO: When we implement full data, check actual p. values
         if result.n_car <= 2:
             assert math.isnan(result.p_val_init)
+            assert result.model_run == False
         else:
             assert not math.isnan(result.p_val_init)
+            assert result.model_run == True
 
         if result.p_val_init < 1e-4:
             print(result)
@@ -155,4 +165,26 @@ def test_run_linear_model(phenofile, unpacked_tarball, expected_genes_path, tarb
         else:
             assert math.isnan(result.p_val_full)
 
+    found_genes = {result.ENST for result in final_models}
     assert len(found_genes.intersection(expected_genes)) == len(expected_genes)
+
+    expected_fields = ['ENST', 'MASK', 'MAF', 'pheno_name', 'n_car', 'cMAC', 'n_model', 'model_run', 'p_val_init', 'p_val_full', 'effect', 'std_err']
+    if tarball_type == TarballType.GENOMEWIDE:
+        expected_fields[1:1] = ['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
+                                           'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']
+
+    if is_binary:
+        expected_fields.extend(['n_noncar_affected', 'n_noncar_unaffected', 'n_car_affected', 'n_car_unaffected'])
+
+    output_files = process_linear_model_outputs(final_models, tmp_path / tarball_name, tarball_type,
+                                                transcripts_table, is_binary=False)
+
+    if tarball_type == TarballType.GENOMEWIDE:
+        assert output_files == [tmp_path / f'{tarball_name}.genes.glm.stats.tsv.gz',
+                                tmp_path / f'{tarball_name}.genes.glm.stats.tsv.gz.tbi']
+    else:
+        assert output_files == [tmp_path / f'{tarball_name}.genes.glm.stats.tsv.gz']
+
+    test_output = pd.read_csv(output_files[0], sep='\t')
+    assert test_output.columns.tolist() == expected_fields
+    assert test_output['ENST'].isin(expected_genes).value_counts()[True] == len(expected_genes)
