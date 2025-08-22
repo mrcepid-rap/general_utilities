@@ -1,4 +1,5 @@
 import math
+import os
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor, Future
 from time import sleep
@@ -11,17 +12,19 @@ from general_utilities.job_management.joblauncher_interface import JobLauncherIn
 
 class ThreadUtility(JobLauncherInterface):
 
-    def __init__(self, incrementor: int = 500,
+    def __init__(self,
+                 incrementor: int = 500,
                  threads: int = None,
                  thread_factor: int = 1):
 
-        self._submitted_futures: List[Future] = []
+        threads = self._get_threads(threads)
+        available_workers = math.floor(threads / thread_factor)
 
         super().__init__(incrementor=incrementor,
-                         threads=threads)
+                         concurrent_job_limit=available_workers)
 
-        available_workers = math.floor(self._threads / thread_factor)
-        self._executor = ThreadPoolExecutor(max_workers=available_workers)
+        self._submitted_futures: List[Future] = []
+        self._executor = ThreadPoolExecutor(max_workers=self._concurrent_job_limit)
 
     # I have a feeling the sleep() part is VERY inefficient but I am unsure of how to fix at the moment...
     # Due to how futures work, most of the time a next() call will receive a 'None' return. We need to create a
@@ -90,3 +93,15 @@ class ThreadUtility(JobLauncherInterface):
         self._queue_closed = True
 
         return self._submitted_futures
+
+    def _get_threads(self, requested_threads: int) -> int:
+        """
+        Get the number of threads to use for job execution.
+        :param requested_threads: The number of threads requested by the user.
+        :return: The number of threads to use for job execution.
+        """
+        threads = requested_threads if requested_threads else os.cpu_count()
+        if threads is None or threads < 1:
+            self._logger.error('Not enough threads on machine to complete task. Number of threads on this machine '
+                               f'({threads}) is less than 1.')
+        return threads

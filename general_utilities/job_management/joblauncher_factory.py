@@ -4,9 +4,9 @@ from general_utilities.job_management.thread_utility import ThreadUtility
 from general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
 
 
-def joblauncher_factory(concurrent_job_limit: int = 100, incrementor: int = 500,
-                        download_on_complete: bool = False, thread_factor: int = 1,
-                        threads: int = None, **kwargs) -> JobLauncherInterface:
+def joblauncher_factory(incrementor: int = 500, concurrent_job_limit: int = 100,
+                        download_on_complete: bool = False, threads: int = None,
+                        thread_factor: int = 1) -> JobLauncherInterface:
     """
     Job launcher that uses either SubjobUtility for DX or ThreadUtility for local execution.
     GCP is not supported in this implementation.
@@ -26,13 +26,12 @@ def joblauncher_factory(concurrent_job_limit: int = 100, incrementor: int = 500,
     platform = PlatformFactory().get_platform()
 
     if platform == Platform.DX:
-        backend = SubjobUtility(concurrent_job_limit=concurrent_job_limit,
-                                incrementor=incrementor,
-                                download_on_complete=download_on_complete,
-                                **kwargs)
+        backend = SubjobUtility(incrementor=incrementor,
+                                concurrent_job_limit=concurrent_job_limit,
+                                download_on_complete=download_on_complete)
     elif platform == Platform.LOCAL:
-        backend = ThreadUtility(threads=threads,
-                                incrementor=incrementor,
+        backend = ThreadUtility(incrementor=incrementor,
+                                threads=threads,
                                 thread_factor=thread_factor)
     else:
         raise RuntimeError("Unsupported platform")
