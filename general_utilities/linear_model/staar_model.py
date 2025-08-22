@@ -1,9 +1,14 @@
 from pathlib import Path
 from typing import List
-from importlib.resources import files
+from importlib_resources import files
 
 from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
-from job_management.command_executor import CommandExecutor
+
+
+def test_import():
+
+    r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Null.R')
+    r_script.exists()
 
 
 # Generate the NULL model for STAAR
