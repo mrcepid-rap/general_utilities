@@ -17,11 +17,8 @@ class ThreadUtility(JobLauncherInterface):
                  threads: int = None,
                  thread_factor: int = 1):
 
-        threads = self._get_threads(threads)
-        available_workers = math.floor(threads / thread_factor)
-
         super().__init__(incrementor=incrementor,
-                         concurrent_job_limit=available_workers)
+                         concurrent_job_limit=self._decide_concurrent_job_limit(threads, thread_factor))
 
         self._submitted_futures: List[Future] = []
         self._executor = ThreadPoolExecutor(max_workers=self._concurrent_job_limit)
@@ -94,14 +91,26 @@ class ThreadUtility(JobLauncherInterface):
 
         return self._submitted_futures
 
-    def _get_threads(self, requested_threads: int) -> int:
+    def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:
         """
-        Get the number of threads to use for job execution.
+        Get the number of concurrent jobs that can be run at one time using either the provided number of threads or the
+        number of threads available on the machine.
+
         :param requested_threads: The number of threads requested by the user.
-        :return: The number of threads to use for job execution.
+        :param thread_factor: The number of threads required per job in this thread pool.
+        :return: The number of concurrent jobs that can be used on this machine
         """
+
         threads = requested_threads if requested_threads else os.cpu_count()
         if threads is None or threads < 1:
             self._logger.error('Not enough threads on machine to complete task. Number of threads on this machine '
                                f'({threads}) is less than 1.')
-        return threads
+            raise ValueError('Not enough threads on machine to complete task.')
+
+        available_workers = math.floor(threads / thread_factor)
+        if available_workers < 1:
+            self._logger.error('Not enough threads on machine to complete task. Number of threads on this machine '
+                               f'({threads}) is less than {thread_factor}.')
+            raise ValueError('Not enough threads on machine to complete task.')
+
+        return available_workers
