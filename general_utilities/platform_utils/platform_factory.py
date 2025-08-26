@@ -1,6 +1,7 @@
 import re
 from enum import Enum
 
+import dxpy
 import requests
 
 from general_utilities.mrc_logger import MRCLogger
@@ -26,7 +27,6 @@ class PlatformFactory:
 
         self._logger = MRCLogger(__name__).get_logger()
 
-        self._gcp_check_result = None
         self._platform = self._detect_platform()
 
     def get_platform(self) -> Platform:
@@ -39,38 +39,40 @@ class PlatformFactory:
         """
         Identifies the platform based on the environment and system information.
         """
-        if re.match(r'job-\w{24}', self._detect_platform_uname()):
-            return Platform.DX
+        if self._is_running_on_dnanexus():
+            platform_type = Platform.DX
 
-        if self._is_running_on_gcp_vm():
-            return Platform.GCP
+        elif self._is_running_on_gcp_vm():
+            platform_type = Platform.GCP
 
-        return Platform.LOCAL
+        else:
+            platform_type = Platform.LOCAL
 
-    def _detect_platform_uname(self) -> str:
+        return platform_type
+
+    def _is_running_on_dnanexus(self) -> bool:
         """
-        Detects the platform by checking the system's uname information.
+        Detects the platform by checking whether we are running a DNA Nexus job.
         """
-        uname_info = platform.uname().node.lower()
-        self._logger.info(f"Platform uname info: {uname_info}")
-        return uname_info
+        jobid_info = dxpy.JOB_ID
+        if re.match(r'job-\w{24}', str(jobid_info)):
+            dna_nexus_job = True
+            self._logger.info(f"Running on DNA Nexus job: {str(jobid_info)}")
+        else:
+            dna_nexus_job = False
+        return dna_nexus_job
 
     def _is_running_on_gcp_vm(self) -> bool:
         """
         Detects if the script is running on a Google Compute Engine VM.
-        Memoized to avoid repeated metadata server queries.
         Returns False silently if detection fails.
         """
-        if self._gcp_check_result is not None:
-            return self._gcp_check_result
-
         try:
             response = requests.get('http://metadata.google.internal', timeout=0.5)
-            self._gcp_check_result = (
+            result = (
                     response.status_code == 200 and
                     response.headers.get('Metadata-Flavor') == 'Google'
             )
-        except Exception:
-            self._gcp_check_result = False
-
-        return self._gcp_check_result
+        except requests.RequestException:
+            result = False
+        return result

@@ -2,7 +2,7 @@ import math
 import os
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor, Future
-from typing import Any, Iterator, Callable, List, Dict, Optional
+from typing import Any, Callable, List, Dict, Optional
 
 import dxpy
 
@@ -21,16 +21,6 @@ class ThreadUtility(JobLauncherInterface):
 
         self._executor = ThreadPoolExecutor(max_workers=self._concurrent_job_limit)
 
-    def __iter__(self) -> Iterator:
-
-        if len(self._output_array) == 0:
-            raise dxpy.AppError('No jobs submitted to future pool!')
-
-        self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
-
-        self._output_array = futures.as_completed(self._job_queue)
-        return self
-
     def launch_job(self, function: Callable, inputs: Optional[Dict[str, Any]] = None,
                    outputs=None, name=None, instance_type=None, **kwargs) -> None:
         """
@@ -43,22 +33,27 @@ class ThreadUtility(JobLauncherInterface):
         self._total_jobs += 1
 
         params: Dict[str, Any] = inputs if inputs is not None else dict(kwargs)
-        self._output_array.append((function, params))
+        future = self._executor.submit(function, **params)
+        self._job_queue.append(future)
 
     def submit_and_monitor(self) -> List[Future]:
         """
         Submit the queued jobs and return an iterator over the futures.
         """
 
-        if len(self._output_array) == 0:
+        if not self._job_queue:
             raise dxpy.AppError('No jobs submitted to future pool!')
 
-        self._logger.info("{0:65}: {val}".format("Total number of threads to iterate through", val=self._total_jobs))
+        self._logger.info("{0:65}: {val}".format(
+            "Total number of threads to iterate through", val=self._total_jobs
+        ))
 
-        # Submit the collected jobs to the executor
-        self._job_queue = [
-            self._executor.submit(function, **inputs) for function, inputs in self._output_array
-        ]
+        # collect results
+        for future in futures.as_completed(self._job_queue):
+            result = future.result()
+            self._output_array.append(result)
+            self._num_completed_jobs += 1
+            self._print_status()
 
         # Mark the queue as closed after successful submission
         self._queue_closed = True
