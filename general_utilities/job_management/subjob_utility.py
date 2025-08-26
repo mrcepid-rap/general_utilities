@@ -4,25 +4,14 @@ import os
 from enum import Enum, auto
 from importlib import import_module
 from time import sleep, time
-from typing import TypedDict, Dict, Any, List, Iterator, Optional, Callable
+from typing import TypedDict, Dict, Any, List, Optional
 
 import dxpy
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.job_management.joblauncher_interface import JobLauncherInterface
-
-
-class Environment(Enum):
-    """An Enum that defines the launch environment used to generate jobs.
-
-    A bit strange, but the Environment enum's value is a class that we can instantiate for our specific job type. This
-    allows each job to be queued with it's expected instantiating class and make calling the required class more
-    abstract.
-    """
-
-    DX = dxpy.DXJob
-    LOCAL = dxpy.DXApplet
+from general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
 
 
 class DXJobInfo(TypedDict):
@@ -33,8 +22,8 @@ class DXJobInfo(TypedDict):
     :cvar properties: Additional properties to be passed to the 'properties' parameter of :func:`dxpy.DXJob.run()`
     :cvar input: The inputs as defined in the Applet / Function specification
     :cvar outputs: The outputs as defined in the Applet / Function specification
-    :cvar job_type: A :func:`Environment()` enum defining where subjobs have been launched from
-    :cvar destination: The output folder for :cvar outputs:. Only used by Environment.DXApplet jobs
+    :cvar job_type: A :func:`Platform()` enum defining where subjobs have been launched from
+    :cvar destination: The output folder for :cvar outputs:. Only used by Platform.DXApplet jobs
     :cvar name: The name for a job
     :cvar instance_type: The requested instance_type for a job. Must conform to available DNANexus instance_types.
     """
@@ -42,7 +31,7 @@ class DXJobInfo(TypedDict):
     properties: Dict[str, str]
     input: Dict[str, Any]
     outputs: List[str]
-    job_type: Environment
+    job_type: Platform
     destination: Optional[str]
     name: Optional[str]
     instance_type: Optional[str]
@@ -100,11 +89,14 @@ class SubjobUtility(JobLauncherInterface):
 
     This class functions in two ways, depending on the methods used to queue jobs:
 
-    1. If run from a local machine (e.g., a macbook) via :func:launch_applet() – Will launch new jobs that are
-    not dependent on any current running job
+    1. If you are looking to launch an applet from a local machine, you can call this class manually and run from
+    a local machine (e.g., a macbook) via :func:launch_applet() – This will launch new jobs that are
+    not dependent on any current running job.
 
-    2. If run from a currently running DNANexus job via :func:launch_job() – Will launch subjobs that are
-    dependent on the current job to be run via the DXJob class
+    2. For all other uses, you should use the joblauncher_factory() method to instantiate the Subjob class (if on DNA Nexus)
+    or the ThreadUtility class (if on a local machine). This factory method will automatically detect the platform
+    and instantiate the correct class. Both classes implement the same interface, so they can be used
+    interchangeably. Run the desired function via :func:launch_job() & :func:submit_and_monitor().
 
     See individual method documentation for more information, but briefly, the workflow for using this class is
     the following:
@@ -151,11 +143,13 @@ class SubjobUtility(JobLauncherInterface):
             # outputs param:
             print(f'output for the outname value is: {output["outname"]})
 
+    :param incrementor: This class will print a status method for every :param:incrementor jobs completed with a
+        percentage of total jobs completed. [500]
     :param concurrent_job_limit: Number of jobs that can be run at once. Default of 100 is the actual limit for
         concurrent jobs on the DNANexus platform. It is also wishful in that you will rarely be able to have 100
         jobs simultaneously running. [100]
-    :param incrementor: This class will print a status method for every :param:incrementor jobs completed with a
-        percentage of total jobs completed. [500]
+    :param instance_type: The default instance type to use for jobs. If None (default), the instance type
+        defined in the parent job will be used.
     :param download_on_complete: Should ALL file outputs be downloaded on subjob completion? Setting this
         option to 'True' will download all files to the current instance and provide a :func:Path. If 'False'
         (default), the value in the output dictionary will be a :func:dxpy.dxlink(). [False]
@@ -175,79 +169,19 @@ class SubjobUtility(JobLauncherInterface):
         self._download_on_complete = download_on_complete
 
         # We define three difference queues for use during runtime:
-        # job_queue   – jobs waiting to be submitted
         # job_running – jobs currently running, with a dict keyed on the DX job-id and with a value of DXJobDict class
         #   which contains the job class from instantiation and information about the job
         #   and information about the job
         # job_failed  – A list of jobs which failed during runtime which, if the job has additional retries, can
         #   be resubmitted
-        self._job_queue: List[DXJobInfo] = []
         self._job_running: Dict[str, DXJobDict] = dict()
         self._job_failed: List[DXJobInfo] = []
 
         # Job type & count monitoring
-        self._queue_type: Optional[Environment] = None
+        self._queue_type = PlatformFactory().get_platform()
 
         # Set default job instance type
-        self._default_instance_type = self._set_default_instance_type
-
-        # This is used to keep track of the current index in the output array when iterating over outputs
-        self._iter_index = 0
-
-    def __iter__(self) -> Iterator[Dict[str, Any]]:
-        """Return an iterator over the outputs collected when jobs finish.
-
-        Outputs returned by the class are a list of dictionaries formatted like::
-
-            # Top-level list
-            [
-                # Per-job output lists
-                [  # job1
-                    # output dictionaries
-                    {
-                    'output1': output_value,
-                    'output2': output_value,
-                    'outputN': output_value
-                    }
-                ],
-                [  # job2
-                    {
-                    'output1': output_value,
-                    'output2': output_value,
-                    'outputN': output_value
-                    }
-                ]
-            ]
-
-        where dict keys are identical to those passed to the :func:`launch_applet()` / :func:`launch_job()` 'outputs'
-        parameter and where 'output_value' is either the actual output (e.g., str, int, boolean), if NOT a file,
-        or if a file, a dxpy.DXLink() reference to a file on the remote file system, OR pathlib.Path(s) to the
-        locally downloaded output itself if download_on_complete is True.
-
-        :return: An iterator of output references
-        """
-        return iter(self._output_array)
-
-    def __len__(self) -> int:
-        """Returns the number of outputs currently in the output queue
-
-        :return: The number of outputs currently in the output queue
-        """
-        return len(self._output_array)
-
-    def __next__(self) -> Any:
-        """Return the next output in the output queue.
-
-        This method will return the next output in the output queue, which is a dictionary of outputs for a given job.
-        If there are no more outputs, it will raise a StopIteration exception.
-
-        :return: The next output in the output queue
-        """
-        if self._iter_index < len(self._output_array):
-            result = self._output_array[self._iter_index]
-            self._iter_index += 1
-            return result
-        raise StopIteration
+        self._set_default_instance_type()
 
     def launch_applet(self, applet_hash: str, inputs: Dict[str, Any], outputs: List[str] = None,
                       destination: str = None, instance_type: str = None, name: str = None) -> None:
@@ -276,10 +210,8 @@ class SubjobUtility(JobLauncherInterface):
             raise dxpy.AppError('Cannot submit new subjobs after calling monitor_subjobs()!')
 
         # Make sure only identical job types have been launched
-        if self._queue_type is Environment.DX:
+        if self._queue_type is Platform.DX:
             raise dxpy.AppError('Cannot mix jobtypes between launch_applet() and launch_job()!')
-        elif self._queue_type is None:
-            self._queue_type = Environment.LOCAL
 
         self._total_jobs += 1
 
@@ -291,15 +223,16 @@ class SubjobUtility(JobLauncherInterface):
                                        'properties': {},
                                        'input': inputs,
                                        'outputs': outputs,
-                                       'job_type': Environment.LOCAL,
+                                       'job_type': Platform.LOCAL,
                                        'destination': f'/{destination}',
                                        'name': f'subjob_{self._total_jobs}' if name is None else None,
                                        'instance_type': instance_type if instance_type else self._default_instance_type}
 
         self._job_queue.append(input_parameters)
 
-    def launch_job(self, function: Callable, inputs: Dict[str, Any], outputs: List[str] = None,
-                   instance_type: str = None, name: str = None) -> None:
+    def launch_job(self, function, inputs: Optional[Dict[str, Any]] = None,
+                   outputs: Optional[List] = None, name: Optional[str] = None,
+                   instance_type: Optional[str] = None) -> None:
         """Launch a DNANexus job with the given parameters from a REMOTE machine.
 
         The only required parameters for this function are :param:function and :param:inputs. This method will add
@@ -341,10 +274,8 @@ class SubjobUtility(JobLauncherInterface):
             raise dxpy.AppError('Cannot submit new subjobs after calling monitor_subjobs()!')
 
         # Make sure only identical job types have been launched
-        if self._queue_type is Environment.LOCAL:
+        if self._queue_type is Platform.LOCAL:
             raise dxpy.AppError('Cannot mix jobtypes between launch_applet() and launch_job()!')
-        elif self._queue_type is None:
-            self._queue_type = Environment.DX
 
         self._total_jobs += 1
 
@@ -356,7 +287,7 @@ class SubjobUtility(JobLauncherInterface):
                                        'properties': {'module': inspect.getmodule(function).__name__},
                                        'input': inputs,
                                        'outputs': outputs,
-                                       'job_type': Environment.DX,
+                                       'job_type': Platform.DX,
                                        'destination': None,
                                        'name': None if name is None else name,
                                        'instance_type': instance_type if instance_type else self._default_instance_type}
@@ -414,7 +345,7 @@ class SubjobUtility(JobLauncherInterface):
 
         This method will first check to see if there are any jobs in the job queue, and if the number of currently
         running jobs is less than self._concurrent_job_limit, will attempt to submit new jobs according to the type of
-        job (:func:Environment).
+        job (:func:Platform).
 
         If there are no more jobs to submit, it will then automatically monitor submitted jobs for a completed
         :func:JobStatus.
@@ -438,14 +369,14 @@ class SubjobUtility(JobLauncherInterface):
                 self._monitor_submitted()
                 sleep(60)
 
-            # A bit strange, but the Environment enum's value is a class that we can instantiate for our specific job
+            # A bit strange, but the Platform enum's value is a class that we can instantiate for our specific job
             # type
-            if job['job_type'] == Environment.DX:
+            if job['job_type'] == Platform.DX:
                 dxjob = job['job_type'].value()
                 dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'],
                           properties=job['properties'], name=job['name'])
 
-            elif job['job_type'] == Environment.LOCAL:
+            elif job['job_type'] == Platform.LOCAL:
                 dxapplet = job['job_type'].value(job['function'])
                 dxjob = dxapplet.run(applet_input=job['input'], folder=job['destination'], name=job['name'],
                                      instance_type=job['instance_type'], priority='low')

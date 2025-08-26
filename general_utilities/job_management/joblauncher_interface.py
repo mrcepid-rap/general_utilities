@@ -1,6 +1,7 @@
 import math
 from abc import ABC, abstractmethod
-from typing import Iterator, Any, Optional, Dict, List
+from concurrent.futures import Future
+from typing import Any, Iterator, List, Dict, Optional
 
 from general_utilities.mrc_logger import MRCLogger
 
@@ -13,14 +14,10 @@ class JobLauncherInterface(ABC):
 
     It provides methods to launch jobs, submit and monitor them, and retrieve outputs.
     :param incrementor: The incrementor for job submission, default is 500.
-    :param threads: The number of threads to use for local execution, default is None.
-    :param error_message: Custom error message to display in case of job submission failure.
-    :raises ValueError: If the number of threads is less than 1.
-    :raises RuntimeError: If an unsupported platform is detected.
+    :param concurrent_job_limit: The maximum number of concurrent jobs to run, default is 100.
     """
 
     def __init__(self, incrementor: int = 500, concurrent_job_limit: int = 100):
-
         self._logger = MRCLogger(__name__).get_logger()
 
         self._incrementor = incrementor
@@ -30,6 +27,12 @@ class JobLauncherInterface(ABC):
         self._num_completed_jobs = 0
         self._total_jobs = 0
         self._output_array = []
+
+        # jobs waiting to be submitted
+        self._job_queue: List[Future] = []
+
+        # This is used to keep track of the current index in the output array when iterating over outputs
+        self._iter_index = 0
 
         self._queue_closed = False  # A flag to make sure we don't submit jobs to a closed executor
 
@@ -47,35 +50,68 @@ class JobLauncherInterface(ABC):
             )
             self._logger.info(f'{"Jobs currently running":{65}}: {self._total_jobs} / {self._num_completed_jobs}')
 
-    @abstractmethod
-    def __iter__(self) -> Iterator:
-        """
-        Make the job launcher iterable.
-        This method should return an iterator over the launched jobs.
-        :return: An iterator over the launched jobs.
-        """
-        pass
-
-    @abstractmethod
     def __len__(self) -> int:
-        """
-        Get the number of jobs in the queue.
-        :return: The total number of jobs in the queue.
-        """
-        pass
+        """Returns the number of outputs currently in the output queue
 
-    @abstractmethod
-    def __next__(self) -> Any:
+        :return: The number of outputs currently in the output queue
         """
-        Return the next result/output in iteration.
-        :return: The next job in the queue.
+        return len(self._output_array)
+
+    def __next__(self) -> dict:
+        """Return the next output in the output queue.
+
+        This method will return the next output in the output queue, which is a dictionary of outputs for a given job.
+        If there are no more outputs, it will raise a StopIteration exception.
+
+        :return: The next output in the output queue
         """
-        pass
+        if self._iter_index < len(self._output_array):
+            result = self._output_array[self._iter_index]
+            self._iter_index += 1
+            self._print_status()
+            return result
+        raise StopIteration
+
+    def __iter__(self) -> Iterator[Dict[str, Any]]:
+        """Return an iterator over the outputs collected when jobs finish.
+
+        Outputs returned by the class are a list of dictionaries formatted like::
+
+            # Top-level list
+            [
+                # Per-job output lists
+                [  # job1
+                    # output dictionaries
+                    {
+                    'output1': output_value,
+                    'output2': output_value,
+                    'outputN': output_value
+                    }
+                ],
+                [  # job2
+                    {
+                    'output1': output_value,
+                    'output2': output_value,
+                    'outputN': output_value
+                    }
+                ]
+            ]
+
+        where dict keys are identical to those passed to the :func:`launch_applet()` / :func:`launch_job()` 'outputs'
+        parameter and where 'output_value' is either the actual output (e.g., str, int, boolean), if NOT a file,
+        or if a file, a dxpy.DXLink() reference to a file on the remote file system, OR pathlib.Path(s) to the
+        locally downloaded output itself if download_on_complete is True.
+
+        :return: An iterator of output dictionaries for completed jobs
+        """
+        # This is used to keep track of the current index in the output array when iterating over outputs
+        self._iter_index = 0
+        return self
 
     @abstractmethod
     def launch_job(self, function, inputs: Optional[Dict[str, Any]] = None,
                    outputs: Optional[List] = None, name: Optional[str] = None,
-                   instance_type: Optional[str] = None, **kwargs) -> None:
+                   instance_type: Optional[str] = None) -> None:
         """
         Queue a subjob with the given parameters.
         :param function: The function to execute as a subjob.
