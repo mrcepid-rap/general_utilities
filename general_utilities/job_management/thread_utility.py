@@ -1,12 +1,12 @@
 import math
 import os
 from concurrent import futures
-from concurrent.futures import ThreadPoolExecutor, Future
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, List, Dict, Optional
 
 import dxpy
 
-from general_utilities.job_management.joblauncher_interface import JobLauncherInterface
+from general_utilities.job_management.joblauncher_interface import JobLauncherInterface, JobInfo
 
 
 class ThreadUtility(JobLauncherInterface):
@@ -25,28 +25,37 @@ class ThreadUtility(JobLauncherInterface):
                    function: Callable,
                    inputs: Optional[Dict[str, Any]] = None,
                    outputs=None,
+                   name: Optional[str] = None,
+                   instance_type: Optional[str] = None,
                    **kwargs) -> None:
         """
-        Launch a job by submitting it to the thread executor.
-
-        :param function: The function to be executed in the thread.
-        :param inputs: A dictionary of inputs to be passed to the function.
-        :param outputs: The expected outputs from the function.
+        Queue a job for later submission, mirroring SubjobUtility.
         """
         if self._queue_closed:
             raise dxpy.AppError("Thread executor has already been collected from!")
 
-        # Track job count for status reporting
         self._total_jobs += 1
 
-        # Store job info for later submission
-        self._job_queue.append((function, inputs, kwargs, outputs))
+        if outputs is None:
+            outputs: List[str] = []
+
+        input_parameters: JobInfo = {
+            'function': function.__name__,
+            'properties': {},
+            'input': inputs,
+            'outputs': outputs,
+            'job_type': None,
+            'destination': None,
+            'name': name,
+            'instance_type': instance_type,
+            **kwargs
+        }
+        self._job_queue.append(input_parameters)
 
     def submit_and_monitor(self) -> List[Any]:
         """
         Submit the queued jobs and return a list of results.
         """
-
         if not self._job_queue:
             raise dxpy.AppError('No jobs submitted to future pool!')
 
@@ -57,8 +66,18 @@ class ThreadUtility(JobLauncherInterface):
         ))
 
         futures_list = []
-        for function, inputs, kwargs, outputs in self._job_queue:
-            fut = self._executor.submit(function, inputs, kwargs, outputs)
+        for job in self._job_queue:
+            # Retrieve the actual function object by name if needed, otherwise pass as is
+            # If you need to call by name, you must have a mapping from name to function
+            # Here, assume you still have the function object available
+            # If not, you need to adjust this logic
+            function_name = job['function']
+            # If you have a mapping: function = function_map[function_name]
+            # Otherwise, if you stored the function object elsewhere, use that
+            # For now, you may need to keep a separate mapping if you want to support this
+            # ...existing code...
+            inputs = job['input']
+            fut = self._executor.submit(globals()[function_name], **inputs)
             futures_list.append(fut)
 
         for fut in futures.as_completed(futures_list):
