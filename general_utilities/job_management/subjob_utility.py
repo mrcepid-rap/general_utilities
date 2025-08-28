@@ -457,12 +457,8 @@ class SubjobUtility(JobLauncherInterface):
                             output_dict[output_key] = output_value
 
             self._output_array.append(output_dict)
-
             self._num_completed_jobs += 1
-            if math.remainder(self._num_completed_jobs, self._incrementor) == 0:
-                self._logger.info(
-                    f'{"Total number of jobs finished":{65}}: {self._num_completed_jobs} / {self._total_jobs} '
-                    f'({((self._num_completed_jobs / self._total_jobs) * 100):0.2f}%)')
+            self._print_status()
 
         return curr_status.value
 

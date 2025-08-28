@@ -30,6 +30,13 @@ class ThreadUtility(JobLauncherInterface):
                    **kwargs) -> None:
         """
         Queue a job for later submission, harmonized with SubjobUtility.
+
+        :param function: The function to be executed in the thread.
+        :param inputs: A dictionary of input parameters to be passed to the function.
+        :param outputs: A list of expected output names (not used in this implementation).
+        :param name: An optional name for the job (not used in this implementation).
+        :param instance_type: An optional instance type for the job (not used in this implementation).
+        :param kwargs: Additional keyword arguments (not used in this implementation).
         """
         if self._queue_closed:
             raise dxpy.AppError("Thread executor has already been collected from!")
