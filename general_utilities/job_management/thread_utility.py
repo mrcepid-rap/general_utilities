@@ -67,17 +67,9 @@ class ThreadUtility(JobLauncherInterface):
 
         futures_list = []
         for job in self._job_queue:
-            # Retrieve the actual function object by name if needed, otherwise pass as is
-            # If you need to call by name, you must have a mapping from name to function
-            # Here, assume you still have the function object available
-            # If not, you need to adjust this logic
-            function_name = job['function']
-            # If you have a mapping: function = function_map[function_name]
-            # Otherwise, if you stored the function object elsewhere, use that
-            # For now, you may need to keep a separate mapping if you want to support this
-            # ...existing code...
+            function = job['function']
             inputs = job['input']
-            fut = self._executor.submit(globals()[function_name], **inputs)
+            fut = self._executor.submit(function, **inputs)
             futures_list.append(fut)
 
         for fut in futures.as_completed(futures_list):
