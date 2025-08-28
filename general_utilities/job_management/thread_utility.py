@@ -21,10 +21,6 @@ class ThreadUtility(JobLauncherInterface):
 
         self._executor = ThreadPoolExecutor(max_workers=self._concurrent_job_limit)
 
-        # Parallel list to store function objects
-        # (have to do this in ThreadUtility because we need the actual function object)
-        self._function = []
-
     def launch_job(self,
                    function: Callable,
                    inputs: Optional[Dict[str, Any]] = None,
@@ -45,7 +41,7 @@ class ThreadUtility(JobLauncherInterface):
 
         # Create job info dictionary
         input_parameters: JobInfo = {
-            'function': function.__name__,
+            'function': function,
             'properties': {},
             'input': inputs,
             'outputs': outputs,
@@ -57,9 +53,6 @@ class ThreadUtility(JobLauncherInterface):
 
         # Append job info to the job queue
         self._job_queue.append(input_parameters)
-
-        # Store function object in parallel list
-        self._function.append(function)
 
     def submit_and_monitor(self) -> None:
         """
@@ -76,8 +69,10 @@ class ThreadUtility(JobLauncherInterface):
 
         futures_list = []
         # Submit each job in the queue to the executor
-        for job, function in zip(self._job_queue, self._function):
+        for job in self._job_queue:
             inputs = job['input']
+            function = job['function']
+            # Submit the job to the executor
             submission = self._executor.submit(function, **inputs)
             # Append the future object to the futures list
             futures_list.append(submission)
@@ -90,7 +85,6 @@ class ThreadUtility(JobLauncherInterface):
             self._print_status()
 
         self._job_queue.clear()
-        self._function.clear()
         self._queue_closed = True
 
     def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:

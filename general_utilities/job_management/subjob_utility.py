@@ -7,6 +7,7 @@ from time import sleep, time
 from typing import TypedDict, Dict, Any, List, Optional
 
 import dxpy
+from dxpy import DXApplet
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
@@ -271,7 +272,7 @@ class SubjobUtility(JobLauncherInterface):
         if outputs is None:
             outputs: List[str] = []
 
-        input_parameters: JobInfo = {'function': function.__name__,
+        input_parameters: JobInfo = {'function': function,
                                        'properties': {'module': inspect.getmodule(function).__name__},
                                        'input': inputs,
                                        'outputs': outputs,
@@ -359,11 +360,11 @@ class SubjobUtility(JobLauncherInterface):
 
             if job['job_type'] == Platform.DX:
                 dxjob = job['job_type'].value()
-                dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'],
-                          properties=job['properties'], name=job['name'])
+                dxpy.DXJob.new(fn_input=job['input'], fn_name=job['function'].__name__, instance_type=job['instance_type'],
+                               properties=job['properties'], name=job['name'])
 
             elif job['job_type'] == Platform.LOCAL:
-                dxapplet = job['job_type'].value(job['function'])
+                dxapplet = DXApplet(job['function'])
                 dxjob = dxapplet.run(applet_input=job['input'], folder=job['destination'], name=job['name'],
                                      instance_type=job['instance_type'], priority=self._priority.value)
 

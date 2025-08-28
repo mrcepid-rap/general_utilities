@@ -1,6 +1,6 @@
 import math
 from abc import ABC, abstractmethod
-from typing import Any, Iterator, List, Dict, Optional, TypedDict
+from typing import Any, Iterator, List, Dict, Optional, TypedDict, Callable
 
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.platform_utils.platform_factory import Platform
@@ -19,7 +19,7 @@ class JobInfo(TypedDict):
     :cvar name: The name for a job
     :cvar instance_type: The requested instance_type for a job. Must conform to available DNANexus instance_types.
     """
-    function: str
+    function: Callable
     properties: Optional[Dict[str, str]]
     input: Dict[str, Any]
     outputs: List[str]
