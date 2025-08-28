@@ -21,10 +21,17 @@ class ThreadUtility(JobLauncherInterface):
 
         self._executor = ThreadPoolExecutor(max_workers=self._concurrent_job_limit)
 
-    def launch_job(self, function: Callable, inputs: Optional[Dict[str, Any]] = None,
-                   outputs=None, name=None, instance_type=None, **kwargs) -> None:
+    def launch_job(self,
+                   function: Callable,
+                   inputs: Optional[Dict[str, Any]] = None,
+                   outputs=None,
+                   **kwargs) -> None:
         """
         Launch a job by submitting it to the thread executor.
+
+        :param function: The function to be executed in the thread.
+        :param inputs: A dictionary of inputs to be passed to the function.
+        :param outputs: The expected outputs from the function.
         """
         if self._queue_closed:
             raise dxpy.AppError("Thread executor has already been collected from!")
@@ -32,33 +39,37 @@ class ThreadUtility(JobLauncherInterface):
         # Track job count for status reporting
         self._total_jobs += 1
 
-        params: Dict[str, Any] = inputs if inputs is not None else dict(kwargs)
-        future = self._executor.submit(function, **params)
-        self._job_queue.append(future)
+        # Store job info for later submission
+        self._job_queue.append((function, inputs, kwargs, outputs))
 
-    def submit_and_monitor(self) -> List[Future]:
+    def submit_and_monitor(self) -> List[Any]:
         """
-        Submit the queued jobs and return an iterator over the futures.
+        Submit the queued jobs and return a list of results.
         """
 
         if not self._job_queue:
             raise dxpy.AppError('No jobs submitted to future pool!')
 
+        self._queue_closed = True
+
         self._logger.info("{0:65}: {val}".format(
             "Total number of threads to iterate through", val=self._total_jobs
         ))
 
-        # collect results
-        for future in futures.as_completed(self._job_queue):
-            result = future.result()
-            self._output_array.append(result)
+        futures_list = []
+        for function, inputs, kwargs, outputs in self._job_queue:
+            fut = self._executor.submit(function, inputs, kwargs, outputs)
+            futures_list.append(fut)
+
+        for fut in futures.as_completed(futures_list):
+            raw = fut.result()
+            self._output_array.append(raw)
             self._num_completed_jobs += 1
             self._print_status()
 
-        # Mark the queue as closed after successful submission
+        self._job_queue.clear()
         self._queue_closed = True
-
-        return self._job_queue
+        return self._output_array
 
     def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:
         """

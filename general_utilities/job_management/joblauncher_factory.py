@@ -17,8 +17,11 @@ def joblauncher_factory(incrementor: int = 500, concurrent_job_limit: int = 100,
     :param incrementor: The incrementor for job submission, default is 500.
     :param concurrent_job_limit: The maximum number of concurrent jobs to run, default is 100.
     :param download_on_complete: Whether to download outputs on job completion, default is False.
-    :param threads: The number of threads to use for local execution, default is None.
-    :param thread_factor: The factor to multiply the number of threads by for local execution, default is 1.
+    :param threads: The number of threads that the user would like to use for local executions. If set to None (default),
+        then the number of cores on the local machine will be used instead.
+    :param thread_factor: The number of threads required for any submitted job. Divides the number of available threads
+        to determine the number of concurrent jobs that can be run at one time. Default is 1, meaning that each job
+        requires one thread.
     :RuntimeError: If the platform is unsupported.
     :return: An instance of JobLauncherInterface appropriate for the detected platform.
     """
