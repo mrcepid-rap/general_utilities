@@ -22,6 +22,7 @@ class ThreadUtility(JobLauncherInterface):
         self._executor = ThreadPoolExecutor(max_workers=self._concurrent_job_limit)
 
         # Parallel list to store function objects
+        # (have to do this in ThreadUtility because we need the actual function object)
         self._function = []
 
     def launch_job(self,
@@ -42,16 +43,19 @@ class ThreadUtility(JobLauncherInterface):
         if outputs is None:
             outputs = []
 
+        # Create job info dictionary
         input_parameters: JobInfo = {
             'function': function.__name__,
             'properties': {},
-            'input': inputs if inputs else {},
-            'outputs': outputs if outputs else [],
+            'input': inputs,
+            'outputs': outputs,
             'job_type': None,
             'destination': None,
             'name': name,
             'instance_type': instance_type
         }
+
+        # Append job info to the job queue
         self._job_queue.append(input_parameters)
 
         # Store function object in parallel list
@@ -71,14 +75,17 @@ class ThreadUtility(JobLauncherInterface):
         ))
 
         futures_list = []
+        # Submit each job in the queue to the executor
         for job, function in zip(self._job_queue, self._function):
             inputs = job['input']
-            fut = self._executor.submit(function, **inputs)
-            futures_list.append(fut)
+            submission = self._executor.submit(function, **inputs)
+            # Append the future object to the futures list
+            futures_list.append(submission)
 
-        for fut in futures.as_completed(futures_list):
-            raw = fut.result()
-            self._output_array.append(raw)
+        # Monitor the completion of the submitted jobs
+        for output in futures.as_completed(futures_list):
+            # Append the result of each completed job to the output array
+            self._output_array.append(output.result())
             self._num_completed_jobs += 1
             self._print_status()
 
