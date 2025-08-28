@@ -60,7 +60,7 @@ class ThreadUtility(JobLauncherInterface):
 
         futures_list = []
         for job in self._job_queue:
-            function = job['function_obj']
+            function = job['function']
             inputs = job['input']
             fut = self._executor.submit(function, **inputs)
             futures_list.append(fut)
