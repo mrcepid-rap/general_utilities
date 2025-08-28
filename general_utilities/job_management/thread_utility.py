@@ -2,7 +2,7 @@ import math
 import os
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, Optional, List
+from typing import Any, Callable, Dict, Optional
 
 import dxpy
 
@@ -21,6 +21,9 @@ class ThreadUtility(JobLauncherInterface):
 
         self._executor = ThreadPoolExecutor(max_workers=self._concurrent_job_limit)
 
+        # Parallel list to store function objects
+        self._function = []
+
     def launch_job(self,
                    function: Callable,
                    inputs: Optional[Dict[str, Any]] = None,
@@ -37,13 +40,22 @@ class ThreadUtility(JobLauncherInterface):
         self._total_jobs += 1
 
         if outputs is None:
-            outputs: List[str] = []
+            outputs = []
 
-        input_parameters: JobInfo = {'function': function.__name__, 'properties': {}, 'input': inputs if inputs else {},
-                                     'outputs': outputs, 'job_type': None, 'destination': None, 'name': name,
-                                     'instance_type': instance_type}
-
+        input_parameters: JobInfo = {
+            'function': function.__name__,
+            'properties': {},
+            'input': inputs if inputs else {},
+            'outputs': outputs if outputs else [],
+            'job_type': None,
+            'destination': None,
+            'name': name,
+            'instance_type': instance_type
+        }
         self._job_queue.append(input_parameters)
+
+        # Store function object in parallel list
+        self._function.append(function)
 
     def submit_and_monitor(self) -> None:
         """
@@ -59,8 +71,7 @@ class ThreadUtility(JobLauncherInterface):
         ))
 
         futures_list = []
-        for job in self._job_queue:
-            function = job['function']
+        for job, function in zip(self._job_queue, self._function):
             inputs = job['input']
             fut = self._executor.submit(function, **inputs)
             futures_list.append(fut)
@@ -72,6 +83,7 @@ class ThreadUtility(JobLauncherInterface):
             self._print_status()
 
         self._job_queue.clear()
+        self._function.clear()
         self._queue_closed = True
 
     def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:
