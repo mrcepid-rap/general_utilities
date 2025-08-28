@@ -39,17 +39,9 @@ class ThreadUtility(JobLauncherInterface):
         if outputs is None:
             outputs: List[str] = []
 
-        input_parameters: JobInfo = {
-            'function': function.__name__,
-            'properties': {},
-            'input': inputs,
-            'outputs': outputs,
-            'job_type': None,
-            'destination': None,
-            'name': name,
-            'instance_type': instance_type,
-            **kwargs
-        }
+        input_parameters: JobInfo = {'function': function.__name__, 'properties': {}, 'input': inputs,
+                                     'outputs': outputs, 'job_type': None, 'destination': None, 'name': name,
+                                     'instance_type': instance_type, **kwargs, 'function_obj': function}
         self._job_queue.append(input_parameters)
 
     def submit_and_monitor(self) -> List[Any]:
@@ -67,7 +59,7 @@ class ThreadUtility(JobLauncherInterface):
 
         futures_list = []
         for job in self._job_queue:
-            function = job['function']
+            function = job['function_obj']  # Use the actual function object
             inputs = job['input']
             fut = self._executor.submit(function, **inputs)
             futures_list.append(fut)
