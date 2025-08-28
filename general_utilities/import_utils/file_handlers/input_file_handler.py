@@ -202,14 +202,8 @@ class InputFileHandler:
         """
         path = self._check_absolute_path()
         if path.is_file():
-            # copy path from wherever it is to the current working directory
-            destination = Path.cwd() / path.name
-            try:
-                # path.rename(target=destination)
-                shutil.copyfile(path, destination)
-            except shutil.SameFileError:
-                pass
-            return Path(destination)
+            # No need to copy the file; just return its resolved path
+            return path.resolve()
         else:
             raise FileNotFoundError(f"Local file not found: {self._input_str}")
 
@@ -390,4 +384,3 @@ class InputFileHandler:
             folder = '/' + folder
 
         return project, folder, file
-

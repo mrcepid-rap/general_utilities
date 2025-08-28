@@ -294,15 +294,32 @@ class CommandExecutor:
             return proc_exit_code
 
 
-def build_default_command_executor() -> CommandExecutor:
-    """Set up the 'CommandExecutor' class, which handles downloading a Docker image, building the appropriate
-    file system mounts, and provides methods for running system calls.
+def build_default_command_executor(files_to_mount: List[Path]) -> CommandExecutor:
+    """
+    Set up the 'CommandExecutor' class, mounting the parent directories of all provided files.
 
+    :param files_to_mount: List of Path objects for files that will be used in Docker commands.
     :return: A CommandExecutor object
     """
+    # Mount each parent directory to the same path inside the container
+    mounts = []
+    for file_path in files_to_mount:
+        parent_dir = file_path.resolve().parent
+        # mount to same path as host
+        mounts.append(DockerMount(parent_dir, parent_dir))
 
-    default_mounts = [DockerMount(Path(os.getcwd()), Path('/test/'))]
-    cmd_executor = CommandExecutor(docker_image='egardner413/mrcepid-burdentesting:latest',
-                                   docker_mounts=default_mounts)
+    # Remove duplicate mounts
+    unique_mounts = []
+    seen = set()
+    for mount in mounts:
+        key = (str(mount.local), str(mount.remote))
+        if key not in seen:
+            unique_mounts.append(mount)
+            seen.add(key)
+
+    cmd_executor = CommandExecutor(
+        docker_image='egardner413/mrcepid-burdentesting:latest',
+        docker_mounts=unique_mounts
+    )
 
     return cmd_executor
