@@ -1,12 +1,12 @@
 import math
 import os
 from concurrent import futures
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Any, Callable, List, Dict, Optional
 
 import dxpy
 
-from general_utilities.job_management.joblauncher_interface import JobLauncherInterface, JobInfo
+from general_utilities.job_management.joblauncher_interface import JobLauncherInterface
 
 
 class ThreadUtility(JobLauncherInterface):
@@ -37,16 +37,24 @@ class ThreadUtility(JobLauncherInterface):
         self._total_jobs += 1
 
         if outputs is None:
-            outputs: List[str] = []
+            outputs = []
 
-        input_parameters: JobInfo = {'function': function.__name__, 'properties': {}, 'input': inputs,
-                                     'outputs': outputs, 'job_type': None, 'destination': None, 'name': name,
-                                     'instance_type': instance_type, **kwargs, 'function_obj': function}
-        self._job_queue.append(input_parameters)
+        job_info = {
+            'function': function.__name__,
+            'function_obj': function,  # store the actual function object for local execution
+            'input': inputs if inputs else {},
+            'outputs': outputs,
+            'job_type': None,
+            'destination': None,
+            'name': name,
+            'instance_type': instance_type,
+            **kwargs
+        }
+        self._job_queue.append(job_info)
 
-    def submit_and_monitor(self) -> List[Any]:
+    def submit_and_monitor(self) -> None:
         """
-        Submit the queued jobs and return a list of results.
+        Submit the queued jobs and monitor their execution.
         """
         if not self._job_queue:
             raise dxpy.AppError('No jobs submitted to future pool!')
@@ -59,7 +67,7 @@ class ThreadUtility(JobLauncherInterface):
 
         futures_list = []
         for job in self._job_queue:
-            function = job['function_obj']  # Use the actual function object
+            function = job['function_obj']
             inputs = job['input']
             fut = self._executor.submit(function, **inputs)
             futures_list.append(fut)
@@ -72,7 +80,6 @@ class ThreadUtility(JobLauncherInterface):
 
         self._job_queue.clear()
         self._queue_closed = True
-        return self._output_array
 
     def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:
         """

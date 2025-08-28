@@ -357,8 +357,6 @@ class SubjobUtility(JobLauncherInterface):
                 self._monitor_submitted()
                 sleep(60)
 
-            # A bit strange, but the Platform enum's value is a class that we can instantiate for our specific job
-            # type
             if job['job_type'] == Platform.DX:
                 dxjob = job['job_type'].value()
                 dxjob.new(fn_input=job['input'], fn_name=job['function'], instance_type=job['instance_type'],
