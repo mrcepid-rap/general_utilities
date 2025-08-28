@@ -6,6 +6,7 @@ from importlib import import_module
 from time import sleep, time
 from typing import TypedDict, Dict, Any, List, Optional
 
+from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 import dxpy
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
@@ -75,6 +76,13 @@ class JobStatus(Enum):
     TERMINATING = RunningStatus.RUNNING
     TERMINATED = RunningStatus.FAILED
     FAILED = RunningStatus.FAILED
+
+class Priority(Enum):
+    """DNANexus-style priority levels for jobs as an Enum to enforce possible values."""
+
+    LOW = 'low'
+    NORMAL = 'normal'
+    HIGH = 'high'
 
 
 class SubjobUtility(JobLauncherInterface):
@@ -153,8 +161,11 @@ class SubjobUtility(JobLauncherInterface):
     :param download_on_complete: Should ALL file outputs be downloaded on subjob completion? Setting this
         option to 'True' will download all files to the current instance and provide a :func:Path. If 'False'
         (default), the value in the output dictionary will be a :func:dxpy.dxlink(). [False]
+    :param priority: The priority of the job. This is a string that can be 'low', 'normal', or 'high'. [low]
     """
 
+    def __init__(self, concurrent_job_limit: int = 100, retries: int = 1, incrementor: int = 500,
+                 log_update_time: int = 60, download_on_complete: bool = False, priority: Priority = Priority.LOW):
     def __init__(self,
                  incrementor: int = 500,
                  concurrent_job_limit: int = 100,
@@ -167,6 +178,7 @@ class SubjobUtility(JobLauncherInterface):
         # Dereference class parameters
         self._instance_type = instance_type
         self._download_on_complete = download_on_complete
+        self._priority = priority
 
         # We define three difference queues for use during runtime:
         # job_running – jobs currently running, with a dict keyed on the DX job-id and with a value of DXJobDict class
@@ -379,7 +391,7 @@ class SubjobUtility(JobLauncherInterface):
             elif job['job_type'] == Platform.LOCAL:
                 dxapplet = job['job_type'].value(job['function'])
                 dxjob = dxapplet.run(applet_input=job['input'], folder=job['destination'], name=job['name'],
-                                     instance_type=job['instance_type'], priority='low')
+                                     instance_type=job['instance_type'], priority=self._priority.value)
 
             else:
                 raise RuntimeError('Job does not have type DX or LOCAL, which should be impossible')
