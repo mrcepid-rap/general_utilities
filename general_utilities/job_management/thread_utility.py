@@ -1,12 +1,12 @@
 import math
 import os
 from concurrent import futures
-from concurrent.futures import ThreadPoolExecutor, Future
-from typing import Any, Callable, List, Dict, Optional
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable, Dict, Optional, List
 
 import dxpy
 
-from general_utilities.job_management.joblauncher_interface import JobLauncherInterface
+from general_utilities.job_management.joblauncher_interface import JobLauncherInterface, JobInfo
 
 
 class ThreadUtility(JobLauncherInterface):
@@ -29,7 +29,7 @@ class ThreadUtility(JobLauncherInterface):
                    instance_type: Optional[str] = None,
                    **kwargs) -> None:
         """
-        Queue a job for later submission, mirroring SubjobUtility.
+        Queue a job for later submission, harmonized with SubjobUtility.
         """
         if self._queue_closed:
             raise dxpy.AppError("Thread executor has already been collected from!")
@@ -37,20 +37,13 @@ class ThreadUtility(JobLauncherInterface):
         self._total_jobs += 1
 
         if outputs is None:
-            outputs = []
+            outputs: List[str] = []
 
-        job_info = {
-            'function': function.__name__,
-            'function_obj': function,  # store the actual function object for local execution
-            'input': inputs if inputs else {},
-            'outputs': outputs,
-            'job_type': None,
-            'destination': None,
-            'name': name,
-            'instance_type': instance_type,
-            **kwargs
-        }
-        self._job_queue.append(job_info)
+        input_parameters: JobInfo = {'function': function.__name__, 'properties': {}, 'input': inputs if inputs else {},
+                                     'outputs': outputs, 'job_type': None, 'destination': None, 'name': name,
+                                     'instance_type': instance_type}
+
+        self._job_queue.append(input_parameters)
 
     def submit_and_monitor(self) -> None:
         """
