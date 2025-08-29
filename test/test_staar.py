@@ -7,14 +7,33 @@ import pytest
 
 from pathlib import Path
 
-from association_resources import build_transcript_table
-from job_management.command_executor import CommandExecutor, DockerMount
-from linear_model.staar_model import staar_null
+from general_utilities.association_resources import build_transcript_table
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
+from general_utilities.import_utils.import_lib import BGENInformation
+from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
+from general_utilities.linear_model.staar_model import staar_null, staar_genes
 
 # from import_utils.import_lib import TarballType
 
 test_data_dir = Path(__file__).parent / "test_data"
 linear_model_test_data_dir = test_data_dir / "linear_model/"
+
+bgen_dict = {'chr1_chunk1': BGENInformation(index= InputFileHandler(test_data_dir / 'chr1_chunk1.bgen.bgi'),
+                                            bgen= InputFileHandler(test_data_dir / 'chr1_chunk1.bgen'),
+                                            sample= InputFileHandler(test_data_dir / 'chr1_chunk1.sample'),
+                                            vep= InputFileHandler(test_data_dir / 'chr1_chunk1.vep.tsv.gz'),
+                                            vepidx= InputFileHandler(test_data_dir / 'chr1_chunk1.vep.tsv.gz.tbi')),
+             'chr1_chunk2': BGENInformation(index= InputFileHandler(test_data_dir / 'chr1_chunk2.bgen.bgi'),
+                                            bgen= InputFileHandler(test_data_dir / 'chr1_chunk2.bgen'),
+                                            sample= InputFileHandler(test_data_dir / 'chr1_chunk2.sample'),
+                                            vep= InputFileHandler(test_data_dir / 'chr1_chunk2.vep.tsv.gz'),
+                                            vepidx= InputFileHandler(test_data_dir / 'chr1_chunk2.vep.tsv.gz.tbi')),
+             'chr1_chunk3': BGENInformation(index= InputFileHandler(test_data_dir / 'chr1_chunk3.bgen.bgi'),
+                                            bgen= InputFileHandler(test_data_dir / 'chr1_chunk3.bgen'),
+                                            sample= InputFileHandler(test_data_dir / 'chr1_chunk3.sample'),
+                                            vep= InputFileHandler(test_data_dir / 'chr1_chunk3.vep.tsv.gz'),
+                                            vepidx= InputFileHandler(test_data_dir / 'chr1_chunk3.vep.tsv.gz.tbi'))}
+
 
 @pytest.fixture
 def phenofile(tmp_path) -> Path:
@@ -101,4 +120,24 @@ def test_staar_null(tmp_path, phenofile):
     # packages. We can check the validity of the model once we run association tests.
     assert model_path.exists()
 
-def test_build_staar_matrix()
+def test_build_staar_gene(tmp_path, phenofile):
+
+    # Make sure the Docker image can see tmp_path via mounting
+    mounts = [DockerMount(tmp_path, Path('/test/'))]
+    test_executor = CommandExecutor('egardner413/mrcepid-burdentesting:latest', docker_mounts=mounts)
+
+    # cmd_exector requires all mounted files to be in the same dir (here that means the tmp_path)
+    tmp_matrix = tmp_path / 'duat_matrix.sparseGRM.mtx'
+    tmp_samples = tmp_path / 'duat_matrix.sparseGRM.mtx.sampleIDs.txt'
+    shutil.copy(Path(linear_model_test_data_dir / 'duat_matrix.sparseGRM.mtx'), tmp_matrix)
+    shutil.copy(Path(linear_model_test_data_dir / 'duat_matrix.sparseGRM.mtx.sampleIDs.txt'), tmp_samples)
+
+    model_path = staar_null(phenofile=phenofile, phenotype='phenotype',
+                            is_binary=False, ignore_base=False,
+                            found_quantitative_covariates=[], found_categorical_covariates=['batman'],
+                            sex=2,
+                            sparse_kinship_file=tmp_matrix,
+                            sparse_kinship_samples=tmp_samples,
+                            cmd_executor=test_executor)
+
+    staar_genes(model_path, )

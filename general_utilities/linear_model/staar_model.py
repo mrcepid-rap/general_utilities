@@ -85,8 +85,8 @@ def build_staar_variant_list(variant_file: Path, bgen_path, index_path, sample_p
 
 
 def staar_genes(staar_null_path: Path, tarball_prefix: str, pheno_name: str, bgen_info: Dict[str, BGENInformation],
-                bgen_prefix: str = None, gene_info_path: Path = None,
-                cmd_executor: CommandExecutor = build_default_command_executor()) -> tuple:
+                bgen_prefix: str = None, valid_genes: List[str] = None,
+                cmd_executor: CommandExecutor = build_default_command_executor()) -> Path:
     """Run rare variant association testing using STAAR.
 
 
@@ -120,6 +120,8 @@ def staar_genes(staar_null_path: Path, tarball_prefix: str, pheno_name: str, bge
 
         for gene, gene_info in variant_matrix.items():
 
+            if (valid_genes is not None) and (gene not in valid_genes):
+                continue
 
             gene_matrix, _ = generate_csr_matrix_from_bgen(bgen_path=bgen_path, sample_path=sample_path, variant_filter_list=gene_info['vars'],
                                                            chromosome=gene_info['chrom'], start=gene_info['min'], end=gene_info['max'],
@@ -148,4 +150,4 @@ def staar_genes(staar_null_path: Path, tarball_prefix: str, pheno_name: str, bge
 
             cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
 
-    return tarball_prefix, chromosome, phenoname
+    return output_path
