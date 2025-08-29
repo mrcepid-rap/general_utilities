@@ -208,12 +208,22 @@ class CommandExecutor:
             if argument.startswith("/") else None
             for argument in command_arguments
         }
-        # Remove None values (non-absolute paths)
         parent_dirs.discard(None)
 
-        # Create DockerMounts for each parent directory of absolute file paths found in the command
-        auto_mounts = [DockerMount(dir_path, dir_path) for dir_path in parent_dirs]
-        all_mounts = (docker_mounts or []) + auto_mounts
+        # Instead of mounting to the same path, mount all host directories to /mnt/host_cwd (safe_mount_point)
+        current_working_directory = Path.cwd()
+        safe_mount_point = Path('/mnt/host_cwd')
+        default_mounts = [DockerMount(current_working_directory, safe_mount_point)]
+
+        # For each detected parent directory, create a mount point inside the container
+        auto_mounts = []
+        for parent_directory in parent_dirs:
+            relative_path = parent_directory.relative_to(current_working_directory)
+            container_path = safe_mount_point / relative_path
+            auto_mounts.append(DockerMount(parent_directory, container_path))
+
+        # Combine default mounts, user-specified mounts, and auto-detected mounts
+        all_mounts = default_mounts + (docker_mounts or []) + auto_mounts
 
         # Deduplicate mounts based on (local, remote) pairs
         deduped_mounts = list({(str(mount.local.resolve()), str(mount.remote)): mount for mount in all_mounts}.values())
@@ -221,9 +231,13 @@ class CommandExecutor:
         # Construct the full Docker command
         docker_mount_string = ' '.join(
             ['-v {}'.format(unique_mount.get_docker_mount()) for unique_mount in deduped_mounts])
-        full_cmd = f'docker run {docker_mount_string} {self._docker_image} {cmd}'
 
-        # Run the command using the existing run_cmd method
+        # Rewrite the command to use the safe mount point inside the container
+        rewritten_command = cmd
+        for parent_directory, mount in zip(parent_dirs, auto_mounts):
+            rewritten_command = rewritten_command.replace(str(parent_directory), str(mount.remote))
+
+        full_cmd = f'docker run {docker_mount_string} {self._docker_image} {rewritten_command}'
         return self.run_cmd(full_cmd, stdout_file, print_cmd, livestream_out, dry_run, ignore_error)
 
     def run_cmd(self, cmd: str, stdout_file: Path = None, print_cmd: bool = False,
@@ -318,13 +332,8 @@ def build_default_command_executor() -> CommandExecutor:
 
     :return: A CommandExecutor object
     """
-    # Mount the current working directory to /mnt/host_cwd in the Docker container
-    host_cwd = Path.cwd()
-    safe_mount_point = Path('/mnt/host_cwd')
-    default_mounts = [DockerMount(host_cwd, safe_mount_point)]
-
     cmd_executor = CommandExecutor(
         docker_image='egardner413/mrcepid-burdentesting:latest',
-        docker_mounts=default_mounts
+        docker_mounts=[]
     )
     return cmd_executor
