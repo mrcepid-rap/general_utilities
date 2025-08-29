@@ -218,8 +218,7 @@ class CommandExecutor:
         # For each detected parent directory, create a mount point inside the container
         auto_mounts = []
         for parent_directory in parent_dirs:
-            relative_path = parent_directory.relative_to(current_working_directory)
-            container_path = safe_mount_point / relative_path
+            container_path = safe_mount_point / parent_directory
             auto_mounts.append(DockerMount(parent_directory, container_path))
 
         # Combine default mounts, user-specified mounts, and auto-detected mounts
