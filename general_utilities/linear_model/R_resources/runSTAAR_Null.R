@@ -14,22 +14,22 @@ library(data.table)
 # 6. [6] Additional quantitative covariates
 # 7. [7] Additional categorical covariates
 
-# args <- commandArgs(trailingOnly = T)
-# covariates_file <- args[1]
-# pheno_name <- args[2]
-# is_binary <- as.logical(args[3])
-# sparse_kinship <- args[4]
-# sparse_kinship_samples <- args[5]
-# quant_covars <- args[6]
-# cat_covars <- args[7]
+args <- commandArgs(trailingOnly = T)
+covariates_file <- args[1]
+pheno_name <- args[2]
+is_binary <- as.logical(args[3])
+sparse_kinship_file <- args[4]
+sparse_kinship_samples_file <- args[5]
+quant_covars <- args[6]
+cat_covars <- args[7]
 
-covariates_file <- '/private/var/folders/z7/4hkdzr016yx6sxqg_bdynqdw0000gp/T/pytest-of-eugene.gardner/pytest-current/test_staar_null0/test_phenotype.tsv'
-pheno_name <- 'phenotype'
-is_binary <- as.logical('False')
-sparse_kinship_file <- '/Users/eugene.gardner/Documents/software/general_utilities/test/test_data/linear_model/duat_matrix.sparseGRM.mtx'
-sparse_kinship_samples_file <- '/Users/eugene.gardner/Documents/software/general_utilities/test/test_data/linear_model/duat_matrix.sparseGRM.mtx.sampleIDs.txt'
-quant_covars <- 'NULL'
-cat_covars <- 'batman'
+# covariates_file <- '/private/var/folders/z7/4hkdzr016yx6sxqg_bdynqdw0000gp/T/pytest-of-eugene.gardner/pytest-current/test_staar_null0/test_phenotype.tsv'
+# pheno_name <- 'phenotype'
+# is_binary <- as.logical('False')
+# sparse_kinship_file <- '/Users/eugene.gardner/Documents/software/general_utilities/test/test_data/linear_model/duat_matrix.sparseGRM.mtx'
+# sparse_kinship_samples_file <- '/Users/eugene.gardner/Documents/software/general_utilities/test/test_data/linear_model/duat_matrix.sparseGRM.mtx.sampleIDs.txt'
+# quant_covars <- 'NULL'
+# cat_covars <- 'batman'
 
 # Load covariates:
 data_for_STAAR <- fread(covariates_file)
