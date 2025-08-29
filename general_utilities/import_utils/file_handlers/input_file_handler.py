@@ -202,7 +202,6 @@ class InputFileHandler:
         """
         path = self._check_absolute_path()
         if path.is_file():
-            # No need to copy the file; just return its resolved path
             return path.resolve()
         else:
             raise FileNotFoundError(f"Local file not found: {self._input_str}")
