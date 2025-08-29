@@ -172,7 +172,7 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
         raise dxpy.AppError(f'Phenotype {phenotype} has no individuals after filtering, exiting...')
 
 
-def load_tarball_linear_model(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[str, pd.DataFrame]:
+def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[str, pd.DataFrame]:
     """Load a tarball containing BGEN files for linear model association testing.
 
     This method decides which function to call (either :func:'load_mask_linear_model' or
@@ -199,11 +199,11 @@ def load_tarball_linear_model(tarball_prefix: str, tarball_type: TarballType, bg
     tarball_path = Path(tarball_prefix)
 
     if tarball_type == TarballType.GENOMEWIDE:
-        genetic_data = load_mask_linear_model(tarball_path, bgen_prefix=bgen_prefix)
+        genetic_data = load_mask_genetic_data(tarball_path, bgen_prefix=bgen_prefix)
     elif tarball_type == TarballType.GENE:
-        genetic_data = load_gene_or_snp_linear_model(replace_multi_suffix(tarball_path, '.GENE.STAAR.mtx'), tarball_type.value)
+        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.GENE.STAAR.mtx'), tarball_type.value)
     elif tarball_type == TarballType.SNP:
-        genetic_data = load_gene_or_snp_linear_model(replace_multi_suffix(tarball_path, '.SNP.STAAR.mtx'), tarball_type.value)
+        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.SNP.STAAR.mtx'), tarball_type.value)
     else:
         raise ValueError(f'Unexpected tarball type {tarball_type} encountered for tarball prefix {tarball_prefix}')
 
@@ -212,7 +212,7 @@ def load_tarball_linear_model(tarball_prefix: str, tarball_type: TarballType, bg
     return tarball_path.name, genetic_data
 
 
-def load_mask_linear_model(tarball_path: Path, bgen_prefix: str = None) -> pd.DataFrame:
+def load_mask_genetic_data(tarball_path: Path, bgen_prefix: str = None) -> pd.DataFrame:
     """Load a genome-wide burden mask with multiple genes into the required format.
 
     Note that the prefix of the tarball is used to identify the BGEN files within the tarball. The tarball should
@@ -260,7 +260,7 @@ def load_mask_linear_model(tarball_path: Path, bgen_prefix: str = None) -> pd.Da
     return genetic_data
 
 
-def load_gene_or_snp_linear_model(matrix_file: Path, dummy_gene_name: str) -> pd.DataFrame:
+def load_gene_or_snp_genetic_data(matrix_file: Path, dummy_gene_name: str) -> pd.DataFrame:
     """Load a collapsed gene or SNP-based mask into the required format
 
     :param matrix_file: The path to the matrix file containing the collapsed gene or SNP data.

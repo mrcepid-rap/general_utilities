@@ -10,7 +10,7 @@ from general_utilities.association_resources import build_transcript_table
 from general_utilities.linear_model.linear_model import linear_model_null, run_linear_model, \
     process_linear_model_outputs
 from general_utilities.import_utils.import_lib import TarballType
-from general_utilities.linear_model.linear_model import load_tarball_linear_model
+from general_utilities.linear_model.linear_model import load_linear_model_genetic_data
 
 test_data_dir = Path(__file__).parent / "test_data"
 linear_model_test_data_dir = test_data_dir / "linear_model/"
@@ -105,7 +105,7 @@ def test_linear_model_null(phenofile):
                          ), indirect=["unpacked_tarball"])
 def test_load_tarball_linear_model(unpacked_tarball, expected_genes_path, bgen_prefix, tarball_type):
 
-    tarball_path, genetic_data = load_tarball_linear_model(str(unpacked_tarball), tarball_type, bgen_prefix=bgen_prefix)
+    tarball_path, genetic_data = load_linear_model_genetic_data(str(unpacked_tarball), tarball_type, bgen_prefix=bgen_prefix)
 
     expected_genes = pd.read_csv(expected_genes_path, header = None)
 
@@ -130,7 +130,7 @@ def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarba
                                    found_categorical_covariates=['batman']
                                    )
 
-    tarball_name, genetic_data = load_tarball_linear_model(str(unpacked_tarball), tarball_type, bgen_prefix=None)
+    tarball_name, genetic_data = load_linear_model_genetic_data(str(unpacked_tarball), tarball_type, bgen_prefix=None)
 
     expected_genes = set()
     with expected_genes_path.open('r') as expected_genes_reader:
