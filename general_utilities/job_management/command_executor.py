@@ -223,9 +223,9 @@ class CommandExecutor:
                 relative_path = parent_directory.relative_to(current_working_directory)
                 container_path = safe_mount_point / relative_path
             except ValueError:
-                # If not under current working directory, mount to /mnt/host_cwd/external/<full_path>
+                # If not under current working directory, mount to /mnt/host_cwd/<hashed_path>
                 hashed_path = hashlib.md5(parent_directory.as_posix().encode()).hexdigest()
-                container_path = safe_mount_point / 'external' / hashed_path
+                container_path = safe_mount_point / hashed_path
             auto_mounts.append(DockerMount(parent_directory, container_path))
 
         # Combine default mounts, user-specified mounts, and auto-detected mounts
