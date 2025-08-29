@@ -1,3 +1,4 @@
+import hashlib
 import shlex
 import subprocess
 from pathlib import Path
@@ -218,7 +219,13 @@ class CommandExecutor:
         # For each detected parent directory, create a mount point inside the container
         auto_mounts = []
         for parent_directory in parent_dirs:
-            container_path = safe_mount_point / parent_directory
+            try:
+                relative_path = parent_directory.relative_to(current_working_directory)
+                container_path = safe_mount_point / relative_path
+            except ValueError:
+                # If not under current working directory, mount to /mnt/host_cwd/external/<full_path>
+                hashed_path = hashlib.md5(parent_directory.as_posix().encode()).hexdigest()
+                container_path = safe_mount_point / 'external' / hashed_path
             auto_mounts.append(DockerMount(parent_directory, container_path))
 
         # Combine default mounts, user-specified mounts, and auto-detected mounts
