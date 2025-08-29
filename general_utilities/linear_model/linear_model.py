@@ -15,7 +15,7 @@ from dataclasses import dataclass, field, asdict
 
 from general_utilities.association_resources import replace_multi_suffix, bgzip_and_tabix, define_field_names_from_pandas
 from general_utilities.mrc_logger import MRCLogger
-from import_utils.import_lib import TarballType
+from general_utilities.import_utils.import_lib import TarballType
 
 LOGGER = MRCLogger(__name__).get_logger()
 

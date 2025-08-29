@@ -1,18 +1,16 @@
 import csv
 import math
-from dataclasses import asdict
-
-import pandas as pd
 import pytest
+import pandas as pd
 import statsmodels.api as sm
 
 from pathlib import Path
 
-from association_resources import build_transcript_table
+from general_utilities.association_resources import build_transcript_table
 from general_utilities.linear_model.linear_model import linear_model_null, run_linear_model, \
     process_linear_model_outputs
-from import_utils.import_lib import TarballType
-from linear_model.linear_model import load_tarball_linear_model
+from general_utilities.import_utils.import_lib import TarballType
+from general_utilities.linear_model.linear_model import load_tarball_linear_model
 
 test_data_dir = Path(__file__).parent / "test_data"
 linear_model_test_data_dir = test_data_dir / "linear_model/"
