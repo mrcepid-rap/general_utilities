@@ -176,6 +176,10 @@ class CommandExecutor:
         This method is a wrapper around the existing run_cmd method that automatically constructs the full Docker
         command to run the requested process within Docker.
 
+        NOTE: if your command is failing, check whether or not you are supplying full paths as arguments. If you used
+        InputFileHandler to create your input files, you should be fine. If you are creating files manually, you must
+        ensure that you are using absolute paths with Path(some_file.txt).
+
         :param cmd: The command to be run.
         :param stdout_file: Capture stdout from the process into the given file
         :param docker_mounts: A List of additional docker mounts (as DockerMount objects) to add to this command.
@@ -191,31 +195,32 @@ class CommandExecutor:
             raise dxpy.AppError('Requested to run via docker without configuring a Docker image!')
 
         try:
-            # Safely split the command into tokens, respecting quoted substrings
-            tokens = shlex.split(cmd)
+            # Safely split the command into respective parts (e.g. --input "some file.txt" -> ['--input', 'some file.txt'])
+            command_arguments = shlex.split(cmd)
         except ValueError:
             # If shlex fails, fall back to a simple split (not sure if this will ever be needed)
-            tokens = []
+            command_arguments = []
 
         # Extract parent directories of absolute paths to mount
         parent_dirs = {
             # Only consider absolute paths
-            (Path(tok) if Path(tok).is_dir() else Path(tok).parent).resolve()
-            if tok.startswith("/") else None
-            for tok in tokens
+            (Path(argument) if Path(argument).is_dir() else Path(argument).parent).resolve()
+            if argument.startswith("/") else None
+            for argument in command_arguments
         }
         # Remove None values (non-absolute paths)
         parent_dirs.discard(None)
 
-        # Create DockerMounts for these directories
-        auto_mounts = [DockerMount(d, d) for d in parent_dirs]
+        # Create DockerMounts for each parent directory of absolute file paths found in the command
+        auto_mounts = [DockerMount(dir_path, dir_path) for dir_path in parent_dirs]
         all_mounts = (docker_mounts or []) + auto_mounts
 
         # Deduplicate mounts based on (local, remote) pairs
-        deduped_mounts = list({(str(m.local.resolve()), str(m.remote)): m for m in all_mounts}.values())
+        deduped_mounts = list({(str(mount.local.resolve()), str(mount.remote)): mount for mount in all_mounts}.values())
 
         # Construct the full Docker command
-        docker_mount_string = ' '.join(f'-v {m.get_docker_mount()}' for m in deduped_mounts)
+        docker_mount_string = ' '.join(
+            ['-v {}'.format(unique_mount.get_docker_mount()) for unique_mount in deduped_mounts])
         full_cmd = f'docker run {docker_mount_string} {self._docker_image} {cmd}'
 
         # Run the command using the existing run_cmd method
