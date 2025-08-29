@@ -1,4 +1,4 @@
-import os
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Union, List
@@ -166,22 +166,15 @@ class CommandExecutor:
     def run_cmd_on_docker(self, cmd: str, stdout_file: Path = None, docker_mounts: List[DockerMount] = None,
                           print_cmd: bool = False, livestream_out: bool = False, dry_run: bool = False,
                           ignore_error: bool = False) -> int:
+        """
+        Run a command in the shell with Docker, automatically mounting parent directories of any absolute file paths
+        found in the command string so files can be referenced by their full path inside Docker.
 
-        """Run a command in the shell with Docker
+        We are now using absolute paths for all files we run on Docker. Filepaths are created using InputFileHandler.
+        This means that we can automatically mount parent directories of absolute paths found in the command string.
 
-        This function runs a command on an instance via the subprocess module with a Docker instance we downloaded;
-        This command will return an error if a valid Docker image was not provided. Docker images are run in headless
-        mode, which cannot be modified. Additional mount points inside the VM can be provided at runtime via the
-        docker_mounts option. Also, by default, standard out is not saved, but can be modified with the 'stdout_file'
-        parameter. print_cmd, livestream_out, and/or dry_run are for internal debugging purposes when testing new
-        code. All options other than `cmd` are optional.
-
-        This method is a wrapper around CommandExecutor.run_cmd() and simply adds self._docker_prefix and
-        self._docker_image to the beginning of any provided command.
-
-        By default, if a command fails, the VM will print the failing process STDOUT / STDERR to the logger and raise
-        a RuntimeError; however, if ignore_error is set to 'True', this method will instead return the exit code for
-        the underlying process to allow for custom error handling.
+        This method is a wrapper around the existing run_cmd method that automatically constructs the full Docker
+        command to run the requested process within Docker.
 
         :param cmd: The command to be run.
         :param stdout_file: Capture stdout from the process into the given file
@@ -194,23 +187,39 @@ class CommandExecutor:
         :return: The exit code of the underlying process
         """
 
-        if self._docker_configured is False:
+        if not self._docker_configured:
             raise dxpy.AppError('Requested to run via docker without configuring a Docker image!')
 
-        # -v here mounts a local directory on an instance (in this case the home dir) to a directory internal to the
-        # Docker instance named /test/. This allows us to run commands on files stored on the AWS instance within
-        # Docker. Multiple mounts can be added (via docker_mounts) to enable this code to find other specialised
-        # files (e.g., some R scripts included in the associationtesting suite).
-        if docker_mounts:
-            docker_mount_string = ' '.join([f'-v {mount.get_docker_mount()}'
-                                            for mount in docker_mounts])
-        else:
-            docker_mount_string = ''
+        try:
+            # Safely split the command into tokens, respecting quoted substrings
+            tokens = shlex.split(cmd)
+        except ValueError:
+            # If shlex fails, fall back to a simple split (not sure if this will ever be needed)
+            tokens = []
 
-        # Use the original docker prefix created as part of the constructor with any additional mounts provided to
-        # this method
-        cmd = f'{self._docker_prefix} {docker_mount_string} {self._docker_image} {cmd}'
-        return self.run_cmd(cmd, stdout_file, print_cmd, livestream_out, dry_run, ignore_error)
+        # Extract parent directories of absolute paths to mount
+        parent_dirs = {
+            # Only consider absolute paths
+            (Path(tok) if Path(tok).is_dir() else Path(tok).parent).resolve()
+            if tok.startswith("/") else None
+            for tok in tokens
+        }
+        # Remove None values (non-absolute paths)
+        parent_dirs.discard(None)
+
+        # Create DockerMounts for these directories
+        auto_mounts = [DockerMount(d, d) for d in parent_dirs]
+        all_mounts = (docker_mounts or []) + auto_mounts
+
+        # Deduplicate mounts based on (local, remote) pairs
+        deduped_mounts = list({(str(m.local.resolve()), str(m.remote)): m for m in all_mounts}.values())
+
+        # Construct the full Docker command
+        docker_mount_string = ' '.join(f'-v {m.get_docker_mount()}' for m in deduped_mounts)
+        full_cmd = f'docker run {docker_mount_string} {self._docker_image} {cmd}'
+
+        # Run the command using the existing run_cmd method
+        return self.run_cmd(full_cmd, stdout_file, print_cmd, livestream_out, dry_run, ignore_error)
 
     def run_cmd(self, cmd: str, stdout_file: Path = None, print_cmd: bool = False,
                 livestream_out: bool = False, dry_run: bool = False, ignore_error: bool = False) -> int:
@@ -294,32 +303,14 @@ class CommandExecutor:
             return proc_exit_code
 
 
-def build_default_command_executor(files_to_mount: List[Path]) -> CommandExecutor:
+def build_default_command_executor() -> CommandExecutor:
     """
-    Set up the 'CommandExecutor' class, mounting the parent directories of all provided files.
-
-    :param files_to_mount: List of Path objects for files that will be used in Docker commands.
-    :return: A CommandExecutor object
+    Returns a `CommandExecutor` instance.
+    The default implementation does not auto-mount parent directories of absolute file paths.
     """
-    # Mount each parent directory to the same path inside the container
-    mounts = []
-    for file_path in files_to_mount:
-        parent_dir = file_path.resolve().parent
-        # mount to same path as host
-        mounts.append(DockerMount(parent_dir, parent_dir))
-
-    # Remove duplicate mounts
-    unique_mounts = []
-    seen = set()
-    for mount in mounts:
-        key = (str(mount.local), str(mount.remote))
-        if key not in seen:
-            unique_mounts.append(mount)
-            seen.add(key)
-
+    # no default mount
     cmd_executor = CommandExecutor(
         docker_image='egardner413/mrcepid-burdentesting:latest',
-        docker_mounts=unique_mounts
+        docker_mounts=[]
     )
-
     return cmd_executor
