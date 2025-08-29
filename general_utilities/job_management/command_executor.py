@@ -310,12 +310,21 @@ class CommandExecutor:
 
 def build_default_command_executor() -> CommandExecutor:
     """
-    Returns a `CommandExecutor` instance.
-    The default implementation does not auto-mount parent directories of absolute file paths.
+    By default, mounts the current working directory to a custom mount point inside the container
+    ("/mnt/host_cwd") to avoid conflicts with important container paths/binaries that we need to run.
+
+    This allows for safe interaction with files in the current working directory while minimizing the
+    risk of overwriting critical files within the Docker container.
+
+    :return: A CommandExecutor object
     """
-    # no default mount
+    # Mount the current working directory to /mnt/host_cwd in the Docker container
+    host_cwd = Path.cwd()
+    safe_mount_point = Path('/mnt/host_cwd')
+    default_mounts = [DockerMount(host_cwd, safe_mount_point)]
+
     cmd_executor = CommandExecutor(
         docker_image='egardner413/mrcepid-burdentesting:latest',
-        docker_mounts=[]
+        docker_mounts=default_mounts
     )
     return cmd_executor
