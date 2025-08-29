@@ -23,14 +23,6 @@ sparse_kinship_samples_file <- args[5]
 quant_covars <- args[6]
 cat_covars <- args[7]
 
-# covariates_file <- '/private/var/folders/z7/4hkdzr016yx6sxqg_bdynqdw0000gp/T/pytest-of-eugene.gardner/pytest-current/test_staar_null0/test_phenotype.tsv'
-# pheno_name <- 'phenotype'
-# is_binary <- as.logical('False')
-# sparse_kinship_file <- '/Users/eugene.gardner/Documents/software/general_utilities/test/test_data/linear_model/duat_matrix.sparseGRM.mtx'
-# sparse_kinship_samples_file <- '/Users/eugene.gardner/Documents/software/general_utilities/test/test_data/linear_model/duat_matrix.sparseGRM.mtx.sampleIDs.txt'
-# quant_covars <- 'NULL'
-# cat_covars <- 'batman'
-
 # Load covariates:
 data_for_STAAR <- fread(covariates_file)
 

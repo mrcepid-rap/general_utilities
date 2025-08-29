@@ -78,6 +78,7 @@ def transcripts_table() -> pd.DataFrame:
 
 def test_staar_null(tmp_path, phenofile):
 
+    # Make sure the Docker image can see tmp_path via mounting
     mounts = [DockerMount(tmp_path, Path('/test/'))]
     test_executor = CommandExecutor('egardner413/mrcepid-burdentesting:latest', docker_mounts=mounts)
 
@@ -97,8 +98,7 @@ def test_staar_null(tmp_path, phenofile):
 
     # We can't really test the contents of the model since it is R .rds format, but we can check that it was created.
     # Yes, I have tried to install an rds reader in python, but none of them work without installing non-uv managed
-    # packages
+    # packages. We can check the validity of the model once we run association tests.
     assert model_path.exists()
 
-    # r_obj = parse_rds(str(model_path))
-    # print(r_obj)
+def test_build_staar_matrix()

@@ -1,9 +1,17 @@
+import re
 from pathlib import Path
-from typing import List
-from importlib_resources import files
+from typing import List, Dict
 
+import pandas as pd
+from importlib_resources import files
+from scipy.io import mmwrite
+
+from general_utilities.association_resources import replace_multi_suffix
+from general_utilities.bgen_utilities.genotype_matrix import generate_csr_matrix_from_bgen
+from general_utilities.bgen_utilities.genotype_matrix import make_variant_list, GeneInformation
 from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
-from job_management.command_executor import CommandExecutor
+from general_utilities.job_management.command_executor import CommandExecutor
+from import_utils.import_lib import BGENInformation
 
 
 # Generate the NULL model for STAAR
@@ -27,6 +35,7 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
         with a single value (e.g., if just running males / females).
     :param sparse_kinship_file: The path to the sparse kinship matrix file in Matrix Market format.
     :param sparse_kinship_samples: The path to the sample IDs file for the sparse kinship matrix.
+    :param cmd_executor: The command executor to use. Defaults to the standard burdentesting Docker file.
     """
 
     r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Null.R')
@@ -69,34 +78,74 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
 
     return Path(f'{phenotype}.STAAR_null.rds')
 
-# Run rare variant association testing using STAAR
-# Returns the finished chromosome to aid in output file creation
-def staar_genes(tarball_prefix: str, chromosome: str, phenoname: str, has_gene_info: bool) -> tuple:
 
-    # I have made a custom script in order to generate STAAR per-gene models that is installed using pip
-    # as part of the general_utilities package. We can extract the system location of this script:
-    r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Genes.R')
+def build_staar_variant_list(variant_file: Path, bgen_path, index_path, sample_path, gene) -> Dict[str, GeneInformation]:
 
-    script_mount = DockerMount(r_script.parent,
-                               Path('/scripts/'))
-    cmd_executor = build_default_command_executor()
 
-    # This generates a text output file of p.values
-    # See the README.md for more information on these parameters
-    cmd = f'Rscript /scripts/{r_script.name} ' \
-          f'/test/{tarball_prefix}.{chromosome}.STAAR.matrix.rds ' \
-          f'/test/{tarball_prefix}.{chromosome}.variants_table.STAAR.tsv ' \
-          f'/test/{phenoname}.STAAR_null.rds ' + \
-          f'{phenoname} ' \
-          f'{tarball_prefix} ' \
-          f'{chromosome} '
 
-    # If a subset of genes has been requested, do it here.
-    if has_gene_info:
-        cmd += f'/test/staar.gene_list'
-    else:
-        cmd += f'none'  # This is always none when doing a genome-wide study.
 
-    cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
+def staar_genes(staar_null_path: Path, tarball_prefix: str, pheno_name: str, bgen_info: Dict[str, BGENInformation],
+                bgen_prefix: str = None, gene_info_path: Path = None,
+                cmd_executor: CommandExecutor = build_default_command_executor()) -> tuple:
+    """Run rare variant association testing using STAAR.
+
+
+
+    """
+
+    tarball_path = Path(tarball_prefix)
+
+    staar_variants_list = tarball_path.parent.glob(replace_multi_suffix(tarball_path, '.*.STAAR.variants_table.tsv').name)
+    # If requested to load a single bgen prefix, filter the list to only include that prefix
+    if bgen_prefix is not None:
+        if tarball_path.parent / f'{tarball_path.name}.{bgen_prefix}.STAAR.variants_table.tsv' in staar_variants_list:
+            staar_variants_list = [tarball_path.parent / f'{tarball_path.name}.{bgen_prefix}.STAAR.variants_table.tsv']
+        else:
+            raise ValueError(
+                f'BGEN prefix {bgen_prefix} not found in tarball {tarball_path.name}.tar.gz. Please check the input.')
+
+    for staar_variants in staar_variants_list:
+
+        variant_table = pd.read_csv(staar_variants, delimiter='\t')
+        variant_matrix = make_variant_list(variant_table)
+
+        # get the bgen prefix out of the staar variants path with a regex:
+        current_prefix = re.search(rf'{tarball_path.name}\.({bgen_prefix})\.STAAR\.variants_table\.tsv', staar_variants.name).group(1)
+        bgen_path = bgen_info[current_prefix]['bgen'].get_file_handle()
+        sample_path = bgen_info[current_prefix]['sample'].get_file_handle()
+        index_path = bgen_info[current_prefix]['index'].get_file_handle()  # have to do this otherwise the file isn't in the right place
+
+        # Make sure we have the samples
+        staar_samples = tarball_path.parent / f'{tarball_path.name}.{current_prefix}.STAAR.samples_table.tsv'
+
+        for gene, gene_info in variant_matrix.items():
+
+
+            gene_matrix, _ = generate_csr_matrix_from_bgen(bgen_path=bgen_path, sample_path=sample_path, variant_filter_list=gene_info['vars'],
+                                                           chromosome=gene_info['chrom'], start=gene_info['min'], end=gene_info['max'],
+                                                           should_collapse_matrix=False)
+
+            staar_matrix = Path(f'{tarball_path}.{current_prefix}.STAAR.matrix.rds')
+            mmwrite(staar_matrix, gene_matrix)
+
+            # I have made a custom script in order to generate STAAR per-gene models that is installed using pip
+            # as part of the general_utilities package. We can extract the system location of this script:
+            r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Genes.R')
+
+            script_mount = DockerMount(r_script.parent,
+                                       Path('/scripts/'))
+
+            output_path = Path(f'{gene}.{pheno_name}.STAAR_results.tsv')
+
+            # This generates a text output file of p.values
+            # See the README.md for more information on these parameters
+            cmd = f'Rscript /scripts/{r_script.name} ' \
+                  f'/test/{staar_matrix.name} ' \
+                  f'/test/{staar_variants.name} ' \
+                  f'/test/{staar_samples.name} ' \
+                  f'/test/{staar_null_path.name} ' \
+                  f'/test/{output_path.name}'
+
+            cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
 
     return tarball_prefix, chromosome, phenoname
