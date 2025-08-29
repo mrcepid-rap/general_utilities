@@ -11,8 +11,8 @@ class JobInfo(TypedDict):
 
     :cvar function: The callable representing the function to execute for a subjob.
     :cvar properties: Optional dictionary of properties for the 'properties' parameter in :func:`dxpy.DXJob.run()`.
-    :cvar input: Dictionary of inputs as specified in the Applet or function definition.
-    :cvar outputs: List of outputs as specified in the Applet or function definition.
+    :cvar input: Optional dictionary of inputs as specified in the Applet or function definition. May be None.
+    :cvar outputs: Optional list of outputs as specified in the Applet or function definition. May be None.
     :cvar job_type: Optional :func:`Platform()` enum indicating the source of the subjob launch.
     :cvar destination: Optional output folder for outputs; used only by Platform.DXApplet jobs.
     :cvar name: Optional name for the job.
@@ -48,10 +48,10 @@ class JobLauncherInterface(ABC):
 
         self._num_completed_jobs = 0
         self._total_jobs = 0
-        self._output_array = List[Dict[str, Any]]
+        self._output_array: List[Dict[str, Any]] = []
 
         # jobs waiting to be submitted
-        self._job_queue = []
+        self._job_queue: List[JobInfo] = []
 
         self._queue_closed = False  # A flag to make sure we don't submit jobs to a closed executor
 
@@ -83,6 +83,7 @@ class JobLauncherInterface(ABC):
         If there are no more outputs, it will raise a StopIteration exception.
 
         :return: The next output in the output queue
+        :raises StopIteration: When all outputs have been returned.
         """
         if self._iter_index < len(self):
             result = self._output_array[self._iter_index]

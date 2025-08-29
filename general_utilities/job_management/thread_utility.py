@@ -31,7 +31,9 @@ class ThreadUtility(JobLauncherInterface):
 
         :param function: The function to be executed in the thread.
         :param inputs: A dictionary of input parameters to be passed to the function.
-        :param outputs: A list of expected output names (not used in this implementation).
+        :param outputs: A named dictionary of output parameters from the function being run
+            (e.g. outputs = {'output': 5}).
+            This mirrors SubJobUtility functionality.
         :param kwargs: Additional keyword arguments (not used in this implementation).
         """
         if self._queue_closed:
