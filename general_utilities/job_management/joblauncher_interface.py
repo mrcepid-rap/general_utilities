@@ -20,8 +20,8 @@ class JobInfo(TypedDict):
     """
     function: Callable
     properties: Optional[Dict[str, str]]
-    input: Dict[str, Any]
-    outputs: List[str]
+    input: Optional[Dict[str, Any]]
+    outputs: Optional[List[str]]
     job_type: Optional[Platform]
     destination: Optional[str]
     name: Optional[str]
@@ -48,7 +48,7 @@ class JobLauncherInterface(ABC):
 
         self._num_completed_jobs = 0
         self._total_jobs = 0
-        self._output_array = []
+        self._output_array = List[Dict[str, Any]]
 
         # jobs waiting to be submitted
         self._job_queue = []
@@ -84,7 +84,7 @@ class JobLauncherInterface(ABC):
 
         :return: The next output in the output queue
         """
-        if self._iter_index < len(self._output_array):
+        if self._iter_index < len(self):
             result = self._output_array[self._iter_index]
             self._iter_index += 1
             return result

@@ -25,8 +25,6 @@ class ThreadUtility(JobLauncherInterface):
                    function: Callable,
                    inputs: Optional[Dict[str, Any]] = None,
                    outputs=None,
-                   name: Optional[str] = None,
-                   instance_type: Optional[str] = None,
                    **kwargs) -> None:
         """
         Queue a job for later submission, harmonized with SubjobUtility.
@@ -34,8 +32,6 @@ class ThreadUtility(JobLauncherInterface):
         :param function: The function to be executed in the thread.
         :param inputs: A dictionary of input parameters to be passed to the function.
         :param outputs: A list of expected output names (not used in this implementation).
-        :param name: An optional name for the job (not used in this implementation).
-        :param instance_type: An optional instance type for the job (not used in this implementation).
         :param kwargs: Additional keyword arguments (not used in this implementation).
         """
         if self._queue_closed:
@@ -54,8 +50,8 @@ class ThreadUtility(JobLauncherInterface):
             'outputs': outputs,
             'job_type': None,
             'destination': None,
-            'name': name,
-            'instance_type': instance_type
+            'name': None,
+            'instance_type': None
         }
 
         # Append job info to the job queue
@@ -90,9 +86,6 @@ class ThreadUtility(JobLauncherInterface):
             self._output_array.append(output.result())
             self._num_completed_jobs += 1
             self._print_status()
-
-        self._job_queue.clear()
-        self._queue_closed = True
 
     def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:
         """

@@ -157,7 +157,7 @@ class SubjobUtility(JobLauncherInterface):
         self._download_on_complete = download_on_complete
         self._priority = priority
 
-        # We define two difference queues for use during runtime:
+        # We define two different queues for use during runtime:
         # job_running – jobs currently running, with a dict keyed on the DX job-id and with a value of DXJobDict class
         #   which contains the job class from instantiation and information about the job
         #   and information about the job
@@ -300,28 +300,6 @@ class SubjobUtility(JobLauncherInterface):
 
         self._logger.info("{0:65}: {val}".format("Total number of jobs to iterate through", val=self._total_jobs))
 
-        # These variables are used to keep track of time so that we can print a job log at the requested interval,
-        # independently of the time it takes to monitor jobs.
-        last_time = time()
-        last_log_time = 0
-
-        # Keep going until we get every job submitted or finished...
-        while len(self._job_queue) > 0 or len(self._job_running.keys()) > 0:
-
-            # We only want to print the status when 60min has passed. To do this we keep track of the time
-            # passed since the last iteration and add it to last_log_time. If last_log_time is greater than
-            # 60, then we print the log and reset last_log_time to 0.
-            current_time = time()
-            last_log_time += current_time - last_time
-            last_time = current_time
-            if last_log_time >= 60:
-                last_log_time = 0
-                self._print_status()
-
-            self._monitor_subjobs()  # Iterate through all jobs in the queue or currently running
-            if len(self._job_running.keys()) > 0:
-                sleep(30)
-
         if len(self._job_failed) > 0:
             self._logger.info('All jobs completed, printing failed jobs...')
             for failed_job in self._job_failed:
@@ -359,12 +337,11 @@ class SubjobUtility(JobLauncherInterface):
                 sleep(60)
 
             if job['job_type'] == Platform.DX:
-                dxjob = job['job_type'].value()
-                dxpy.DXJob.new(fn_input=job['input'], fn_name=job['function'].__name__, instance_type=job['instance_type'],
+                dxjob = dxpy.new_dxjob(fn_input=job['input'], fn_name=job['function'].__name__, instance_type=job['instance_type'],
                                properties=job['properties'], name=job['name'])
 
             elif job['job_type'] == Platform.LOCAL:
-                dxapplet = DXApplet(job['function'])
+                dxapplet = dxpy.DXApplet(job['function'])
                 dxjob = dxapplet.run(applet_input=job['input'], folder=job['destination'], name=job['name'],
                                      instance_type=job['instance_type'], priority=self._priority.value)
 
