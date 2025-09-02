@@ -298,7 +298,10 @@ class CommandExecutor:
         for host_path, container_path in sorted(file_path_map.items(), key=lambda x: -len(x[0])):
             rewritten_command = rewritten_command.replace(host_path, container_path)
 
-        full_cmd = f'{self._docker_prefix} {docker_mount_string} {self._docker_image} {rewritten_command}'
+        # Add working directory mount so that we can use tools that write/read to that directory
+        docker_workdir = f'-rw {safe_mount_point}'
+
+        full_cmd = f'{self._docker_prefix} {docker_workdir} {docker_mount_string} {self._docker_image} {rewritten_command}'
         return self.run_cmd(full_cmd, stdout_file, print_cmd, livestream_out, dry_run, ignore_error)
 
     def run_cmd(self, cmd: str, stdout_file: Path = None, print_cmd: bool = False,
