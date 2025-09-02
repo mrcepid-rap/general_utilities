@@ -34,6 +34,17 @@ class DockerMount:
 
         return f'{self.local.resolve()}:{self.remote}'
 
+    def __eq__(self, other):
+
+        if not isinstance(other, DockerMount):
+            return False
+        else:
+            return self.local == other.local and self.remote == other.remote
+
+    def __hash__(self):
+
+        return hash((self.local, self.remote))
+
 
 class CommandExecutor:
     """An object that contains the information to run system calls either with or without Docker
@@ -151,7 +162,8 @@ class CommandExecutor:
             if docker_mounts is None:
                 docker_mount_string = ''
             else:
-                docker_mount_string = ' '.join([f'-v {mount.get_docker_mount()}'
+                # Add :rw for read-write access (default), or :ro for read-only if desired
+                docker_mount_string = ' '.join([f'-v {mount.get_docker_mount()}:rw'
                                                 for mount in docker_mounts])
 
             docker_prefix = f'docker run ' \
@@ -163,39 +175,46 @@ class CommandExecutor:
 
             return None
 
-    def _get_dockermount_for_file(self, argument: Path, safe_mount_point: Path) -> DockerMount:
+    def _get_dockermount_for_file(self, argument: Path, safe_mount_point: Path):
         """
         Given an argument, check if it looks like a file path. If so, return a DockerMount object that mounts the
-        parent directory of the file to a safe mount point within the Docker image.
+        parent directory of the file to a safe mount point within the Docker image, and the corresponding container file path.
 
         :param argument: A command line argument that is either a file or a directory
         :param safe_mount_point: The location within the Docker image to mount the current working directory. This is
             intended to be a location that is unlikely to conflict with existing files within the Docker image.
-        :return: A DockerMount object or None if the argument does not look like a file path
+        :return: (DockerMount, container_file_path) tuple
         """
 
         # If a directory, mount the directory
         if argument.is_dir():
             resolved_path = argument.resolve()
+            file_or_dir = resolved_path
         else:
-            # If a file, mount the parent directory
+            # If a file, mount the parent directory, but map the file itself for rewriting
             resolved_path = argument.parent.resolve()
+            file_or_dir = argument.resolve()
         # Next we need to determine the mount point within the container
         try:
             # If the path is under the current working directory, we can mount it to a relative path
-            relative_path = resolved_path.relative_to(Path.cwd())
-            container_path = safe_mount_point / relative_path
+            relative_mount_path = resolved_path.relative_to(Path.cwd())
+            container_mount_path = safe_mount_point / relative_mount_path
+            relative_file_path = file_or_dir.relative_to(Path.cwd())
+            container_file_path = safe_mount_point / relative_file_path
         except ValueError:
             # If the path is outside the current working directory, we will mount it to a custom location
-            self._logger.info(f'FYI - A file and/or directory {argument} is external to the current working directory. ')
+            self._logger.debug(
+                f'FYI - A file and/or directory {argument} is external to the current working directory. ')
             container_name = resolved_path.as_posix().lstrip("/").replace("/", "_")
-            container_path = safe_mount_point / "external" / container_name
+            container_mount_path = safe_mount_point / "external" / container_name
+            file_container_name = file_or_dir.as_posix().lstrip("/").replace("/", "_")
+            container_file_path = safe_mount_point / "external" / file_container_name
 
         # Create the DockerMount object
-        mount = DockerMount(resolved_path, container_path)
+        mount = DockerMount(resolved_path, container_mount_path)
 
-        # Return the DockerMount object
-        return mount
+        # Return both the DockerMount object and the container file path for rewriting
+        return mount, container_file_path
 
     def run_cmd_on_docker(self, cmd: str, stdout_file: Path = None, docker_mounts: List[DockerMount] = None,
                           print_cmd: bool = False, livestream_out: bool = False, dry_run: bool = False,
@@ -231,52 +250,55 @@ class CommandExecutor:
         :return: The exit code of the underlying process
         """
 
+        # Ensure that Docker is configured
         if not self._docker_configured:
             raise dxpy.AppError('Requested to run via docker without configuring a Docker image!')
 
         # Safely split the command into respective parts (e.g. --input "some file.txt" -> ['--input', 'some file.txt'])
         command_arguments = shlex.split(cmd)
 
-        # Mount the current working directory to a safe location inside the Docker container.
-        # This ensures that all files in our working directory are accessible within Docker,
-        # and avoids potential conflicts with existing container paths.
-        current_working_directory = Path.cwd()
-        default_mounts = [DockerMount(current_working_directory, safe_mount_point)]
+        # Start with all_mounts as a set for deduplication
+        all_mounts = set()
 
-        # Extract parent directories of arguments that look like file paths and exist to 'parent_dirs'
-        parent_dirs = set()
-        auto_mounts = []
+        # Always mount the current working directory to the safe mount point
+        cwd_mount = DockerMount(Path.cwd(), safe_mount_point)
+        all_mounts.add(cwd_mount)
 
-        # Collect all arguments that are valid file or directory paths
+        # Collect valid file/directory paths from command arguments
         valid_paths = []
         for argument in command_arguments:
             possible_paths = Path(argument)
-            if (possible_paths.exists() or possible_paths.is_absolute()) and (possible_paths.is_file() or possible_paths.is_dir()):
+            if (possible_paths.exists()) and (
+                    possible_paths.is_file() or possible_paths.is_dir()):
                 valid_paths.append(possible_paths)
 
-        for file in valid_paths:
-            # if the path exists or is absolute, and is a file or directory, we will mount it
-            mount = self._get_dockermount_for_file(file, safe_mount_point)
+        # For each valid path, add its mount and map host file path to container path for rewriting
+        file_path_map = {}
+        for file_path in valid_paths:
+            mount, container_file_path = self._get_dockermount_for_file(file_path, safe_mount_point)
+            all_mounts.add(mount)
+            # The mapping below is used to rewrite command strings so that any file paths referenced in the command are replaced with the correct container paths,
+            # ensuring the command works properly inside Docker with the mounted files.
+            file_path_map[str(file_path.resolve())] = str(container_file_path)
 
-        # Add the mount to the list of mounts
-        auto_mounts.append(mount)
-        parent_dirs.add(mount.local)
+        # Add any user-specified mounts
+        if docker_mounts:
+            for additional_mounts in docker_mounts:
+                all_mounts.add(additional_mounts)
 
-        # Combine default mounts, user-specified mounts, and auto-detected mounts
-        all_mounts = set(default_mounts + (docker_mounts or []) + auto_mounts)
+        # Sort mounts for deterministic order (by remote path length, descending)
+        sorted_mounts = sorted(all_mounts, key=lambda unsorted_mount: -len(str(unsorted_mount.remote)))
 
-        # Construct the full Docker command
-        docker_mount_string = ' '.join(
-            ['-v {}'.format(unique_mount.get_docker_mount()) for unique_mount in all_mounts])
+        # Build docker mount string with :rw for read-write access
+        docker_mount_string = ' '.join([f'-v {sorted_mount.get_docker_mount()}:rw' for sorted_mount in sorted_mounts])
 
-        # Rewrite the command to use the safe mount point inside the container
+        # Rewrite the command to use the correct container file paths
         rewritten_command = cmd
-        # Sort by length of parent_directory (longest first) to avoid prefix short-circuiting
-        sorted_mounts = sorted(zip(parent_dirs, auto_mounts), key=lambda x: -len(str(x[0])))
-        for parent_directory, mount in sorted_mounts:
-            rewritten_command = rewritten_command.replace(str(parent_directory), str(mount.remote))
+        # Replace host file paths with container paths (longest first to avoid partial replacements)
+        for host_path, container_path in sorted(file_path_map.items(), key=lambda x: -len(x[0])):
+            rewritten_command = rewritten_command.replace(host_path, container_path)
 
-        full_cmd = f'docker run {docker_mount_string} {self._docker_image} {rewritten_command}'
+        full_cmd = f'{self._docker_prefix} {docker_mount_string} {self._docker_image} {rewritten_command}'
         return self.run_cmd(full_cmd, stdout_file, print_cmd, livestream_out, dry_run, ignore_error)
 
     def run_cmd(self, cmd: str, stdout_file: Path = None, print_cmd: bool = False,
