@@ -87,9 +87,11 @@ if (length(sparse_kinship@x[sparse_kinship@x < 0.5]) == 0) {
       obj_nullmodel <- list('zero_cases' = TRUE)
     } else {
       obj_nullmodel <- fit_null_glm(formated.formula, data=data_for_STAAR, family="binomial")
+      obj_nullmodel$zero_cases <- FALSE
     }
   } else {
     obj_nullmodel <- fit_null_glm(formated.formula, data=data_for_STAAR, family="gaussian")
+    obj_nullmodel$zero_cases <- FALSE
   }
   obj_nullmodel$id_include <- sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
   obj_nullmodel$corrected_for_relateds <- FALSE
@@ -105,6 +107,7 @@ if (length(sparse_kinship@x[sparse_kinship@x < 0.5]) == 0) {
           obj_nullmodel
         } else {
           obj_nullmodel <- fit_null_glmmkin(formated.formula, data=data_for_STAAR, id="FID", family=binomial(link="logit"), kins = sparse_kinship)
+          obj_nullmodel$id_include <- sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
           obj_nullmodel$corrected_for_relateds <- TRUE
           obj_nullmodel$zero_cases <- FALSE
           obj_nullmodel
@@ -123,6 +126,7 @@ if (length(sparse_kinship@x[sparse_kinship@x < 0.5]) == 0) {
     obj_nullmodel <- tryCatch(
       {
         obj_nullmodel <- fit_null_glmmkin(formated.formula, data=data_for_STAAR, id="FID", family=gaussian(link="identity"), kins = sparse_kinship)
+        obj_nullmodel$id_include <- sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
         obj_nullmodel$corrected_for_relateds <- TRUE
         obj_nullmodel$zero_cases <- FALSE
         obj_nullmodel

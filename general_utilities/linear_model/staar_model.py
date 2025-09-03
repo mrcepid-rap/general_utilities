@@ -1,6 +1,10 @@
+import csv
+import json
+import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict
+from typing import List
 
 import pandas as pd
 from importlib_resources import files
@@ -11,7 +15,44 @@ from general_utilities.bgen_utilities.genotype_matrix import generate_csr_matrix
 from general_utilities.bgen_utilities.genotype_matrix import make_variant_list, GeneInformation
 from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
 from general_utilities.job_management.command_executor import CommandExecutor
-from import_utils.import_lib import BGENInformation
+
+
+@dataclass
+class STAARModelResult:
+    """
+    Class that holds results from STAAR models
+
+    :attr ENST: ENST ID of the gene tested
+    :attr maskname: Name of the mask used for this gene (e.g., PTV)
+    :attr pheno_name: Name of the phenotype tested
+    :attr n_car: Number of carriers of the variant
+    :attr cMAC: Carrier minor allele count
+    :attr n_model: Number of individuals in the model
+    :attr model_run: Boolean indicating if the model was run successfully
+    :attr p_val_init: Initial p-value from the null model
+    :attr p_val_full: Full model p-value (if p_val_init < nominal significance of 1e-4)
+    :attr effect: Effect size of the variant on the phenotype
+    :attr std_err: Standard error of the effect size
+    :attr n_noncar_affected: Number of non-carriers affected by the phenotype
+    :attr n_noncar_unaffected: Number of non-carriers unaffected by the phenotype
+    :attr n_car_affected: Number of carriers affected by the phenotype
+    :attr n_car_unaffected: Number of carriers unaffected by the phenotype
+    """
+
+    ENST: str
+    mask_name: str
+    pheno_name: str
+
+    # These fields are automatically populated by the runSTAAR_genes.R script
+    n_var: int
+    cMAC: int
+    n_model: int
+    model_run: bool
+    relatedness_correction: bool
+    p_val_O: float = float('nan')
+    p_val_SKAT: float = float('nan')
+    p_val_burden: float = float('nan')
+    p_val_ACAT: float = float('nan')
 
 
 # Generate the NULL model for STAAR
@@ -79,19 +120,7 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
     return Path(f'{phenotype}.STAAR_null.rds')
 
 
-def build_staar_variant_list(variant_file: Path, bgen_path, index_path, sample_path, gene) -> Dict[str, GeneInformation]:
-
-
-
-
-def staar_genes(staar_null_path: Path, tarball_prefix: str, pheno_name: str, bgen_info: Dict[str, BGENInformation],
-                bgen_prefix: str = None, valid_genes: List[str] = None,
-                cmd_executor: CommandExecutor = build_default_command_executor()) -> Path:
-    """Run rare variant association testing using STAAR.
-
-
-
-    """
+def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None):
 
     tarball_path = Path(tarball_prefix)
 
@@ -104,50 +133,62 @@ def staar_genes(staar_null_path: Path, tarball_prefix: str, pheno_name: str, bge
             raise ValueError(
                 f'BGEN prefix {bgen_prefix} not found in tarball {tarball_path.name}.tar.gz. Please check the input.')
 
+    variant_matricies = {}
+
     for staar_variants in staar_variants_list:
+
+        # get the bgen prefix out of the staar variants path with a regex:
+        current_prefix = re.match(rf'{tarball_path.name}\.(\w*)\.STAAR\.variants_table\.tsv',
+                                  staar_variants.name).group(1)
 
         variant_table = pd.read_csv(staar_variants, delimiter='\t')
         variant_matrix = make_variant_list(variant_table)
 
-        # get the bgen prefix out of the staar variants path with a regex:
-        current_prefix = re.search(rf'{tarball_path.name}\.({bgen_prefix})\.STAAR\.variants_table\.tsv', staar_variants.name).group(1)
-        bgen_path = bgen_info[current_prefix]['bgen'].get_file_handle()
-        sample_path = bgen_info[current_prefix]['sample'].get_file_handle()
-        index_path = bgen_info[current_prefix]['index'].get_file_handle()  # have to do this otherwise the file isn't in the right place
+        variant_matricies[current_prefix] = variant_matrix
 
-        # Make sure we have the samples
-        staar_samples = tarball_path.parent / f'{tarball_path.name}.{current_prefix}.STAAR.samples_table.tsv'
+    return variant_matricies
 
-        for gene, gene_info in variant_matrix.items():
 
-            if (valid_genes is not None) and (gene not in valid_genes):
-                continue
+def staar_genes(staar_null_path: Path, pheno_name: str, gene: str, mask_name: str,
+                gene_info: GeneInformation, staar_samples: Path, staar_variants: Path, bgen_path: Path, sample_path: Path,
+                out_dir: Path = Path(os.getcwd()), cmd_executor: CommandExecutor = build_default_command_executor()) -> STAARModelResult:
+    """Run rare variant association testing using STAAR.
 
-            gene_matrix, _ = generate_csr_matrix_from_bgen(bgen_path=bgen_path, sample_path=sample_path, variant_filter_list=gene_info['vars'],
-                                                           chromosome=gene_info['chrom'], start=gene_info['min'], end=gene_info['max'],
-                                                           should_collapse_matrix=False)
 
-            staar_matrix = Path(f'{tarball_path}.{current_prefix}.STAAR.matrix.rds')
-            mmwrite(staar_matrix, gene_matrix)
 
-            # I have made a custom script in order to generate STAAR per-gene models that is installed using pip
-            # as part of the general_utilities package. We can extract the system location of this script:
-            r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Genes.R')
+    """
 
-            script_mount = DockerMount(r_script.parent,
-                                       Path('/scripts/'))
+    gene_matrix, _ = generate_csr_matrix_from_bgen(bgen_path=bgen_path, sample_path=sample_path, variant_filter_list=gene_info['vars'],
+                                                   chromosome=gene_info['chrom'], start=gene_info['min'], end=gene_info['max'],
+                                                   should_collapse_matrix=False)
 
-            output_path = Path(f'{gene}.{pheno_name}.STAAR_results.tsv')
+    staar_matrix_path = out_dir / f'{gene}.{pheno_name}.STAAR.mtx'
+    mmwrite(staar_matrix_path, gene_matrix)
 
-            # This generates a text output file of p.values
-            # See the README.md for more information on these parameters
-            cmd = f'Rscript /scripts/{r_script.name} ' \
-                  f'/test/{staar_matrix.name} ' \
-                  f'/test/{staar_variants.name} ' \
-                  f'/test/{staar_samples.name} ' \
-                  f'/test/{staar_null_path.name} ' \
-                  f'/test/{output_path.name}'
+    # I have made a custom script in order to generate STAAR per-gene models that is installed using pip
+    # as part of the general_utilities package. We can extract the system location of this script:
+    r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Genes.R')
 
-            cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
+    script_mount = DockerMount(r_script.parent,
+                               Path('/scripts/'))
 
-    return output_path
+    output_path = out_dir / f'{gene}.{pheno_name}.STAAR_results.json'
+
+    # This generates a text output file of p.values
+    # See the README.md for more information on these parameters
+    cmd = f'Rscript /scripts/{r_script.name} ' \
+          f'/test/{staar_matrix_path.name} ' \
+          f'/test/{staar_variants.name} ' \
+          f'/test/{staar_samples.name} ' \
+          f'/test/{staar_null_path.name} ' \
+          f'{gene} ' \
+          f'/test/{output_path.name}'
+
+    cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
+
+    # Read in the outputs and format into a model pack
+    staar_json = json.load(output_path.open('r'))
+    staar_json.update({'ENST': gene, 'maskname': mask_name, 'pheno_name': pheno_name})
+    staar_result = STAARModelResult(**staar_json)
+
+    return staar_result
