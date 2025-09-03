@@ -49,7 +49,7 @@ class LinearModelResult:
     Class that holds results from linear models
 
     :attr ENST: ENST ID of the gene tested
-    :attr maskname: Name of the mask used for this gene (e.g., PTV)
+    :attr mask_name: Name of the mask used for this gene (e.g., PTV)
     :attr pheno_name: Name of the phenotype tested
     :attr n_car: Number of carriers of the variant
     :attr cMAC: Carrier minor allele count
@@ -66,7 +66,7 @@ class LinearModelResult:
     """
 
     ENST: str
-    maskname: str
+    mask_name: str
     pheno_name: str
     n_car: int
     cMAC: int
@@ -401,9 +401,9 @@ def process_linear_model_outputs(input_models: List[LinearModelResult], output_p
         if tarball_type == TarballType.GENOMEWIDE:
             linear_model_fieldnames.remove('ENST')  # Remove ENST as we add it above if genomewide
         fieldnames.extend(linear_model_fieldnames)
-        mask_maf_fields = define_field_names_from_pandas(input_models[0].maskname)
-        fieldnames[fieldnames.index('maskname'):fieldnames.index('maskname')] = mask_maf_fields
-        fieldnames.pop(fieldnames.index('maskname'))
+        mask_maf_fields = define_field_names_from_pandas(input_models[0].mask_name)
+        fieldnames[fieldnames.index('mask_name'):fieldnames.index('mask_name')] = mask_maf_fields
+        fieldnames.pop(fieldnames.index('mask_name'))
 
         if not is_binary:
             fieldnames.remove('n_noncar_affected')
@@ -415,7 +415,7 @@ def process_linear_model_outputs(input_models: List[LinearModelResult], output_p
         # result in too much in memory as the number of genes is relatively small
         gene_rows = []
         for model in input_models:
-            mask_maf_columns = (dict(zip(mask_maf_fields, model.maskname.split('-'))))
+            mask_maf_columns = (dict(zip(mask_maf_fields, model.mask_name.split('-'))))
 
             model_dict = asdict(model)
             model_dict.update(mask_maf_columns)

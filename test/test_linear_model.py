@@ -145,7 +145,7 @@ def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarba
 
         assert result.pheno_name == 'phenotype'
         assert result.ENST == gene
-        assert result.maskname == tarball_name
+        assert result.mask_name == tarball_name
         assert result.n_model == 10000
         assert result.n_noncar_unaffected == 0  #TODO: Implement binary models!
 
