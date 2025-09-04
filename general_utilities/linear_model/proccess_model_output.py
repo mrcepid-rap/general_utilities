@@ -1,12 +1,11 @@
-import dataclasses
 import csv
 import dxpy
+import pysam
+import dataclasses
 import pandas as pd
 
-from typing import List, Union
 from pathlib import Path
-
-import pysam
+from typing import List, Union
 
 from general_utilities.association_resources import define_field_names_from_pandas, bgzip_and_tabix
 from general_utilities.import_utils.import_lib import TarballType
@@ -15,12 +14,18 @@ from general_utilities.linear_model.staar_model import STAARModelResult
 
 def process_model_outputs(input_models: Union[List[STAARModelResult], List[LinearModelResult]], output_path: Path,
                           tarball_type: TarballType, transcripts_table: pd.DataFrame) -> List[Path]:
-    """Process a list of model results into a single output file
+    """Process a list of model results into a single output file.
+
+    The 'model results' can currently come from either linear or STAAR models; We have not implemented an Interface for
+    to harmonise between these two dataclasses, so additional models would need to conform to a rough specification that
+    currently includes only 'mask_name' and 'ENST' fields.
 
     :param input_models: A list of model results, either STAARModelResult or LinearModelResult
     :param output_path: The path to write the output file to (before bgzip/tabix)
     :param tarball_type: The type of tarball being processed (TarballType Enum)
     :param transcripts_table: A pandas DataFrame containing transcript information.
+    :returns: A list with a bgzipped output file of associations at output list index [0]. If TarballType is TarballType.GENOMEWIDE,
+        will also sort and provide a tabix index and list index [1].
     """
 
     outputs = []

@@ -137,9 +137,15 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
 def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None) -> Dict[str, Dict[str, GeneInformation]]:
     """Load STAAR genetic data from a CollapseVariants output tarball.
 
+    This method is a wrapper for :func:`make_variant_list()` in the bgen_utilities.genotype_matrix module. The method
+    wraps this function in order to load all variant tables (except when provided with :param bgen_prefix:) in a
+    CollapseVariants output tarball rather than load one variant table. It generates a dictionary of GeneInformation
+    labelled by the BGEN prefix.
+
     :param tarball_prefix: The prefix of the tarball (i.e., the tarball file without the '.tar.gz' suffix).
     :param bgen_prefix: Optional specific BGEN prefix to load. If None, all prefixes in the tarball will be loaded.
-    :return: A dictionary where keys are BGEN prefixes and values are
+    :return: A dictionary where keys are BGEN prefixes and values are dictionaries of GeneInformation objects keyed by
+        ENST ID.
     """
 
     tarball_path = Path(tarball_prefix)

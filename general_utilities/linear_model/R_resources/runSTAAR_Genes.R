@@ -14,8 +14,8 @@ library(jsonlite)
 # 5. [5] Gene name for subsetting the variants file
 # 6. [6] Output file path
 args <- commandArgs(trailingOnly = T)
-matrix_file <-args[1]
-variants_file <-args[2]
+matrix_file <- args[1]
+variants_file <- args[2]
 samples_file <- args[3]
 null_model_file <- args[4]
 gene <- args[5]
