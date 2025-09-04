@@ -1,21 +1,23 @@
 import csv
+import gzip
 import shutil
-
+from math import isnan
 
 import pandas as pd
 import pytest
 
 from pathlib import Path
 
+from scipy.io import mmwrite
+
+from bgen_utilities.genotype_matrix import generate_csr_matrix_from_bgen
 from general_utilities.association_resources import build_transcript_table
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.import_utils.import_lib import BGENInformation
 from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
-from general_utilities.linear_model.staar_model import staar_null, staar_genes
-from general_utilities.job_management.thread_utility import ThreadUtility
-from general_utilities.linear_model.staar_model import load_staar_genetic_data
-
-# from import_utils.import_lib import TarballType
+from general_utilities.linear_model.staar_model import staar_null, staar_genes, load_staar_genetic_data
+from general_utilities.linear_model.proccess_model_output import process_model_outputs
+from general_utilities.import_utils.import_lib import TarballType
 
 test_data_dir = Path(__file__).parent / "test_data"
 linear_model_test_data_dir = test_data_dir / "linear_model/"
@@ -145,8 +147,8 @@ def test_load_staar(tmp_path, unpacked_tarball, expected_genes_path: Path):
     assert len(found_genes.intersection(expected_genes)) == len(expected_genes)
 
 
-@pytest.mark.parametrize('unpacked_tarball', ['HC_PTV-MAF_001',], indirect=['unpacked_tarball'])
-def test_build_staar_gene(tmp_path, phenofile, unpacked_tarball):
+@pytest.mark.parametrize('unpacked_tarball', ('HC_PTV-MAF_001',), indirect=['unpacked_tarball'])
+def test_staar_genes_genomewide(tmp_path, phenofile, transcripts_table, unpacked_tarball):
 
     # Make sure the Docker image can see tmp_path via mounting
     mounts = [DockerMount(tmp_path, Path('/test/'))]
@@ -184,23 +186,133 @@ def test_build_staar_gene(tmp_path, phenofile, unpacked_tarball):
         while tested_counter < 10:
             gene, gene_info = next(info_iter)
 
+            # The STAAR method does not collapse the genotype matrix, so we need to do that here if using a burden mask
+            gene_matrix, _ = generate_csr_matrix_from_bgen(bgen_path=bgen_info['bgen'].get_file_handle(),
+                                                           sample_path=bgen_info['sample'].get_file_handle(),
+                                                           variant_filter_list=gene_info['vars'],
+                                                           chromosome=gene_info['chrom'], start=gene_info['min'],
+                                                           end=gene_info['max'],
+                                                           should_collapse_matrix=False)
+
+            staar_matrix = tmp_path / f'{gene}.phenotype.STAAR.mtx'
+            mmwrite(staar_matrix, gene_matrix)
+
             # This is because of the bug in the Duat data with duplicated variants
             if gene == 'ENST00000337107':
                 continue
 
             bgen_info['index'].get_file_handle()
             staar_return = staar_genes(staar_null_path=model_path, pheno_name='phenotype', gene=gene, mask_name=unpacked_tarball.name,
-                                       gene_info=gene_info, staar_samples=staar_samples, staar_variants=staar_variants,
-                                       bgen_path=bgen_info['bgen'].get_file_handle(),
-                                       sample_path=bgen_info['sample'].get_file_handle(),
+                                       staar_matrix=staar_matrix, staar_samples=staar_samples, staar_variants=staar_variants,
                                        out_dir=tmp_path, cmd_executor=test_executor)
 
             tested_counter += 1
 
             assert staar_return.ENST == gene
-            assert staar_return.maskname == unpacked_tarball.name
+            assert staar_return.mask_name == unpacked_tarball.name
+            assert staar_return.pheno_name == 'phenotype'
+            assert staar_return.relatedness_correction == False
 
+            if not staar_return.model_run:
+                assert staar_return.cMAC <= 2
+                assert isnan(staar_return.p_val_O)
+                assert isnan(staar_return.p_val_SKAT)
+                assert isnan(staar_return.p_val_ACAT)
+                assert isnan(staar_return.p_val_burden)
+
+            else:
+                assert staar_return.cMAC > 2
+                assert not isnan(staar_return.p_val_O)
+                assert not isnan(staar_return.p_val_SKAT)
+                assert not isnan(staar_return.p_val_ACAT)
+                assert not isnan(staar_return.p_val_burden)
 
             finished_models.append(staar_return)
 
     assert len(finished_models) == 30
+
+    output_path = tmp_path / f'{unpacked_tarball.name}.genes.STAAR.stats.tsv'
+    output_files = process_model_outputs(input_models=finished_models, output_path=output_path,
+                                         tarball_type=TarballType.GENOMEWIDE, transcripts_table=transcripts_table)
+
+    assert len(output_files) == 2
+    assert output_files[0].exists()
+    assert output_files[0].name == f'{unpacked_tarball.name}.genes.STAAR.stats.tsv.gz'
+    assert output_files[1].exists()
+    assert output_files[1].name == f'{unpacked_tarball.name}.genes.STAAR.stats.tsv.gz.tbi'
+
+    expected_fields = ['ENST', 'chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL', 'CANONICAL',
+                       'BIOTYPE', 'cds_length', 'coord', 'manh.pos', 'MASK', 'MAF', 'pheno_name', 'n_var', 'cMAC',
+                       'n_model', 'model_run', 'relatedness_correction', 'p_val_O', 'p_val_SKAT', 'p_val_burden',
+                       'p_val_ACAT']
+
+    test_output = pd.read_csv(output_files[0], sep='\t')
+    assert test_output.columns.tolist() == expected_fields
+    assert len(test_output) == 30
+
+
+@pytest.mark.parametrize('unpacked_tarball, tarball_type',
+                         zip(
+                             ('HC_PTV-MAF_001_GENE','HC_PTV-MAF_001_SNP'),
+                             (TarballType.GENE, TarballType.SNP)
+                         ), indirect=['unpacked_tarball'])
+def test_staar_genes_gene_or_snp(tmp_path, phenofile, transcripts_table, unpacked_tarball, tarball_type):
+
+    # Make sure the Docker image can see tmp_path via mounting
+    mounts = [DockerMount(tmp_path, Path('/test/'))]
+    test_executor = CommandExecutor('egardner413/mrcepid-burdentesting:latest', docker_mounts=mounts)
+
+    # cmd_exector requires all mounted files to be in the same dir (here that means the tmp_path)
+    tmp_matrix = tmp_path / 'duat_matrix.sparseGRM.mtx'
+    tmp_samples = tmp_path / 'duat_matrix.sparseGRM.mtx.sampleIDs.txt'
+    shutil.copy(Path(linear_model_test_data_dir / 'duat_matrix.sparseGRM.mtx'), tmp_matrix)
+    shutil.copy(Path(linear_model_test_data_dir / 'duat_matrix.sparseGRM.mtx.sampleIDs.txt'), tmp_samples)
+
+    model_path = staar_null(phenofile=phenofile, phenotype='phenotype',
+                            is_binary=False, ignore_base=False,
+                            found_quantitative_covariates=[], found_categorical_covariates=['batman'],
+                            sex=2,
+                            sparse_kinship_file=tmp_matrix,
+                            sparse_kinship_samples=tmp_samples,
+                            cmd_executor=test_executor)
+
+    staar_samples = Path(unpacked_tarball.parent / f'{unpacked_tarball.name}.{tarball_type.name}.STAAR.samples_table.tsv')
+    staar_variants = Path(unpacked_tarball.parent / f'{unpacked_tarball.name}.{tarball_type.name}.STAAR.variants_table.tsv')
+    staar_matrix = Path(unpacked_tarball.parent / f'{unpacked_tarball.name}.{tarball_type.name}.STAAR.mtx')
+
+    staar_return = staar_genes(staar_null_path=model_path, pheno_name='phenotype', gene=tarball_type.value, mask_name=unpacked_tarball.name,
+                               staar_matrix=staar_matrix, staar_samples=staar_samples, staar_variants=staar_variants,
+                               out_dir=tmp_path, cmd_executor=test_executor)
+
+    assert staar_return.ENST == tarball_type.value
+    assert staar_return.mask_name == unpacked_tarball.name
+    assert staar_return.pheno_name == 'phenotype'
+    assert staar_return.relatedness_correction == False
+
+    if not staar_return.model_run:
+        assert staar_return.cMAC <= 2
+        assert isnan(staar_return.p_val_O)
+        assert isnan(staar_return.p_val_SKAT)
+        assert isnan(staar_return.p_val_ACAT)
+        assert isnan(staar_return.p_val_burden)
+
+    else:
+        assert staar_return.cMAC > 2
+        assert not isnan(staar_return.p_val_O)
+        assert not isnan(staar_return.p_val_SKAT)
+        assert not isnan(staar_return.p_val_ACAT)
+        assert not isnan(staar_return.p_val_burden)
+
+    output_path = tmp_path / f'{unpacked_tarball.name}.{tarball_type.name}.STAAR.stats.tsv'
+    output_files = process_model_outputs(input_models=[staar_return], output_path=output_path,
+                                         tarball_type=tarball_type, transcripts_table=transcripts_table)
+    assert len(output_files) == 1
+    assert output_files[0].exists()
+    assert output_files[0].name == f'{unpacked_tarball.name}.{tarball_type.name}.STAAR.stats.tsv.gz'
+
+    expected_fields = ['ENST', 'MASK', 'MAF', 'pheno_name', 'n_var', 'cMAC', 'n_model', 'model_run',
+                       'relatedness_correction', 'p_val_O', 'p_val_SKAT', 'p_val_burden', 'p_val_ACAT']
+
+    test_output = pd.read_csv(output_files[0], sep='\t')
+    assert test_output.columns.tolist() == expected_fields
+    assert len(test_output) == 1

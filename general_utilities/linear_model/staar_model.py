@@ -1,20 +1,23 @@
 import csv
+import dataclasses
 import json
 import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 
 import pandas as pd
+import pysam
 from importlib_resources import files
-from scipy.io import mmwrite
 
-from general_utilities.association_resources import replace_multi_suffix
-from general_utilities.bgen_utilities.genotype_matrix import generate_csr_matrix_from_bgen
-from general_utilities.bgen_utilities.genotype_matrix import make_variant_list, GeneInformation
+from bgen_utilities.genotype_matrix import GeneInformation
+from general_utilities.association_resources import replace_multi_suffix, define_field_names_from_pandas, \
+    bgzip_and_tabix
+from general_utilities.bgen_utilities.genotype_matrix import make_variant_list
 from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
 from general_utilities.job_management.command_executor import CommandExecutor
+from general_utilities.import_utils.import_lib import TarballType
 
 
 @dataclass
@@ -23,20 +26,17 @@ class STAARModelResult:
     Class that holds results from STAAR models
 
     :attr ENST: ENST ID of the gene tested
-    :attr maskname: Name of the mask used for this gene (e.g., PTV)
+    :attr mask_name: Name of the mask used for this gene (e.g., PTV)
     :attr pheno_name: Name of the phenotype tested
-    :attr n_car: Number of carriers of the variant
+    :attr n_car: Number of carriers of the mask
     :attr cMAC: Carrier minor allele count
     :attr n_model: Number of individuals in the model
     :attr model_run: Boolean indicating if the model was run successfully
-    :attr p_val_init: Initial p-value from the null model
-    :attr p_val_full: Full model p-value (if p_val_init < nominal significance of 1e-4)
-    :attr effect: Effect size of the variant on the phenotype
-    :attr std_err: Standard error of the effect size
-    :attr n_noncar_affected: Number of non-carriers affected by the phenotype
-    :attr n_noncar_unaffected: Number of non-carriers unaffected by the phenotype
-    :attr n_car_affected: Number of carriers affected by the phenotype
-    :attr n_car_unaffected: Number of carriers unaffected by the phenotype
+    :attr relatedness_correction: Boolean indicating if relatedness correction was applied during STAAR Null
+    :attr p_val_O: P-value from the STAAR-Omnibus (O) test combining SKAT, burden, and ACAT
+    :attr p_val_SKAT: P-value from the SKAT test
+    :attr p_val_burden: P-value from the burden test
+    :attr p_val_ACAT: P-value from the ACAT test
     """
 
     ENST: str
@@ -54,6 +54,15 @@ class STAARModelResult:
     p_val_burden: float = float('nan')
     p_val_ACAT: float = float('nan')
 
+    def __post_init__(self):
+        """Post-initialization to coerce float 'NaN' values from R to float nan in Python that Python reads as strings.
+        """
+
+        for p_str in ['p_val_O', 'p_val_SKAT', 'p_val_burden', 'p_val_ACAT']:
+            p_val = getattr(self, p_str)
+            if isinstance(p_val, str) and p_val == 'NaN':
+                setattr(self, p_str, float('nan'))
+
 
 # Generate the NULL model for STAAR
 def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bool,
@@ -62,8 +71,11 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
                cmd_executor: CommandExecutor = build_default_command_executor()) -> Path:
     """This method wraps an R script that generates the STAAR Null model.
 
+    The STAAR model residualises the phenotype on covariates and a sparse kinship matrix to account for relatedness. The
+    output is an RDS file of this null model that can be used in subsequent STAAR gene-based tests (:func:`staar_genes()`).
+
     The script is included as a package resource in the general_utilities.linear_model.R_resources package. The file
-    is included in the wheel on installation by pip and can be accessed using importlib_resources. Thus, the script
+    is included in the wheel on installation by pip and can be accessed using importlib_resources; the script
     location is hardcoded into this method.
 
     :param phenofile: The path to the phenotype file. This file must be space or tab delimited and contain a header row.
@@ -76,7 +88,9 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
         with a single value (e.g., if just running males / females).
     :param sparse_kinship_file: The path to the sparse kinship matrix file in Matrix Market format.
     :param sparse_kinship_samples: The path to the sample IDs file for the sparse kinship matrix.
-    :param cmd_executor: The command executor to use. Defaults to the standard burdentesting Docker file.
+    :param cmd_executor: The command executor to use. Defaults to the standard burdentesting Docker file. Primarily used
+        for testing; users should not need to change this parameter.
+    :return: The path to the output RDS file containing the STAAR null model.
     """
 
     r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Null.R')
@@ -120,7 +134,13 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
     return Path(f'{phenotype}.STAAR_null.rds')
 
 
-def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None):
+def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None) -> Dict[str, Dict[str, GeneInformation]]:
+    """Load STAAR genetic data from a CollapseVariants output tarball.
+
+    :param tarball_prefix: The prefix of the tarball (i.e., the tarball file without the '.tar.gz' suffix).
+    :param bgen_prefix: Optional specific BGEN prefix to load. If None, all prefixes in the tarball will be loaded.
+    :return: A dictionary where keys are BGEN prefixes and values are
+    """
 
     tarball_path = Path(tarball_prefix)
 
@@ -150,20 +170,29 @@ def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None):
 
 
 def staar_genes(staar_null_path: Path, pheno_name: str, gene: str, mask_name: str,
-                gene_info: GeneInformation, staar_samples: Path, staar_variants: Path, bgen_path: Path, sample_path: Path,
+                staar_matrix: Path, staar_samples: Path, staar_variants: Path,
                 out_dir: Path = Path(os.getcwd()), cmd_executor: CommandExecutor = build_default_command_executor()) -> STAARModelResult:
-    """Run rare variant association testing using STAAR.
+    """Run a single rare variant association test using STAAR.
 
+    This method wraps an R script that runs a STAAR gene-based test for a single gene or pre-collapsed SNP / GENE mask.
 
+    The :param staar_matrix: parameter can be generated in one of two ways. For genome-wide burden masks, :func:`generate_csr_matrix_from_bgen()`
+    in the general_utilities.bgen_utilities.genotype_matrix module can be used to generate a sparse genotype matrix in Matrix Market format. For
+    pre-collapsed SNP / GENE masks generated directly by the CollapseVariants tool, the sparse genotype matrix is included in the output tarball as
+    '<mask_name>.[SNP/GENE].STAAR.mtx'.
 
+    :param staar_null_path: The path to the STAAR null model RDS file generated by the :func:`staar_null()` method.
+    :param pheno_name: The name of the phenotype column in the phenotype file.
+    :param gene: The ENST ID of the gene to test.
+    :param mask_name: The name of the mask to test (e.g., HC_PTV-MAF_01).
+    :param staar_matrix: The path to the sparse genotype matrix in Matrix Market format.
+    :param staar_samples: The path to the sample IDs file for the sparse genotype matrix (see CollapseVariants for more information).
+    :param staar_variants: The path to the variants table file for the sparse genotype matrix (see CollapseVariants for more information).
+    :param out_dir: The directory to write output files to. Defaults to the current working directory.
+    :param cmd_executor: The command executor to use. Defaults to the standard burdentesting Docker file. Primarily used
+        for testing; users should not need to change this parameter.
+    :return: A STAARModelResult object containing the results of the association test.
     """
-
-    gene_matrix, _ = generate_csr_matrix_from_bgen(bgen_path=bgen_path, sample_path=sample_path, variant_filter_list=gene_info['vars'],
-                                                   chromosome=gene_info['chrom'], start=gene_info['min'], end=gene_info['max'],
-                                                   should_collapse_matrix=False)
-
-    staar_matrix_path = out_dir / f'{gene}.{pheno_name}.STAAR.mtx'
-    mmwrite(staar_matrix_path, gene_matrix)
 
     # I have made a custom script in order to generate STAAR per-gene models that is installed using pip
     # as part of the general_utilities package. We can extract the system location of this script:
@@ -177,7 +206,7 @@ def staar_genes(staar_null_path: Path, pheno_name: str, gene: str, mask_name: st
     # This generates a text output file of p.values
     # See the README.md for more information on these parameters
     cmd = f'Rscript /scripts/{r_script.name} ' \
-          f'/test/{staar_matrix_path.name} ' \
+          f'/test/{staar_matrix.name} ' \
           f'/test/{staar_variants.name} ' \
           f'/test/{staar_samples.name} ' \
           f'/test/{staar_null_path.name} ' \
@@ -188,7 +217,7 @@ def staar_genes(staar_null_path: Path, pheno_name: str, gene: str, mask_name: st
 
     # Read in the outputs and format into a model pack
     staar_json = json.load(output_path.open('r'))
-    staar_json.update({'ENST': gene, 'maskname': mask_name, 'pheno_name': pheno_name})
+    staar_json.update({'ENST': gene, 'mask_name': mask_name, 'pheno_name': pheno_name})
     staar_result = STAARModelResult(**staar_json)
 
     return staar_result

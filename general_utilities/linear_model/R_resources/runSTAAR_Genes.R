@@ -20,13 +20,6 @@ samples_file <- args[3]
 null_model_file <- args[4]
 gene <- args[5]
 output_file <- args[6]
-#
-# matrix_file <- '/private/var/folders/z7/4hkdzr016yx6sxqg_bdynqdw0000gp/T/pytest-of-eugene.gardner/pytest-28/test_build_staar_gene_HC_PTV_M0/ENST00000235345.phenotype.STAAR.mtx'
-# variants_file <- '/private/var/folders/z7/4hkdzr016yx6sxqg_bdynqdw0000gp/T/pytest-of-eugene.gardner/pytest-28/test_build_staar_gene_HC_PTV_M0/HC_PTV-MAF_001.chr1_chunk3.STAAR.variants_table.tsv'
-# samples_file <- '/private/var/folders/z7/4hkdzr016yx6sxqg_bdynqdw0000gp/T/pytest-of-eugene.gardner/pytest-28/test_build_staar_gene_HC_PTV_M0/HC_PTV-MAF_001.chr1_chunk3.STAAR.samples_table.tsv'
-# null_model_file <-  '/private/var/folders/z7/4hkdzr016yx6sxqg_bdynqdw0000gp/T/pytest-of-eugene.gardner/pytest-28/test_build_staar_gene_HC_PTV_M0/phenotype.STAAR_null.rds'
-# gene <- 'ENST00000235345'
-# output_file <- '/private/var/folders/z7/4hkdzr016yx6sxqg_bdynqdw0000gp/T/pytest-of-eugene.gardner/pytest-28/test_build_staar_gene_HC_PTV_M0/ENST00000235345.phenotype.STAAR_results.json'
 
 # Load RDS genotype matrix
 genotypes <- readMM(matrix_file)
@@ -56,7 +49,7 @@ for (i in seq_len(ncol(genotypes))) {
 cMAC <- sum(genotypes)
 
 # Only run STAAR if there is greater than one non-ref variant and there are cases
-if (obj_nullmodel$zero_cases == TRUE | tot_vars <= 2) {
+if (obj_nullmodel$zero_cases == TRUE | cMAC <= 2) {
   # Else just return NaN to indicate the test was not run
   gene.results <- list(n_model=nrow(genotypes), relatedness_correction=obj_nullmodel$corrected_for_relateds,
                        p_val_O=NaN, p_val_SKAT=NaN,
