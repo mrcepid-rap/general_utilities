@@ -13,7 +13,6 @@ from general_utilities.import_utils.import_lib import TarballType
 from general_utilities.linear_model.linear_model import LinearModelResult
 from general_utilities.linear_model.staar_model import STAARModelResult
 
-
 def process_model_outputs(input_models: Union[List[STAARModelResult], List[LinearModelResult]], output_path: Path,
                           tarball_type: TarballType, transcripts_table: pd.DataFrame) -> List[Path]:
     """Process a list of model results into a single output file

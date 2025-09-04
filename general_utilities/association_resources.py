@@ -271,7 +271,7 @@ def gt_to_float(gt: str) -> float:
     """
     if gt == '0/0':
         return 0
-    elif gt == '0/1':
+    elif gt == '0/1' or gt == '1/0':
         return 1
     elif gt == '1/1':
         return 2
