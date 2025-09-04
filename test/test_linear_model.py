@@ -7,10 +7,10 @@ import statsmodels.api as sm
 from pathlib import Path
 
 from general_utilities.association_resources import build_transcript_table
-from general_utilities.linear_model.linear_model import linear_model_null, run_linear_model, \
-    process_linear_model_outputs
+from general_utilities.linear_model.linear_model import linear_model_null, run_linear_model
 from general_utilities.import_utils.import_lib import TarballType
 from general_utilities.linear_model.linear_model import load_linear_model_genetic_data
+from general_utilities.linear_model.proccess_model_output import process_model_outputs
 
 test_data_dir = Path(__file__).parent / "test_data"
 linear_model_test_data_dir = test_data_dir / "linear_model/"
@@ -76,6 +76,10 @@ def transcripts_table() -> pd.DataFrame:
     return build_transcript_table(transcripts_path, False)
 
 def test_linear_model_null(phenofile):
+    """Test the creation of the null model for a quantitative phenotype.
+
+    Note: Binary traits are not yet tested by this pipeline as we do not yet have a full implementation of test data.
+    """
 
     null_model = linear_model_null(phenofile,
                                    phenotype='phenotype',
@@ -104,6 +108,7 @@ def test_linear_model_null(phenofile):
                              (TarballType.GENOMEWIDE, TarballType.GENOMEWIDE, TarballType.GENE, TarballType.SNP)
                          ), indirect=["unpacked_tarball"])
 def test_load_tarball_linear_model(unpacked_tarball, expected_genes_path, bgen_prefix, tarball_type):
+    """Test loading genetic data from different tarball types."""
 
     tarball_path, genetic_data = load_linear_model_genetic_data(str(unpacked_tarball), tarball_type, bgen_prefix=bgen_prefix)
 
@@ -121,6 +126,11 @@ def test_load_tarball_linear_model(unpacked_tarball, expected_genes_path, bgen_p
                              (False, False, False, False)
                          ), indirect=["unpacked_tarball"])
 def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarball, expected_genes_path, tarball_type, is_binary):
+    """Test running the linear model on different tarball types.
+
+    This test re-runs the generation of the null model and loading of genetic data, but does not test the outputs as
+    this has already been done above. The resulting data is then run through the linear model and the outputs checked.
+    """
 
     null_model = linear_model_null(phenofile,
                                    phenotype='phenotype',
@@ -166,16 +176,14 @@ def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarba
     found_genes = {result.ENST for result in final_models}
     assert len(found_genes.intersection(expected_genes)) == len(expected_genes)
 
-    expected_fields = ['ENST', 'MASK', 'MAF', 'pheno_name', 'n_car', 'cMAC', 'n_model', 'model_run', 'p_val_init', 'p_val_full', 'effect', 'std_err']
+    expected_fields = ['ENST', 'MASK', 'MAF', 'pheno_name', 'n_car', 'cMAC', 'n_model', 'model_run', 'p_val_init',
+                       'p_val_full', 'effect', 'std_err', 'n_noncar_affected', 'n_noncar_unaffected', 'n_car_affected',
+                       'n_car_unaffected']
     if tarball_type == TarballType.GENOMEWIDE:
         expected_fields[1:1] = ['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
-                                           'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']
+                                'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']
 
-    if is_binary:
-        expected_fields.extend(['n_noncar_affected', 'n_noncar_unaffected', 'n_car_affected', 'n_car_unaffected'])
-
-    output_files = process_linear_model_outputs(final_models, tmp_path / tarball_name, tarball_type,
-                                                transcripts_table, is_binary=False)
+    output_files = process_model_outputs(final_models, tmp_path / f'{tarball_name}.genes.glm.stats.tsv', tarball_type, transcripts_table)
 
     if tarball_type == TarballType.GENOMEWIDE:
         assert output_files == [tmp_path / f'{tarball_name}.genes.glm.stats.tsv.gz',
