@@ -1,13 +1,10 @@
 import csv
-import gzip
 import shutil
-from math import isnan
-
-import pandas as pd
 import pytest
+import pandas as pd
 
+from math import isnan
 from pathlib import Path
-
 from scipy.io import mmwrite
 
 from bgen_utilities.genotype_matrix import generate_csr_matrix_from_bgen
@@ -100,6 +97,7 @@ def transcripts_table() -> pd.DataFrame:
     return build_transcript_table(transcripts_path, False)
 
 def test_staar_null(tmp_path, phenofile):
+    """Tests the creation of a STAAR null model using a sparse kinship matrix and covariates."""
 
     # Make sure the Docker image can see tmp_path via mounting
     mounts = [DockerMount(tmp_path, Path('/test/'))]
@@ -130,6 +128,7 @@ def test_staar_null(tmp_path, phenofile):
                              (linear_model_test_data_dir / 'expt_genes.PTV.tsv',)
                          ), indirect=['unpacked_tarball'])
 def test_load_staar(tmp_path, unpacked_tarball, expected_genes_path: Path):
+    """Tests loading the genetic data from a STAAR tarball and compares to expected genes."""
 
     variant_infos = load_staar_genetic_data(str(unpacked_tarball))
 
@@ -149,6 +148,10 @@ def test_load_staar(tmp_path, unpacked_tarball, expected_genes_path: Path):
 
 @pytest.mark.parametrize('unpacked_tarball', ('HC_PTV-MAF_001',), indirect=['unpacked_tarball'])
 def test_staar_genes_genomewide(tmp_path, phenofile, transcripts_table, unpacked_tarball):
+    """Tests running STAAR on a genomewide tarball.
+
+    We test SNP / GENE masks in a separate function as the inputs and required checks are very different.
+    """
 
     # Make sure the Docker image can see tmp_path via mounting
     mounts = [DockerMount(tmp_path, Path('/test/'))]
@@ -257,6 +260,7 @@ def test_staar_genes_genomewide(tmp_path, phenofile, transcripts_table, unpacked
                              (TarballType.GENE, TarballType.SNP)
                          ), indirect=['unpacked_tarball'])
 def test_staar_genes_gene_or_snp(tmp_path, phenofile, transcripts_table, unpacked_tarball, tarball_type):
+    """Tests running STAAR on a gene or SNP tarball."""
 
     # Make sure the Docker image can see tmp_path via mounting
     mounts = [DockerMount(tmp_path, Path('/test/'))]
