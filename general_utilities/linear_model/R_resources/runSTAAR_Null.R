@@ -9,15 +9,19 @@ library(data.table)
 # 1. [1] Filtered covariates + phenotypes file
 # 2. [2] Phenotype name. Must be identical to some column in [1]
 # 3. [3] Boolean flag for if our phenotype is binary
-# 4. [4] Additional quantitative covariates
-# 5. [5] Additional categorical covariates
+# 4. [4] Sparse kinship matrix file
+# 5. [5] Sparse kinship sample IDs file
+# 6. [6] Additional quantitative covariates
+# 7. [7] Additional categorical covariates
 
-args = commandArgs(trailingOnly = T)
-covariates_file = args[1]
-pheno_name = args[2]
-is_binary = as.logical(args[3])
-quant_covars = args[4]
-cat_covars = args[5]
+args <- commandArgs(trailingOnly = T)
+covariates_file <- args[1]
+pheno_name <- args[2]
+is_binary <- as.logical(args[3])
+sparse_kinship_file <- args[4]
+sparse_kinship_samples_file <- args[5]
+quant_covars <- args[6]
+cat_covars <- args[7]
 
 # Load covariates:
 data_for_STAAR <- fread(covariates_file)
@@ -47,8 +51,8 @@ if (cat_covars != "NULL") {
 }
 
 # Load GRM:
-sparse_kinship <- readMM("/test/genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx")
-sparse_kinship_samples <- fread("/test/genetics/sparseGRM_470K_Autosomes_QCd.sparseGRM.mtx.sampleIDs.txt")
+sparse_kinship <- readMM(sparse_kinship_file)
+sparse_kinship_samples <- fread(sparse_kinship_samples_file)
 rownames(sparse_kinship) <- as.character(sparse_kinship_samples[,V1])
 colnames(sparse_kinship) <- as.character(sparse_kinship_samples[,V1])
 
@@ -83,12 +87,14 @@ if (length(sparse_kinship@x[sparse_kinship@x < 0.5]) == 0) {
       obj_nullmodel <- list('zero_cases' = TRUE)
     } else {
       obj_nullmodel <- fit_null_glm(formated.formula, data=data_for_STAAR, family="binomial")
+      obj_nullmodel$zero_cases <- FALSE
     }
   } else {
     obj_nullmodel <- fit_null_glm(formated.formula, data=data_for_STAAR, family="gaussian")
+    obj_nullmodel$zero_cases <- FALSE
   }
-  obj_nullmodel$id_include = sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
-  obj_nullmodel$corrected_for_relateds = FALSE
+  obj_nullmodel$id_include <- sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
+  obj_nullmodel$corrected_for_relateds <- FALSE
 } else {
   cat("Related samples found, using LMM to fit STAAR null")
   if (is_binary) {
@@ -101,17 +107,18 @@ if (length(sparse_kinship@x[sparse_kinship@x < 0.5]) == 0) {
           obj_nullmodel
         } else {
           obj_nullmodel <- fit_null_glmmkin(formated.formula, data=data_for_STAAR, id="FID", family=binomial(link="logit"), kins = sparse_kinship)
-          obj_nullmodel$corrected_for_relateds = TRUE
-          obj_nullmodel$zero_cases = FALSE
+          obj_nullmodel$id_include <- sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
+          obj_nullmodel$corrected_for_relateds <- TRUE
+          obj_nullmodel$zero_cases <- FALSE
           obj_nullmodel
         }
         },
       error=function(cond) {
         cat(paste0("STAAR model failed for phenotype ", pheno_name, ". Trying model uncorrected for relatedness..."))
         obj_nullmodel <- fit_null_glm(formated.formula, data=data_for_STAAR, family="binomial")
-        obj_nullmodel$id_include = sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
-        obj_nullmodel$corrected_for_relateds = FALSE
-        obj_nullmodel$zero_cases = FALSE
+        obj_nullmodel$id_include <- sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
+        obj_nullmodel$corrected_for_relateds <- FALSE
+        obj_nullmodel$zero_cases <- FALSE
         obj_nullmodel
         }
       )
@@ -119,16 +126,17 @@ if (length(sparse_kinship@x[sparse_kinship@x < 0.5]) == 0) {
     obj_nullmodel <- tryCatch(
       {
         obj_nullmodel <- fit_null_glmmkin(formated.formula, data=data_for_STAAR, id="FID", family=gaussian(link="identity"), kins = sparse_kinship)
-        obj_nullmodel$corrected_for_relateds = TRUE
-        obj_nullmodel$zero_cases = FALSE
+        obj_nullmodel$id_include <- sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
+        obj_nullmodel$corrected_for_relateds <- TRUE
+        obj_nullmodel$zero_cases <- FALSE
         obj_nullmodel
       },
       error=function(cond) {
         cat(paste0("STAAR model failed for phenotype ", pheno_name, ". Trying model uncorrected for relatedness..."))
         obj_nullmodel <- fit_null_glm(formated.formula, data=data_for_STAAR, family="gaussian")
-        obj_nullmodel$id_include = sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
-        obj_nullmodel$corrected_for_relateds = FALSE
-        obj_nullmodel$zero_cases = FALSE
+        obj_nullmodel$id_include <- sparse_kinship@Dimnames[[1]] # This adds a variable to this S3 object make it easier to keep the same samples regardless of model type
+        obj_nullmodel$corrected_for_relateds <- FALSE
+        obj_nullmodel$zero_cases <- FALSE
         obj_nullmodel
         }
     )
