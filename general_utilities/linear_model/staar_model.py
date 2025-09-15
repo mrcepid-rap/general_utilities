@@ -1,23 +1,18 @@
-import csv
-import dataclasses
 import json
 import os
 import re
-from dataclasses import dataclass
+import pandas as pd
+
 from pathlib import Path
 from typing import List, Dict
-
-import pandas as pd
-import pysam
+from dataclasses import dataclass
 from importlib_resources import files
 
-from bgen_utilities.genotype_matrix import GeneInformation
-from general_utilities.association_resources import replace_multi_suffix, define_field_names_from_pandas, \
-    bgzip_and_tabix
+from general_utilities.bgen_utilities.genotype_matrix import GeneInformation
+from general_utilities.association_resources import replace_multi_suffix
 from general_utilities.bgen_utilities.genotype_matrix import make_variant_list
 from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
 from general_utilities.job_management.command_executor import CommandExecutor
-from general_utilities.import_utils.import_lib import TarballType
 
 
 @dataclass

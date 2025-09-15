@@ -7,10 +7,10 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Union
 
-from general_utilities.association_resources import define_field_names_from_pandas, bgzip_and_tabix
 from general_utilities.import_utils.import_lib import TarballType
-from general_utilities.linear_model.linear_model import LinearModelResult
 from general_utilities.linear_model.staar_model import STAARModelResult
+from general_utilities.linear_model.linear_model import LinearModelResult
+from general_utilities.association_resources import define_field_names_from_pandas, bgzip_and_tabix
 
 def process_model_outputs(input_models: Union[List[STAARModelResult], List[LinearModelResult]], output_path: Path,
                           tarball_type: TarballType, transcripts_table: pd.DataFrame) -> List[Path]:

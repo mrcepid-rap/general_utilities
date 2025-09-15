@@ -1,13 +1,13 @@
 import csv
 import re
+import dxpy
 import tarfile
 from enum import Enum
 from pathlib import Path
 from typing import Dict, TypedDict, Optional, Union, List, Tuple
 
-import dxpy
-from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.mrc_logger import MRCLogger
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 
 LOGGER = MRCLogger().get_logger()
 

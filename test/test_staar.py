@@ -7,7 +7,7 @@ from math import isnan
 from pathlib import Path
 from scipy.io import mmwrite
 
-from bgen_utilities.genotype_matrix import generate_csr_matrix_from_bgen
+from general_utilities.bgen_utilities.genotype_matrix import generate_csr_matrix_from_bgen
 from general_utilities.association_resources import build_transcript_table
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.import_utils.import_lib import BGENInformation
