@@ -1,151 +1,84 @@
-import os
 import csv
 import dxpy
+import pysam
+import dataclasses
 import pandas as pd
 
-from typing import List
 from pathlib import Path
+from typing import List, Union
 
-from general_utilities.association_resources import build_transcript_table, define_field_names_from_pandas, \
-    bgzip_and_tabix
+from general_utilities.import_utils.import_lib import TarballType
+from general_utilities.linear_model.staar_model import STAARModelResult
+from general_utilities.linear_model.linear_model import LinearModelResult
+from general_utilities.association_resources import define_field_names_from_pandas, bgzip_and_tabix
 
+def process_model_outputs(input_models: Union[List[STAARModelResult], List[LinearModelResult]], output_path: Path,
+                          tarball_type: TarballType, transcripts_table: pd.DataFrame) -> List[Path]:
+    """Process a list of model results into a single output file.
 
-def process_linear_model_outputs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False,
-                                 gene_infos: list = None) -> List[Path]:
+    The 'model results' can currently come from either linear or STAAR models; We have not implemented an Interface for
+    to harmonise between these two dataclasses, so additional models would need to conform to a rough specification that
+    currently includes only 'mask_name' and 'ENST' fields.
 
-    if gene_infos is not None:
-        valid_genes = []
-        for gene_info in gene_infos:
-            valid_genes.append(gene_info.name)
-    else:
-        valid_genes = None
+    :param input_models: A list of model results, either STAARModelResult or LinearModelResult
+    :param output_path: The path to write the output file to (before bgzip/tabix)
+    :param tarball_type: The type of tarball being processed (TarballType Enum)
+    :param transcripts_table: A pandas DataFrame containing transcript information.
+    :returns: A list with a bgzipped output file of associations at output list index [0]. If TarballType is TarballType.GENOMEWIDE,
+        will also sort and provide a tabix index and list index [1].
+    """
 
-    tmp_output = Path(f'{output_prefix}.lm_stats.tmp')
     outputs = []
+    with output_path.open('w') as output_writer:
 
-    if is_snp_tar:
-        snp_output = Path(f'{output_prefix}.SNP.glm.stats.tsv')
-        tmp_output.rename(snp_output)
-        outputs.append(snp_output)
-    elif is_gene_tar:
-        gene_output = Path(f'{output_prefix}.GENE.glm.stats.tsv')
-        tmp_output.rename(gene_output)
-        outputs.append(gene_output)
-    else:
-        # read in the GLM stats file:
-        glm_table = pd.read_csv(tmp_output, sep="\t")
+        # Determine table fieldnames
+        fieldnames = []
 
-        # Now process the gene table into a useable format:
-        # First read in the transcripts file
-        transcripts_table = build_transcript_table()
+        # Add gene information, if genomewide mask
+        if tarball_type == TarballType.GENOMEWIDE:
+            fieldnames.append('ENST')
+            fieldnames.extend(transcripts_table.columns)
 
-        # Limit to genes we care about if running only a subset:
-        if valid_genes is not None:
-            transcripts_table = transcripts_table.loc[valid_genes]
+        # Build the fieldnames programmatically from available data
+        model_fieldnames = [linear_field.name for linear_field in dataclasses.fields(type(input_models[0]))]
+        if tarball_type == TarballType.GENOMEWIDE:
+            model_fieldnames.remove('ENST')  # Remove ENST as we add it above if genomewide
+        fieldnames.extend(model_fieldnames)
+        mask_maf_fields = define_field_names_from_pandas(input_models[0].mask_name)
+        fieldnames[fieldnames.index('mask_name'):fieldnames.index('mask_name')] = mask_maf_fields
+        fieldnames.pop(fieldnames.index('mask_name'))
 
-        # Test what columns we have in the 'SNP' field so we can name them...
-        field_one = glm_table.iloc[0]
-        field_one = field_one['maskname'].split("-")
-        field_names = []
-        if len(field_one) == 2:  # This could be the standard naming format... check that column [1] is MAF/AC
-            if 'MAF' in field_one[1] or 'AC' in field_one[1]:
-                field_names.extend(['MASK', 'MAF'])
-            else:  # This means we didn't hit on MAF/AC in column [2] and a different naming convention is used...
-                field_names.extend(['var1', 'var2'])
-        else:
-            for i in range(2, len(field_one) + 1):
-                field_names.append('var%i' % i)
+        # Note: We append to a list and then write to the file at once so that we can sort. This should never
+        # result in too much in memory as the number of genes is relatively small
+        gene_rows = []
+        for model in input_models:
+            mask_maf_columns = (dict(zip(mask_maf_fields, model.mask_name.split('-'))))
 
-        # Process the 'SNP' column into separate fields and remove
-        glm_table[field_names] = glm_table['maskname'].str.split("-", expand=True)
-        glm_table = glm_table.drop(columns=['maskname'])
+            model_dict = dataclasses.asdict(model)
+            model_dict.update(mask_maf_columns)
+            gene_info = transcripts_table.loc[model.ENST].to_dict() if tarball_type == TarballType.GENOMEWIDE else {}
+            model_dict.update(gene_info)
 
-        # Now merge the transcripts table into the gene table to add annotation and write
-        glm_table = pd.merge(transcripts_table, glm_table, on='ENST', how="left")
+            gene_rows.append(model_dict)
 
-        # Sort just in case
-        glm_table = glm_table.sort_values(by=['chrom', 'start', 'end'])
-
-        glm_tsv = Path(f'{output_prefix}.genes.glm.stats.tsv')
-        with glm_tsv.open('w') as glm_out:
-            glm_table.to_csv(path_or_buf=glm_out, index=False, sep="\t", na_rep='NA')
-
-        outputs.extend(bgzip_and_tabix(glm_tsv, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
-
-    return outputs
-
-
-# Helper method to just write STAAR outputs from the 'process_staar_outputs' function below
-def write_staar_csv(file_path: Path, completed_staar_files: List[str]) -> Path:
-    with file_path.open('w') as staar_output:
-        output_csv = csv.DictWriter(staar_output,
-                                    delimiter="\t",
-                                    fieldnames=['SNP', 'n.samps', 'pheno_name', 'relatedness.correction',
-                                                'staar.O.p', 'staar.SKAT.p', 'staar.burden.p',
-                                                'staar.ACAT.p', 'n_var', 'cMAC'])
+        output_csv = csv.DictWriter(output_writer, delimiter='\t', fieldnames=fieldnames, extrasaction='ignore')
         output_csv.writeheader()
-        for file in completed_staar_files:
-            with open(file, 'r') as curr_file_reader:
-                curr_file_csv = csv.DictReader(curr_file_reader, delimiter="\t")
-                for gene in curr_file_csv:
-                    output_csv.writerow(gene)
-            curr_file_reader.close()
-        staar_output.close()
 
-    return file_path
+        # Sort if we are dealing with a genomewide mask
+        if tarball_type == TarballType.GENOMEWIDE:
+            # Sort by chromosome, start, and end for genomewide masks
+            gene_rows = sorted(gene_rows, key=lambda row: (row['chrom'], row['start']))
 
+        output_csv.writerows(gene_rows)
 
-# Process STAAR output files
-def process_staar_outputs(completed_staar_files: List[str], output_prefix: str, is_snp_tar: bool = False,
-                          is_gene_tar: bool = False, gene_infos: list = None) -> List[Path]:
-
-    if is_gene_tar or is_snp_tar:
-        if is_gene_tar:
-            prefix = 'GENE'
-        elif is_snp_tar:
-            prefix = 'SNP'
-        else:
-            raise dxpy.AppError('Somehow output is neither GENE or SNP from STAAR!')
-
-        outputs = [write_staar_csv(Path(f'{output_prefix}.{prefix}.STAAR.stats.tsv'), completed_staar_files)]
-
+    if tarball_type == TarballType.GENOMEWIDE:
+        outputs.extend(bgzip_and_tabix(output_path, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
     else:
-        # Here we are concatenating a temp file of each tsv from completed_staar_files:
-        temp_path = write_staar_csv(Path(f'{output_prefix}.genes.STAAR.stats.temp'), completed_staar_files)
-
-        # Now read in the concatenated STAAR stats file:
-        staar_table = pd.read_csv(temp_path, sep="\t")
-
-        # Now process the gene table into a useable format:
-        # First read in the transcripts file
-        transcripts_table = build_transcript_table()
-
-        # Limit to genes we care about if running only a subset:
-        if gene_infos is not None:
-            valid_genes = []
-            for gene_info in gene_infos:
-                valid_genes.append(gene_info.name)
-            transcripts_table = transcripts_table.loc[valid_genes]
-
-        # Test what columns we have in the 'SNP' field so we can name them...
-        field_names = define_field_names_from_pandas(staar_table.iloc[0])
-        staar_table[field_names] = staar_table['SNP'].str.split("-", expand=True)
-        staar_table = staar_table.drop(columns=['SNP'])  # And drop the SNP column now that we have processed it
-
-        # Now merge the transcripts table into the gene table to add annotation and the write
-        staar_table = pd.merge(transcripts_table, staar_table, on='ENST', how="left")
-        staar_tsv = Path(f'{output_prefix}.genes.STAAR.stats.tsv')
-        with staar_tsv.open('w') as gene_out:
-
-            # Sort just in case
-            staar_table = staar_table.sort_values(by=['chrom', 'start', 'end'])
-            staar_table.to_csv(path_or_buf=gene_out, index=False, sep="\t", na_rep='NA')
-
-            # And bgzip and tabix...
-        outputs = list(bgzip_and_tabix(staar_tsv, skip_row=1, sequence_row=2, begin_row=3, end_row=4))
+        output_compressed = output_path.with_suffix('.tsv.gz')
+        pysam.tabix_compress(str(output_path.absolute()), str(output_compressed))
+        outputs.append(output_compressed)
 
     return outputs
-
 
 def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False) -> List[Path]:
 
