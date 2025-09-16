@@ -60,12 +60,8 @@ class Plotter(ABC):
 
         options = [f'{opt}' for opt in options]  # have to convert all opts to strings
         options = " ".join(options)
-        plot_cmd = f'Rscript /scripts/{r_script.name} {options}'
+        plot_cmd = f'Rscript {r_script} {options}'
 
-        # If editing in pycharm, the .parent parameter does exist, so ignore the error
-        script_mount = DockerMount(r_script.parent,
-                                   Path('/scripts/'))
-
-        self._cmd_executor.run_cmd_on_docker(plot_cmd, docker_mounts=[script_mount])
+        self._cmd_executor.run_cmd_on_docker(plot_cmd)
 
         return out_path

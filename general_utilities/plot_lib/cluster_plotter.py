@@ -95,7 +95,7 @@ class ClusterPlotter(Plotter, ABC):
             header = [self._chrom_column, self._pos_column, self._pos_column, self._id_column]
             candidate_vars[header].to_csv(bed_out, sep='\t', index=False, header=False, float_format='%0.0f')
 
-            bed_cmd = f'bedtools cluster -i /test/{bed_out} -d {self._clumping_distance} > {bed_in}'
+            bed_cmd = f'bedtools cluster -i {bed_out} -d {self._clumping_distance} > {bed_in}'
             self._cmd_executor.run_cmd_on_docker(bed_cmd)
 
             clustered = pd.read_csv(bed_in, names=['CHROM', 'GENPOS', 'GENPOS2', self._id_column, 'CLUSTER'], sep='\t')

@@ -37,7 +37,7 @@ class IngestData(ABC):
 
         # Work our way through all the resources we need
         # Gene transcript dictionary
-        self._ingest_transcript_index(parsed_options.transcript_index)
+        transcript_index = self._ingest_transcript_index(parsed_options.transcript_index)
 
         # Phenotype files
         phenotypes = self._ingest_phenofile(parsed_options.phenofile, parsed_options.phenoname)
@@ -86,6 +86,7 @@ class IngestData(ABC):
                                                  final_covariates=final_covariates,
                                                  inclusion_samples=inclusion_samples,
                                                  exclusion_samples=exclusion_samples,
+                                                 transcript_index=transcript_index
                                                  )
     def get_association_pack(self) -> AssociationPack:
         """Getter for self._association_pack
@@ -114,16 +115,17 @@ class IngestData(ABC):
         return threads
 
     @staticmethod
-    def _ingest_transcript_index(transcript_index: InputFileHandler) -> None:
+    def _ingest_transcript_index(transcript_index: InputFileHandler) -> Path:
         """Get transcripts for gene annotation
 
         The provided file with always be placed at `$HOME/transcripts.tsv.gz`.
 
         :param transcript_index: A transcript index in .tsv format. For more information on the structure of the file,
             see the README.
-        :return: None
+        :return: Path to the transcript index file
         """
-        transcript_index.get_file_handle()
+        transcript_index = transcript_index.get_file_handle()
+        return transcript_index
 
     def _ingest_phenofile(self, pheno_files: List[InputFileHandler], pheno_name: str) -> Dict[str, Dict[str, Any]]:
         """Download provided phenotype files and attempt to retrieve phenotypes from these file(s)

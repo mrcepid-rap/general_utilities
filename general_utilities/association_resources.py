@@ -167,8 +167,8 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
 
     # And filter the relevant SAIGE file to just the individuals we want so we can get actual MAC
     cmd_executor = build_default_command_executor()
-    cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.bcf.txt -Ob -o /test/' \
-          f'{tarball_prefix}.{file_prefix}.saige_input.bcf /test/' \
+    cmd = f'bcftools view --threads 4 -S SAMPLES_Include.bcf.txt -Ob -o ' \
+          f'{tarball_prefix}.{file_prefix}.saige_input.bcf ' \
           f'{tarball_prefix}.{file_prefix}.SAIGE.bcf'
     cmd_executor.run_cmd_on_docker(cmd)
 
