@@ -4,8 +4,8 @@ from typing import List, Any
 
 from importlib_resources.abc import Traversable
 
+from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.mrc_logger import MRCLogger
-from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
 
 
 class Plotter(ABC):
@@ -22,7 +22,6 @@ class Plotter(ABC):
     """
 
     def __init__(self, cmd_executor: CommandExecutor):
-
         self._logger = MRCLogger(__name__).get_logger()
         self._cmd_executor = cmd_executor
 

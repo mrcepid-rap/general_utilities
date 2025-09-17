@@ -2,7 +2,7 @@ import csv
 import os
 from abc import ABC
 from pathlib import Path
-from typing import Set, Tuple, List, Any, Dict, Union
+from typing import Set, Tuple, List, Any, Dict
 
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
@@ -45,7 +45,7 @@ class IngestData(ABC):
 
         # Base and Additional covariates
         base_covariates_file, additional_covariates_file = self._ingest_covariates(parsed_options.base_covariates,
-                                                                                    parsed_options.covarfile)
+                                                                                   parsed_options.covarfile)
 
         # Sample inclusion / exclusion lists
         inclusion_filepath, exclusion_filepath = self._define_exclusion_lists(parsed_options.inclusion_list,
@@ -88,6 +88,7 @@ class IngestData(ABC):
                                                  exclusion_samples=exclusion_samples,
                                                  transcript_index=transcript_index
                                                  )
+
     def get_association_pack(self) -> AssociationPack:
         """Getter for self._association_pack
 
@@ -246,7 +247,8 @@ class IngestData(ABC):
         return base_covariates, additional_covariates
 
     @staticmethod
-    def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[Path, Path]:
+    def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[
+        Path, Path]:
         """Get inclusion/exclusion sample lists
 
         If provided, inclusion and exclusion lists will be downloaded to `$HOME/INCLUSION.lst` and
