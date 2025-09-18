@@ -118,9 +118,7 @@ class ThreadUtility(JobLauncherInterface):
 
         self._queue_closed = True
 
-        self._logger.info("{0:65}: {val}".format(
-            "Total number of threads to iterate through", val=self._total_jobs
-        ))
+        self._logger.info(f'{"Total number of threads to iterate through":{65}}: {self._total_jobs}')
 
         futures_list = []
         # Submit each job in the queue to the executor
