@@ -139,7 +139,7 @@ class ThreadUtility(JobLauncherInterface):
             self._print_status()
 
     @staticmethod
-    def _run_requested_function(function: Callable, inputs: Optional[Dict[str, Any]], outputs: Optional[List]) -> Dict[str, Any]:
+    def _run_requested_function(function: Callable, inputs: Optional[Dict[str, Any]], outputs: Optional[List]) -> Optional[Dict[str, Any]]:
         """Helper class that wraps the requested function and formats the output, when complete, as a dictionary.
 
         This method will run the requested function and then, using 'outputs' as a guide, will format the output
@@ -149,7 +149,8 @@ class ThreadUtility(JobLauncherInterface):
         :param function: The function to be executed in the thread.
         :param inputs: A dictionary of input parameters to be passed to the function.
         :param outputs: A named dictionary of output parameters from the function being run
-        :returns: A dictionary of outputs, labelled by the names provided in the outputs parameter.
+        :returns: A dictionary of outputs, labelled by the names provided in the outputs parameter. If outputs is None,
+            then None is returned to match expected output from the function.
         """
 
         function_outputs = function(**inputs)
@@ -161,7 +162,12 @@ class ThreadUtility(JobLauncherInterface):
         for n, output_label in enumerate(outputs):
             return_dict[output_label] = function_outputs[n]
 
-        return return_dict
+        if outputs is None and len(function_outputs) != 0:
+            raise ValueError('Function returned output, but no output labels were provided!')
+        elif outputs is not None and len(function_outputs) != len(outputs):
+            raise ValueError('Function returned a different number of outputs than the number of output labels provided!')
+
+        return None if outputs is None else return_dict
 
     def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:
         """
