@@ -1,15 +1,52 @@
-import math
 import os
+import math
+import dxpy
+
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, Optional, List
-
-import dxpy
 
 from general_utilities.job_management.joblauncher_interface import JobLauncherInterface, JobInfo
 
 
 class ThreadUtility(JobLauncherInterface):
+    """Class for managing the execution of functions using a ThreadPoolExecutor.
+
+    This class implements the JobLauncherInterface and provides methods to launch jobs. Briefly, a worked example of
+    how to use this class is as follows::
+
+        # Dummy test method for submission:
+        def test_method(input_str: str, input_int: int, input_bool: bool) -> Tuple[str, int, bool]:
+            my_str = input_str
+            my_int = input_int
+            my_bool = input_bool
+            return my_str, my_int, my_bool
+
+        # Construct ThreadUtility
+        thread_utility = ThreadUtility(threads=8, thread_factor=1, incrementor=1)
+
+        # Submit a job to ThreadUtility, but does not run it yet:
+        thread_utility.launch_job(test_method,
+            inputs={'input_str':'Hello', 'input_int':42, 'input_bool':True},
+            outputs=['output_str', 'output_int', 'output_bool'])
+
+        # Submit all queued jobs to the ThreadPoolExecutor and monitor their execution:
+        thread_utility.submit_and_monitor()
+
+        # Retrieve the results of the completed jobs. These outputs will be formatted as a dictionary based on the 'outputs'
+        # parameter provided using :func:`launch_job`.
+        for result in thread_utility:
+            print(result)
+            # For the above, will print: {'output_str': 'Hello', 'output_int': 42, 'output_bool': True}
+
+    If trying to decide on additional VM resources rather than threads, it may be preferred to use the joblauncher_factory
+    method provided in :func:`general_utilities.job_management.joblauncher_factory` to decide between using SubjobUtility
+    (for recruitment of additional machines) or ThreadUtility (for local jobs).
+
+    :param incrementor: The incrementor for job submission, default is 500.
+    :param threads: The number of threads available on the machine. If None, will use os.cpu_count().
+    :param thread_factor: The number of threads required per job in this thread pool, default is 1.
+    """
 
     def __init__(self,
                  incrementor: int = 500,
@@ -114,7 +151,6 @@ class ThreadUtility(JobLauncherInterface):
         :param outputs: A named dictionary of output parameters from the function being run
         :returns: A dictionary of outputs, labelled by the names provided in the outputs parameter.
         """
-
 
         function_outputs = function(**inputs)
         if not isinstance(function_outputs, tuple):
