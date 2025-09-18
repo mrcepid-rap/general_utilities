@@ -139,7 +139,7 @@ class ThreadUtility(JobLauncherInterface):
             self._print_status()
 
     @staticmethod
-    def _run_requested_function(function: Callable, inputs: Optional[Dict[str, Any]], outputs: Optional[List]) -> Optional[Dict[str, Any]]:
+    def _run_requested_function(function: Callable, inputs: Optional[Dict[str, Any]], outputs: List[str]) -> Optional[Dict[str, Any]]:
         """Helper class that wraps the requested function and formats the output, when complete, as a dictionary.
 
         This method will run the requested function and then, using 'outputs' as a guide, will format the output
@@ -154,20 +154,23 @@ class ThreadUtility(JobLauncherInterface):
         """
 
         function_outputs = function(**inputs)
-        if not isinstance(function_outputs, tuple):
-            function_outputs = tuple([function_outputs])
+        if len(outputs) == 0:
+            return_dict = None
 
-        return_dict = {}
+        else:
+            if not isinstance(function_outputs, tuple):
+                function_outputs = tuple([function_outputs])
 
-        for n, output_label in enumerate(outputs):
-            return_dict[output_label] = function_outputs[n]
+            return_dict = {}
 
-        if outputs is None and len(function_outputs) != 0:
-            raise ValueError('Function returned output, but no output labels were provided!')
-        elif outputs is not None and len(function_outputs) != len(outputs):
-            raise ValueError('Function returned a different number of outputs than the number of output labels provided!')
+            for n, output_label in enumerate(outputs):
+                return_dict[output_label] = function_outputs[n]
 
-        return None if outputs is None else return_dict
+            # Check for obvious errors with returns
+            if len(function_outputs) != len(outputs):
+                raise ValueError('Function returned a different number of outputs than the number of output labels provided!')
+
+        return return_dict
 
     def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:
         """
