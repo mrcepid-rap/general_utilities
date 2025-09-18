@@ -2,7 +2,7 @@ import math
 import os
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional, List
 
 import dxpy
 
@@ -24,10 +24,23 @@ class ThreadUtility(JobLauncherInterface):
     def launch_job(self,
                    function: Callable,
                    inputs: Optional[Dict[str, Any]] = None,
-                   outputs=None,
+                   outputs: Optional[List[str]] = None,
                    **kwargs) -> None:
         """
         Queue a job for later submission, harmonized with SubjobUtility.
+
+        This method will run the requested function and then, using 'outputs' as a guide, will format the output
+        as a dictionary. For example, given a function that returns two values, if outputs = ['output1', 'output2'],
+        the returned dictionary will be {'output1': value1, 'output2': value2}. Note that Tuple returns will be
+        treated as separate objects, while List and Dict returns will be treated as single objects. For example,
+
+        Given a return type of List[Any]:
+
+        with outputs = ['output_list'], the returned dictionary will be {'output_list': [val1, val2, ...]}.
+
+        Given a return type of Tuple[List, List]:
+
+        with outputs = ['output1', 'output2'], the returned dictionary will be {'output1': list1, 'output2': list2}.
 
         :param function: The function to be executed in the thread.
         :param inputs: A dictionary of input parameters to be passed to the function.
@@ -75,10 +88,9 @@ class ThreadUtility(JobLauncherInterface):
         futures_list = []
         # Submit each job in the queue to the executor
         for job in self._job_queue:
-            inputs = job['input']
-            function = job['function']
+
             # Submit the job to the executor
-            submission = self._executor.submit(function, **inputs)
+            submission = self._executor.submit(self._run_requested_function, job['function'], job['input'], job['outputs'])
             # Append the future object to the futures list
             futures_list.append(submission)
 
@@ -88,6 +100,32 @@ class ThreadUtility(JobLauncherInterface):
             self._output_array.append(output.result())
             self._num_completed_jobs += 1
             self._print_status()
+
+    @staticmethod
+    def _run_requested_function(function: Callable, inputs: Optional[Dict[str, Any]], outputs: Optional[List]) -> Dict[str, Any]:
+        """Helper class that wraps the requested function and formats the output, when complete, as a dictionary.
+
+        This method will run the requested function and then, using 'outputs' as a guide, will format the output
+        as a dictionary. For example, given a function that returns two values, if outputs = ['output1', 'output2'],
+        the returned dictionary will be {'output1': value1, 'output2': value2}.
+
+        :param function: The function to be executed in the thread.
+        :param inputs: A dictionary of input parameters to be passed to the function.
+        :param outputs: A named dictionary of output parameters from the function being run
+        :returns: A dictionary of outputs, labelled by the names provided in the outputs parameter.
+        """
+
+
+        function_outputs = function(**inputs)
+        if not isinstance(function_outputs, tuple):
+            function_outputs = tuple([function_outputs])
+
+        return_dict = {}
+
+        for n, output_label in enumerate(outputs):
+            return_dict[output_label] = function_outputs[n]
+
+        return return_dict
 
     def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:
         """
