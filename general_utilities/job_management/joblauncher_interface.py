@@ -64,10 +64,10 @@ class JobLauncherInterface(ABC):
         if math.remainder(self._num_completed_jobs, self._incrementor) == 0 or \
                 self._num_completed_jobs == self._total_jobs:
             self._logger.info(
-                f'{"Total number of jobs finished":{50}}: {self._num_completed_jobs} / {self._total_jobs} '
+                f'{"Total number of jobs finished":{65}}: {self._num_completed_jobs} / {self._total_jobs} '
                 f'({((self._num_completed_jobs / self._total_jobs) * 100):0.2f}%)'
             )
-            self._logger.info(f'{"Jobs currently running":{65}}: {self._total_jobs} / {self._num_completed_jobs}')
+            self._logger.info(f'{"Jobs currently running":{65}}: {self._total_jobs - self._num_completed_jobs}')
 
     def __len__(self) -> int:
         """Returns the number of outputs currently in the output queue
