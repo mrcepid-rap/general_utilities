@@ -298,6 +298,9 @@ class SubjobUtility(JobLauncherInterface):
 
         self._logger.info(f'{"Total number of jobs to iterate through":{65}}: {self._total_jobs}')
 
+        # submit and monitor jobs
+        self._monitor_subjobs()
+
         if len(self._job_failed) > 0:
             self._logger.info('All jobs completed, printing failed jobs...')
             for failed_job in self._job_failed:
