@@ -298,33 +298,13 @@ class SubjobUtility(JobLauncherInterface):
 
         self._logger.info(f'{"Total number of jobs to iterate through":{65}}: {self._total_jobs}')
 
-        # If nothing was queued, say so explicitly
-        if self._total_jobs == 0:
-            self._logger.warning("No sub-jobs were queued. Nothing to submit.")
-            return
+        # submit and monitor jobs
+        self._monitor_subjobs()
 
-        # Keep going until both the queue is empty and no jobs are running
-        from time import sleep, time
-        last_time = time()
-        last_log_time = 0
+        # monitor running jobs until all are finished
+        while len(self._job_running) > 0:
+            self._monitor_submitted()
 
-        while len(self._job_queue) > 0 or len(self._job_running) > 0:
-            # Periodic status log (optional)
-            current_time = time()
-            last_log_time += current_time - last_time
-            last_time = current_time
-            if last_log_time >= 60:
-                last_log_time = 0
-                self._print_status()
-
-            # Submit as many as allowed, and harvest statuses
-            self._monitor_subjobs()
-
-            # If anything is still running, poll again shortly
-            if len(self._job_running) > 0:
-                sleep(30)
-
-        # Final report
         if len(self._job_failed) > 0:
             self._logger.info('All jobs completed, printing failed jobs...')
             for failed_job in self._job_failed:
