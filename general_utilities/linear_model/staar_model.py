@@ -11,7 +11,7 @@ from importlib_resources import files
 from general_utilities.bgen_utilities.genotype_matrix import GeneInformation
 from general_utilities.association_resources import replace_multi_suffix
 from general_utilities.bgen_utilities.genotype_matrix import make_variant_list
-from general_utilities.job_management.command_executor import DockerMount, build_default_command_executor
+from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.job_management.command_executor import CommandExecutor
 
 
@@ -90,17 +90,14 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
 
     r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Null.R')
 
-    script_mount = DockerMount(r_script.parent,
-                               Path('/scripts/'))
-
     # This script then generates an RDS output file containing the NULL model
     # See the README.md for more information on these parameters
-    cmd = f'Rscript /scripts/{r_script.name} ' \
-          f'/test/{phenofile.name} ' \
+    cmd = f'Rscript {r_script} ' \
+          f'{phenofile} ' \
           f'{phenotype} ' \
           f'{is_binary} ' \
-          f'/test/{sparse_kinship_file.name} ' \
-          f'/test/{sparse_kinship_samples.name} '
+          f'{sparse_kinship_file} ' \
+          f'{sparse_kinship_samples} '
 
     # Set covariates for the model
     if ignore_base:
@@ -199,20 +196,17 @@ def staar_genes(staar_null_path: Path, pheno_name: str, gene: str, mask_name: st
     # as part of the general_utilities package. We can extract the system location of this script:
     r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Genes.R')
 
-    script_mount = DockerMount(r_script.parent,
-                               Path('/scripts/'))
-
     output_path = out_dir / f'{gene}.{pheno_name}.STAAR_results.json'
 
     # This generates a text output file of p.values
     # See the README.md for more information on these parameters
-    cmd = f'Rscript /scripts/{r_script.name} ' \
-          f'/test/{staar_matrix.name} ' \
-          f'/test/{staar_variants.name} ' \
-          f'/test/{staar_samples.name} ' \
-          f'/test/{staar_null_path.name} ' \
+    cmd = f'Rscript {r_script} ' \
+          f'{staar_matrix} ' \
+          f'{staar_variants} ' \
+          f'{staar_samples} ' \
+          f'{staar_null_path} ' \
           f'{gene} ' \
-          f'/test/{output_path.name}'
+          f'{output_path}'
 
     cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
 

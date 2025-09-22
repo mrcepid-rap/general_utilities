@@ -144,4 +144,4 @@ if (length(sparse_kinship@x[sparse_kinship@x < 0.5]) == 0) {
 }
 
 # Save the null model:
-saveRDS(object = obj_nullmodel, file = paste0("/test/", paste(pheno_name, "STAAR_null.rds", sep = ".")))
+saveRDS(object = obj_nullmodel, file = paste0(pheno_name, "STAAR_null.rds", sep = "."))

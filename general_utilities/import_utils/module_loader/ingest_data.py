@@ -2,7 +2,7 @@ import csv
 import os
 from abc import ABC
 from pathlib import Path
-from typing import Set, Tuple, List, Any, Dict, Union
+from typing import Set, Tuple, List, Any, Dict
 
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.import_utils.module_loader.association_pack import AssociationPack, ProgramArgs
@@ -37,7 +37,7 @@ class IngestData(ABC):
 
         # Work our way through all the resources we need
         # Gene transcript dictionary
-        self._ingest_transcript_index(parsed_options.transcript_index)
+        transcript_index = self._ingest_transcript_index(parsed_options.transcript_index)
 
         # Phenotype files
         phenotypes = self._ingest_phenofile(parsed_options.phenofile, parsed_options.phenoname)
@@ -45,7 +45,7 @@ class IngestData(ABC):
 
         # Base and Additional covariates
         base_covariates_file, additional_covariates_file = self._ingest_covariates(parsed_options.base_covariates,
-                                                                                    parsed_options.covarfile)
+                                                                                   parsed_options.covarfile)
 
         # Sample inclusion / exclusion lists
         inclusion_filepath, exclusion_filepath = self._define_exclusion_lists(parsed_options.inclusion_list,
@@ -86,7 +86,9 @@ class IngestData(ABC):
                                                  final_covariates=final_covariates,
                                                  inclusion_samples=inclusion_samples,
                                                  exclusion_samples=exclusion_samples,
+                                                 transcript_index=transcript_index
                                                  )
+
     def get_association_pack(self) -> AssociationPack:
         """Getter for self._association_pack
 
@@ -114,16 +116,17 @@ class IngestData(ABC):
         return threads
 
     @staticmethod
-    def _ingest_transcript_index(transcript_index: InputFileHandler) -> None:
+    def _ingest_transcript_index(transcript_index: InputFileHandler) -> Path:
         """Get transcripts for gene annotation
 
         The provided file with always be placed at `$HOME/transcripts.tsv.gz`.
 
         :param transcript_index: A transcript index in .tsv format. For more information on the structure of the file,
             see the README.
-        :return: None
+        :return: Path to the transcript index file
         """
-        transcript_index.get_file_handle()
+        transcript_index = transcript_index.get_file_handle()
+        return transcript_index
 
     def _ingest_phenofile(self, pheno_files: List[InputFileHandler], pheno_name: str) -> Dict[str, Dict[str, Any]]:
         """Download provided phenotype files and attempt to retrieve phenotypes from these file(s)
@@ -244,7 +247,8 @@ class IngestData(ABC):
         return base_covariates, additional_covariates
 
     @staticmethod
-    def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[Path, Path]:
+    def _define_exclusion_lists(inclusion_list: InputFileHandler, exclusion_list: InputFileHandler) -> Tuple[
+        Path, Path]:
         """Get inclusion/exclusion sample lists
 
         If provided, inclusion and exclusion lists will be downloaded to `$HOME/INCLUSION.lst` and
