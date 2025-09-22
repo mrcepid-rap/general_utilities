@@ -455,7 +455,7 @@ def build_default_command_executor() -> CommandExecutor:
     :return: A CommandExecutor object
     """
     cmd_executor = CommandExecutor(
-        docker_image='egardner413/mrcepid-burdentesting:latest',
+        docker_image='egardner413/mrcepid-burdentesting:v2',
         docker_mounts=[]
     )
     return cmd_executor
