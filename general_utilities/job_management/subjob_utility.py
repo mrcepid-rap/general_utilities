@@ -301,6 +301,10 @@ class SubjobUtility(JobLauncherInterface):
         # submit and monitor jobs
         self._monitor_subjobs()
 
+        # monitor running jobs until all are finished
+        while len(self._job_running) > 0:
+            self._monitor_submitted()
+
         if len(self._job_failed) > 0:
             self._logger.info('All jobs completed, printing failed jobs...')
             for failed_job in self._job_failed:
