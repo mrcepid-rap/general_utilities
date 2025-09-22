@@ -1,13 +1,11 @@
-import inspect
-import math
 import os
+import dxpy
+import inspect
+
+from time import sleep
 from enum import Enum, auto
 from importlib import import_module
-from time import sleep, time
 from typing import TypedDict, Dict, Any, List, Optional
-
-import dxpy
-from dxpy import DXApplet
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
@@ -298,7 +296,10 @@ class SubjobUtility(JobLauncherInterface):
         # Close the queue to future job submissions to save my sanity for weird edge cases
         self._queue_closed = True
 
-        self._logger.info("{0:65}: {val}".format("Total number of jobs to iterate through", val=self._total_jobs))
+        self._logger.info(f'{"Total number of jobs to iterate through":{65}}: {self._total_jobs}')
+
+        # submit and monitor jobs
+        self._monitor_subjobs()
 
         if len(self._job_failed) > 0:
             self._logger.info('All jobs completed, printing failed jobs...')

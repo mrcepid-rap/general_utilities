@@ -1,15 +1,52 @@
-import math
 import os
+import math
+import dxpy
+
 from concurrent import futures
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable, Dict, Optional
-
-import dxpy
+from typing import Any, Callable, Dict, Optional, List
 
 from general_utilities.job_management.joblauncher_interface import JobLauncherInterface, JobInfo
 
 
 class ThreadUtility(JobLauncherInterface):
+    """Class for managing the execution of functions using a ThreadPoolExecutor.
+
+    This class implements the JobLauncherInterface and provides methods to launch jobs. Briefly, a worked example of
+    how to use this class is as follows::
+
+        # Dummy test method for submission:
+        def test_method(input_str: str, input_int: int, input_bool: bool) -> Tuple[str, int, bool]:
+            my_str = input_str
+            my_int = input_int
+            my_bool = input_bool
+            return my_str, my_int, my_bool
+
+        # Construct ThreadUtility
+        thread_utility = ThreadUtility(threads=8, thread_factor=1, incrementor=1)
+
+        # Submit a job to ThreadUtility, but does not run it yet:
+        thread_utility.launch_job(test_method,
+            inputs={'input_str':'Hello', 'input_int':42, 'input_bool':True},
+            outputs=['output_str', 'output_int', 'output_bool'])
+
+        # Submit all queued jobs to the ThreadPoolExecutor and monitor their execution:
+        thread_utility.submit_and_monitor()
+
+        # Retrieve the results of the completed jobs. These outputs will be formatted as a dictionary based on the 'outputs'
+        # parameter provided using :func:`launch_job`.
+        for result in thread_utility:
+            print(result)
+            # For the above, will print: {'output_str': 'Hello', 'output_int': 42, 'output_bool': True}
+
+    If trying to decide on additional VM resources rather than threads, it may be preferred to use the joblauncher_factory
+    method provided in :func:`general_utilities.job_management.joblauncher_factory` to decide between using SubjobUtility
+    (for recruitment of additional machines) or ThreadUtility (for local jobs).
+
+    :param incrementor: The incrementor for job submission, default is 500.
+    :param threads: The number of threads available on the machine. If None, will use os.cpu_count().
+    :param thread_factor: The number of threads required per job in this thread pool, default is 1.
+    """
 
     def __init__(self,
                  incrementor: int = 500,
@@ -24,10 +61,23 @@ class ThreadUtility(JobLauncherInterface):
     def launch_job(self,
                    function: Callable,
                    inputs: Optional[Dict[str, Any]] = None,
-                   outputs=None,
+                   outputs: Optional[List[str]] = None,
                    **kwargs) -> None:
         """
         Queue a job for later submission, harmonized with SubjobUtility.
+
+        This method will run the requested function and then, using 'outputs' as a guide, will format the output
+        as a dictionary. For example, given a function that returns two values, if outputs = ['output1', 'output2'],
+        the returned dictionary will be {'output1': value1, 'output2': value2}. Note that Tuple returns will be
+        treated as separate objects, while List and Dict returns will be treated as single objects. For example,
+
+        Given a return type of List[Any]:
+
+        with outputs = ['output_list'], the returned dictionary will be {'output_list': [val1, val2, ...]}.
+
+        Given a return type of Tuple[List, List]:
+
+        with outputs = ['output1', 'output2'], the returned dictionary will be {'output1': list1, 'output2': list2}.
 
         :param function: The function to be executed in the thread.
         :param inputs: A dictionary of input parameters to be passed to the function.
@@ -68,17 +118,14 @@ class ThreadUtility(JobLauncherInterface):
 
         self._queue_closed = True
 
-        self._logger.info("{0:65}: {val}".format(
-            "Total number of threads to iterate through", val=self._total_jobs
-        ))
+        self._logger.info(f'{"Total number of threads to iterate through":{65}}: {self._total_jobs}')
 
         futures_list = []
         # Submit each job in the queue to the executor
         for job in self._job_queue:
-            inputs = job['input']
-            function = job['function']
+
             # Submit the job to the executor
-            submission = self._executor.submit(function, **inputs)
+            submission = self._executor.submit(self._run_requested_function, job['function'], job['input'], job['outputs'])
             # Append the future object to the futures list
             futures_list.append(submission)
 
@@ -88,6 +135,40 @@ class ThreadUtility(JobLauncherInterface):
             self._output_array.append(output.result())
             self._num_completed_jobs += 1
             self._print_status()
+
+    @staticmethod
+    def _run_requested_function(function: Callable, inputs: Optional[Dict[str, Any]], outputs: List[str]) -> Optional[Dict[str, Any]]:
+        """Helper class that wraps the requested function and formats the output, when complete, as a dictionary.
+
+        This method will run the requested function and then, using 'outputs' as a guide, will format the output
+        as a dictionary. For example, given a function that returns two values, if outputs = ['output1', 'output2'],
+        the returned dictionary will be {'output1': value1, 'output2': value2}.
+
+        :param function: The function to be executed in the thread.
+        :param inputs: A dictionary of input parameters to be passed to the function.
+        :param outputs: A named dictionary of output parameters from the function being run
+        :returns: A dictionary of outputs, labelled by the names provided in the outputs parameter. If outputs is None,
+            then None is returned to match expected output from the function.
+        """
+
+        function_outputs = function(**inputs)
+        if len(outputs) == 0:
+            return_dict = None
+
+        else:
+            if not isinstance(function_outputs, tuple):
+                function_outputs = tuple([function_outputs])
+
+            return_dict = {}
+
+            for n, output_label in enumerate(outputs):
+                return_dict[output_label] = function_outputs[n]
+
+            # Check for obvious errors with returns
+            if len(function_outputs) != len(outputs):
+                raise ValueError('Function returned a different number of outputs than the number of output labels provided!')
+
+        return return_dict
 
     def _decide_concurrent_job_limit(self, requested_threads: int, thread_factor: int) -> int:
         """
