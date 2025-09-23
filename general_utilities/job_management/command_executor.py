@@ -348,9 +348,6 @@ class CommandExecutor:
             for additional_mounts in docker_mounts:
                 all_mounts.add(additional_mounts)
 
-        # We can keep the old test mount as well.. if we want to, so some commands don't break?
-        all_mounts.add(DockerMount(Path("/home/dnanexus"), Path("/test")))
-
         # Sort mounts for deterministic order (by remote path length, descending)
         sorted_mounts = sorted(all_mounts, key=lambda unsorted_mount: -len(str(unsorted_mount.remote)))
         # Build docker mount string with :rw for read-write access
