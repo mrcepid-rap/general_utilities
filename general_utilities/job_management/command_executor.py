@@ -8,7 +8,7 @@ import dxpy
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
 
-platform = PlatformFactory.get_platform()
+platform = PlatformFactory().get_platform()
 
 
 class DockerMount:
