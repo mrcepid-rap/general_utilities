@@ -5,11 +5,11 @@ from typing import Union, List
 
 import dxpy
 
-from build.lib.general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
 from general_utilities.mrc_logger import MRCLogger
-import os
+from general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
 
 platform = PlatformFactory.get_platform()
+
 
 class DockerMount:
 
