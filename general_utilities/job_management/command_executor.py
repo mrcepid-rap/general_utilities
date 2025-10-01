@@ -4,9 +4,12 @@ from pathlib import Path
 from typing import Union, List
 
 import dxpy
+
+from build.lib.general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
 from general_utilities.mrc_logger import MRCLogger
 import os
 
+platform = PlatformFactory.get_platform()
 
 class DockerMount:
 
@@ -281,6 +284,10 @@ class CommandExecutor:
         # Start with all_mounts as a set for deduplication
         all_mounts = set()
         all_mounts.add(DockerMount(Path.cwd(), Path('/mnt/host_cwd')))
+
+        # add DNA Nexus mount if working on DNA Nexus
+        if platform == Platform.DX:
+            all_mounts.add(DockerMount(Path("/home/dnanexus"), Path("/test")))
 
         # Collect valid file/directory paths from command arguments
         valid_paths = []
