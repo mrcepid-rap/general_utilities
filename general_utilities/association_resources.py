@@ -305,7 +305,7 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
 
 
 def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
-                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
+                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3, force: bool = False) -> Tuple[Path, Path]:
     """Compress a file using bgzip and create a tabix index.
 
     This function uses pysam to compress a file with bgzip and create a corresponding tabix index.
@@ -321,6 +321,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
         sequence_row: 1-based column number containing sequence names (default: 1)
         begin_row: 1-based column number containing start positions (default: 2)
         end_row: 1-based column number containing end positions (default: 3)
+        force: Whether to overwrite existing files (default: False)
 
     Returns:
         Tuple[Path, Path]: Paths to the compressed file (.gz) and its index (.tbi)
@@ -332,12 +333,12 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
 
     # Compress using pysam
     outfile_compress = f'{file_path}.gz'
-    pysam.tabix_compress(str(file_path.absolute()), outfile_compress)
+    pysam.tabix_compress(str(file_path.absolute()), outfile_compress, force=force)
 
     try:
         # Run indexing via pysam, and incorporate comment character if requested
         pysam.tabix_index(outfile_compress, seq_col=sequence_row - 1, start_col=begin_row - 1, end_col=end_row - 1,
-                          meta_char=comment_char, line_skip=skip_row)
+                          meta_char=comment_char, line_skip=skip_row, force=force)
     except Exception as e:
         LOGGER.error(f"Failed to index file {outfile_compress}: {e}. Check the bgzip_and_tabix command in "
                      f"general_utilities - it's likely that the header settings need to be adjusted for your "
