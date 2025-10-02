@@ -28,7 +28,7 @@ class BGENInformation(TypedDict):
     vepidx: Optional[InputFileHandler]
 
 
-def download_bgen_file(chrom_bgen_index: BGENInformation) -> None:
+def download_bgen_file(chrom_bgen_index: BGENInformation) -> Tuple[Path, Path, Path, Path, Path]:
     """Download and process a bgen file when requested
 
     :param chrom_bgen_index: An object of :func:`BGENInformation` containing :func:`InputFileHandler` class for the bgen
@@ -36,13 +36,15 @@ def download_bgen_file(chrom_bgen_index: BGENInformation) -> None:
     """
 
     # First we have to download the actual data
-    chrom_bgen_index['index'].get_file_handle()
-    chrom_bgen_index['sample'].get_file_handle()
-    chrom_bgen_index['bgen'].get_file_handle()
+    bgen_index = chrom_bgen_index['index'].get_file_handle()
+    bgen_sample = chrom_bgen_index['sample'].get_file_handle()
+    bgen = chrom_bgen_index['bgen'].get_file_handle()
     # Now we need to download the VEP file if it exists
     if chrom_bgen_index['vep'] is not None:
-        chrom_bgen_index['vep'].get_file_handle()
-        chrom_bgen_index['vepidx'].get_file_handle()
+        vep = chrom_bgen_index['vep'].get_file_handle()
+        vep_index = chrom_bgen_index['vepidx'].get_file_handle()
+
+    return bgen, bgen_index, bgen_sample, vep, vep_index
 
 
 def ingest_wes_bgen(bgen_index: Union[InputFileHandler, dict]) -> Dict[str, BGENInformation]:
