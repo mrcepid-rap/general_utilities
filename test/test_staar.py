@@ -7,17 +7,20 @@ from math import isnan
 from pathlib import Path
 from scipy.io import mmwrite
 
+from build.lib.general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.bgen_utilities.genotype_matrix import generate_csr_matrix_from_bgen
 from general_utilities.association_resources import build_transcript_table
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.import_utils.import_lib import BGENInformation
-from general_utilities.job_management.command_executor import CommandExecutor, DockerMount
 from general_utilities.linear_model.staar_model import staar_null, staar_genes, load_staar_genetic_data
 from general_utilities.linear_model.proccess_model_output import process_model_outputs
 from general_utilities.import_utils.import_lib import TarballType
 
 test_data_dir = Path(__file__).parent / "test_data"
 linear_model_test_data_dir = test_data_dir / "linear_model/"
+
+# initiate the default command executor
+test_executor = build_default_command_executor()
 
 bgen_dict = {'chr1_chunk1': BGENInformation(index= InputFileHandler(linear_model_test_data_dir / 'chr1_chunk1.bgen.bgi'),
                                             bgen= InputFileHandler(linear_model_test_data_dir / 'chr1_chunk1.bgen'),
@@ -99,10 +102,6 @@ def transcripts_table() -> pd.DataFrame:
 def test_staar_null(tmp_path, phenofile):
     """Tests the creation of a STAAR null model using a sparse kinship matrix and covariates."""
 
-    # Make sure the Docker image can see tmp_path via mounting
-    mounts = [DockerMount(tmp_path, Path('/test/'))]
-    test_executor = CommandExecutor('egardner413/mrcepid-burdentesting:latest', docker_mounts=mounts)
-
     # cmd_exector requires all mounted files to be in the same dir (here that means the tmp_path)
     tmp_matrix = tmp_path / 'duat_matrix.sparseGRM.mtx'
     tmp_samples = tmp_path / 'duat_matrix.sparseGRM.mtx.sampleIDs.txt'
@@ -152,10 +151,6 @@ def test_staar_genes_genomewide(tmp_path, phenofile, transcripts_table, unpacked
 
     We test SNP / GENE masks in a separate function as the inputs and required checks are very different.
     """
-
-    # Make sure the Docker image can see tmp_path via mounting
-    mounts = [DockerMount(tmp_path, Path('/test/'))]
-    test_executor = CommandExecutor('egardner413/mrcepid-burdentesting:latest', docker_mounts=mounts)
 
     # cmd_exector requires all mounted files to be in the same dir (here that means the tmp_path)
     tmp_matrix = tmp_path / 'duat_matrix.sparseGRM.mtx'
@@ -261,10 +256,6 @@ def test_staar_genes_genomewide(tmp_path, phenofile, transcripts_table, unpacked
                          ), indirect=['unpacked_tarball'])
 def test_staar_genes_gene_or_snp(tmp_path, phenofile, transcripts_table, unpacked_tarball, tarball_type):
     """Tests running STAAR on a gene or SNP tarball."""
-
-    # Make sure the Docker image can see tmp_path via mounting
-    mounts = [DockerMount(tmp_path, Path('/test/'))]
-    test_executor = CommandExecutor('egardner413/mrcepid-burdentesting:latest', docker_mounts=mounts)
 
     # cmd_exector requires all mounted files to be in the same dir (here that means the tmp_path)
     tmp_matrix = tmp_path / 'duat_matrix.sparseGRM.mtx'

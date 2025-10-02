@@ -22,6 +22,7 @@ sparse_kinship_file <- args[4]
 sparse_kinship_samples_file <- args[5]
 quant_covars <- args[6]
 cat_covars <- args[7]
+output_file <- args[8]
 
 # Load covariates:
 data_for_STAAR <- fread(covariates_file)
@@ -144,4 +145,4 @@ if (length(sparse_kinship@x[sparse_kinship@x < 0.5]) == 0) {
 }
 
 # Save the null model:
-saveRDS(object = obj_nullmodel, file = paste0("/test/", paste(pheno_name, "STAAR_null.rds", sep = ".")))
+saveRDS(object = obj_nullmodel, file = output_file)

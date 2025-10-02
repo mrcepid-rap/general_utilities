@@ -274,8 +274,9 @@ class GeneticsLoader:
 
         # Generate a plink file to use that only has included individuals:
         cmd = f'plink2 ' \
-              f'--bfile /test/{genetic_data} --make-bed --keep-fam /test/SAMPLES_Include.txt ' \
-              f'--out /test/Autosomes_QCd_WBA'
+              f'--bed {bed_filename} --bim {bim_filename} --fam {fam_filename} ' \
+              f'--make-bed --keep-fam SAMPLES_Include.txt ' \
+              f'--out Autosomes_QCd_WBA'
 
         self._cmd_executor.run_cmd_on_docker(cmd, stdout_file=Path('plink_filtered.out'))
 

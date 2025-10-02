@@ -167,8 +167,8 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
 
     # And filter the relevant SAIGE file to just the individuals we want so we can get actual MAC
     cmd_executor = build_default_command_executor()
-    cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.bcf.txt -Ob -o /test/' \
-          f'{tarball_prefix}.{file_prefix}.saige_input.bcf /test/' \
+    cmd = f'bcftools view --threads 4 -S SAMPLES_Include.bcf.txt -Ob -o ' \
+          f'{tarball_prefix}.{file_prefix}.saige_input.bcf ' \
           f'{tarball_prefix}.{file_prefix}.SAIGE.bcf'
     cmd_executor.run_cmd_on_docker(cmd)
 
@@ -197,7 +197,7 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     :return: A List of field string names to use for outputs
     """
     # Test what columns we have in the 'SNP' field, so we can name them...
-    split_id_field = id_field.split("-")
+    split_id_field = id_field['SNP'].split("-")
     field_names = [] if default_fields is None else default_fields
     num_default = len(field_names)
     if len(split_id_field) == num_default + 1:  # This is the bare minimum; we found 1 additional field to the default
