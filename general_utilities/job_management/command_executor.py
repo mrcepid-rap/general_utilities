@@ -6,6 +6,9 @@ from typing import Union, List
 import dxpy
 
 from general_utilities.mrc_logger import MRCLogger
+from general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
+
+platform = PlatformFactory().get_platform()
 
 
 class DockerMount:
@@ -153,27 +156,33 @@ class CommandExecutor:
         :return: A str representation of the docker prefix or None if no Docker image is provided.
         """
 
-        if self._docker_configured:
-
-            # -v here mounts a local directory on an instance (in this case the home dir) to a directory internal to the
-            # Docker instance named /test/. This allows us to run commands on files stored on the AWS instance within
-            # Docker. Multiple mounts can be added (via docker_mounts) to enable this code to find other specialised
-            # files (e.g., some R scripts included in the associationtesting suite).
-            if docker_mounts is None:
-                docker_mount_string = ''
-            else:
-                # Add :rw for read-write access (default), or :ro for read-only if desired
-                docker_mount_string = ' '.join([f'-v {mount.get_docker_mount()}:rw'
-                                                for mount in docker_mounts])
-
-            docker_prefix = f'docker run ' \
-                            f'{docker_mount_string} '
-
-            return docker_prefix
-
-        else:
-
+        if not self._docker_configured:
             return None
+
+            # Mounts
+        docker_mount_string = ''
+        if docker_mounts:
+            docker_mount_string = ' '.join(
+                f'-v {mount.get_docker_mount()}:rw' for mount in docker_mounts
+            )
+
+            # Try to find the mount that corresponds to Path.cwd()
+            cwd_mount = next(
+                (mount for mount in docker_mounts if mount.local.resolve() == Path.cwd().resolve()),
+                None
+            )
+
+            # Set working dir to the remote path of the CWD mount if found
+            if cwd_mount:
+                docker_mount_string += f' -w {cwd_mount.remote}'
+            else:
+                # Default to /mnt/host_cwd
+                docker_mount_string += ' -w /mnt/host_cwd'
+        else:
+            # No custom mounts provided — assume safe default
+            docker_mount_string = '-w /mnt/host_cwd'
+
+        return f'docker run {docker_mount_string} '
 
     def _get_dockermount_for_file(self, argument: Path, safe_mount_point: Path):
         """
@@ -194,7 +203,11 @@ class CommandExecutor:
             # If a file, mount the parent directory, but map the file itself for rewriting
             resolved_path = argument.parent.resolve()
             file_or_dir = argument.resolve()
-        # Next we need to determine the mount point within the container
+
+        # Ensure safe_mount_point is a Path, not a DockerMount
+        if isinstance(safe_mount_point, DockerMount):
+            safe_mount_point = safe_mount_point.remote
+
         try:
             # If the path is under the current working directory, we can mount it to a relative path
             relative_mount_path = resolved_path.relative_to(Path.cwd())
@@ -207,8 +220,7 @@ class CommandExecutor:
                 f'FYI - A file and/or directory {argument} is external to the current working directory. ')
             container_name = resolved_path.as_posix().lstrip("/").replace("/", "_")
             container_mount_path = safe_mount_point / "external" / container_name
-            file_container_name = file_or_dir.as_posix().lstrip("/").replace("/", "_")
-            container_file_path = safe_mount_point / "external" / file_container_name
+            container_file_path = container_mount_path / file_or_dir.name
 
         # Create the DockerMount object
         mount = DockerMount(resolved_path, container_mount_path)
@@ -218,7 +230,10 @@ class CommandExecutor:
 
     def run_cmd_on_docker(self, cmd: str, stdout_file: Path = None, docker_mounts: List[DockerMount] = None,
                           print_cmd: bool = False, livestream_out: bool = False, dry_run: bool = False,
-                          ignore_error: bool = False, safe_mount_point: Path = Path('/mnt/host_cwd')) -> int:
+                          ignore_error: bool = False,
+                          safe_mount_point: DockerMount = DockerMount(Path.cwd(), Path('/mnt/host_cwd')),
+                          force_include_paths: List[Path] = None,
+                          protected_container_paths: List[str] = None) -> int:
         """
         Run a command in the shell with Docker, automatically mounting parent directories of any absolute file paths
         found in the command string so files can be referenced by their full path inside Docker.
@@ -247,8 +262,17 @@ class CommandExecutor:
         :param safe_mount_point: The location within the Docker image to mount the current working directory. This is
             intended to be a location that is unlikely to conflict with existing files within the Docker image.
             Default is /mnt/host_cwd, but can be changed if this conflicts with your Docker image.
+        :param force_include_paths: A list of additional file paths to include as mounts, even if they are not found
+            in the command string. This is useful if your command references files indirectly (or if the command has an
+            obscure syntax that the parser cannot handle). Default is None.
+        :param protected_container_paths: A list of container paths that should not be overwritten by mounts. If a mount
+            tries to overwrite one of these paths, it will be skipped and a warning will be logged. Default is None.
         :return: The exit code of the underlying process
         """
+
+        # Check if the list is None before trying to iterate over it
+        if force_include_paths is None:
+            force_include_paths = []
 
         # Ensure that Docker is configured
         if not self._docker_configured:
@@ -259,26 +283,71 @@ class CommandExecutor:
 
         # Start with all_mounts as a set for deduplication
         all_mounts = set()
+        all_mounts.add(DockerMount(Path.cwd(), Path('/mnt/host_cwd')))
 
-        # Always mount the current working directory to the safe mount point
-        cwd_mount = DockerMount(Path.cwd(), safe_mount_point)
-        all_mounts.add(cwd_mount)
+        # add DNA Nexus mount if working on DNA Nexus
+        if platform == Platform.DX:
+            all_mounts.add(DockerMount(Path("/home/dnanexus"), Path("/test")))
 
         # Collect valid file/directory paths from command arguments
         valid_paths = []
+        # Try to resolve each argument as a file or directory in CWD if it exists
         for argument in command_arguments:
-            possible_paths = Path(argument)
-            if (possible_paths.exists()) and (
-                    possible_paths.is_file() or possible_paths.is_dir()):
-                valid_paths.append(possible_paths)
+            # Handle --flag=file.txt style arguments
+            if '=' in argument and not argument.startswith('='):
+                flag, value = argument.split('=', 1)
+                possible_path = Path(value)
+                if possible_path.exists() and (possible_path.is_file() or possible_path.is_dir()):
+                    valid_paths.append(possible_path)
+                    continue
+                cwd_path = Path.cwd() / value
+                if cwd_path.exists() and (cwd_path.is_file() or cwd_path.is_dir()):
+                    valid_paths.append(cwd_path)
+                    continue
+            # Handle --flag:file.txt style arguments
+            if ':' in argument and not argument.startswith(':'):
+                flag, value = argument.split(':', 1)
+                possible_path = Path(value)
+                if possible_path.exists() and (possible_path.is_file() or possible_path.is_dir()):
+                    valid_paths.append(possible_path)
+                    continue
+                cwd_path = Path.cwd() / value
+                if cwd_path.exists() and (cwd_path.is_file() or cwd_path.is_dir()):
+                    valid_paths.append(cwd_path)
+                    continue
+            # Try absolute path first
+            possible_path = Path(argument)
+            if possible_path.exists() and (possible_path.is_file() or possible_path.is_dir()):
+                valid_paths.append(possible_path)
+                continue
+            # Try relative to CWD
+            cwd_path = Path.cwd() / argument
+            if cwd_path.exists() and (cwd_path.is_file() or cwd_path.is_dir()):
+                valid_paths.append(cwd_path)
+                continue
 
-        # For each valid path, add its mount and map host file path to container path for rewriting
+        # Include manually forced paths
+        if force_include_paths:
+            for path in force_include_paths:
+                if path.exists() and path not in valid_paths:
+                    valid_paths.append(path)
+
+        # For each valid path, add its mount and map host file path to container file path for rewriting
         file_path_map = {}
+        # Ensure protected_container_paths is a list, not None
+        if protected_container_paths is None:
+            protected_container_paths = []
+
         for file_path in valid_paths:
             mount, container_file_path = self._get_dockermount_for_file(file_path, safe_mount_point)
+
+            # Skip mounts that would overwrite protected container paths
+            if any(str(mount.remote).startswith(protected) for protected in protected_container_paths):
+                self._logger.warning(f"Skipping mount {mount.remote} to avoid overwriting protected container path.")
+                continue
+
             all_mounts.add(mount)
-            # The mapping below is used to rewrite command strings so that any file paths referenced in the command are replaced with the correct container paths,
-            # ensuring the command works properly inside Docker with the mounted files.
+            # Map both absolute and relative paths to container path
             file_path_map[str(file_path.resolve())] = str(container_file_path)
 
         # Add any user-specified mounts
@@ -288,7 +357,6 @@ class CommandExecutor:
 
         # Sort mounts for deterministic order (by remote path length, descending)
         sorted_mounts = sorted(all_mounts, key=lambda unsorted_mount: -len(str(unsorted_mount.remote)))
-
         # Build docker mount string with :rw for read-write access
         docker_mount_string = ' '.join([f'-v {sorted_mount.get_docker_mount()}:rw' for sorted_mount in sorted_mounts])
 
@@ -394,7 +462,7 @@ def build_default_command_executor() -> CommandExecutor:
     :return: A CommandExecutor object
     """
     cmd_executor = CommandExecutor(
-        docker_image='egardner413/mrcepid-burdentesting:latest',
+        docker_image='egardner413/mrcepid-burdentesting:v2',
         docker_mounts=[]
     )
     return cmd_executor

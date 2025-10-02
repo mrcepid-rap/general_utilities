@@ -154,19 +154,34 @@ class ThreadUtility(JobLauncherInterface):
         function_outputs = function(**inputs)
         if len(outputs) == 0:
             return_dict = None
-
         else:
-            if not isinstance(function_outputs, tuple):
-                function_outputs = tuple([function_outputs])
+            # Case 1: function already returned a dict with matching keys
+            if isinstance(function_outputs, dict):
+                return_dict = function_outputs
 
-            return_dict = {}
+                # sanity check: make sure all expected labels are present
+                missing = [o for o in outputs if o not in return_dict]
+                if missing:
+                    raise ValueError(
+                        f"Function returned a dict missing expected keys: {missing}"
+                    )
 
-            for n, output_label in enumerate(outputs):
-                return_dict[output_label] = function_outputs[n]
+            # Case 2: function returned a single value
+            elif not isinstance(function_outputs, tuple):
+                function_outputs = (function_outputs,)
+                return_dict = {outputs[0]: function_outputs[0]}
 
-            # Check for obvious errors with returns
-            if len(function_outputs) != len(outputs):
-                raise ValueError('Function returned a different number of outputs than the number of output labels provided!')
+            # Case 3: function returned a tuple of values
+            else:
+                if len(function_outputs) != len(outputs):
+                    raise ValueError(
+                        f"Function returned {len(function_outputs)} values, "
+                        f"but {len(outputs)} output labels were provided!"
+                    )
+                return_dict = {
+                    output_label: function_outputs[n]
+                    for n, output_label in enumerate(outputs)
+                }
 
         return return_dict
 
