@@ -285,9 +285,10 @@ class CommandExecutor:
         all_mounts = set()
         all_mounts.add(DockerMount(Path.cwd(), Path('/mnt/host_cwd')))
 
-        # add DNA Nexus mount if working on DNA Nexus
+        # add DNAnexus mount if working on DNAnexus
         if platform == Platform.DX:
-            all_mounts.add(DockerMount(Path("/home/dnanexus"), Path("/test")))
+            # mount home/dnanexus into a safe internal path, not /test
+            all_mounts.add(DockerMount(Path("/home/dnanexus"), Path("/mnt/host_cwd")))
 
         # Collect valid file/directory paths from command arguments
         valid_paths = []
