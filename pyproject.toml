@@ -36,3 +36,4 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "general_utilities.linear_model.R_resources" = ["*.R"]
+"general_utilities.plot_lib.R_resources" = ["*.R"]
