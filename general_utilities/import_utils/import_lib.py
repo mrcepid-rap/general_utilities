@@ -1,12 +1,11 @@
 import csv
-import re
 import dxpy
 import tarfile
 from enum import Enum
 from pathlib import Path
 from typing import Dict, TypedDict, Optional, Union, List, Tuple
 
-from association_resources import replace_multi_suffix
+from general_utilities.association_resources import replace_multi_suffix
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 
