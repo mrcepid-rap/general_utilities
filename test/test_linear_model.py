@@ -140,7 +140,7 @@ def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarba
                                    found_categorical_covariates=['batman']
                                    )
 
-    tarball_name, genetic_data = load_linear_model_genetic_data(str(unpacked_tarball), tarball_type, bgen_prefix=None)
+    tarball_name, genetic_data = load_linear_model_genetic_data(unpacked_tarball, tarball_type, bgen_prefix=None)
 
     expected_genes = set()
     with expected_genes_path.open('r') as expected_genes_reader:
@@ -150,6 +150,7 @@ def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarba
     final_models = []
 
     for gene in genetic_data.index.get_level_values('ENST').unique():
+        print(tarball_name)
         result = run_linear_model(null_model, genetic_data, gene, tarball_name, is_binary=False, always_run_corrected=False)
         final_models.append(result)
 

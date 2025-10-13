@@ -168,7 +168,7 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
         raise dxpy.AppError(f'Phenotype {phenotype} has no individuals after filtering, exiting...')
 
 
-def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[str, pd.DataFrame]:
+def load_linear_model_genetic_data(tarball_prefix: Path, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[str, pd.DataFrame]:
     """Load a tarball containing BGEN files for linear model association testing.
 
     This method decides which function to call (either :func:'load_mask_linear_model' or
@@ -189,23 +189,20 @@ def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballTyp
     :return: A tuple containing the tarball name and a pandas DataFrame with genetic data indexed by ENST and FID.
     """
 
-    LOGGER.info(f'Loading tarball prefix: {tarball_prefix}')
-
-    # Convert to a path object to allow for file operations.
-    tarball_path = Path(tarball_prefix)
+    LOGGER.info(f'Loading tarball prefix: {tarball_prefix.name}')
 
     if tarball_type == TarballType.GENOMEWIDE:
-        genetic_data = load_mask_genetic_data(tarball_path, bgen_prefix=bgen_prefix)
+        genetic_data = load_mask_genetic_data(tarball_prefix, bgen_prefix=bgen_prefix)
     elif tarball_type == TarballType.GENE:
-        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.GENE.STAAR.mtx'), tarball_type.value)
+        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_prefix, '.GENE.STAAR.mtx'), tarball_type.value)
     elif tarball_type == TarballType.SNP:
-        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.SNP.STAAR.mtx'), tarball_type.value)
+        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_prefix, '.SNP.STAAR.mtx'), tarball_type.value)
     else:
-        raise ValueError(f'Unexpected tarball type {tarball_type} encountered for tarball prefix {tarball_prefix}')
+        raise ValueError(f'Unexpected tarball type {tarball_type} encountered for tarball prefix {tarball_prefix.name}')
 
-    LOGGER.info(f'Finished loading tarball prefix: {tarball_prefix}')
+    LOGGER.info(f'Finished loading tarball prefix: {tarball_prefix.name}')
 
-    return tarball_path.name, genetic_data
+    return tarball_prefix.name, genetic_data
 
 
 def load_mask_genetic_data(tarball_path: Path, bgen_prefix: str = None) -> pd.DataFrame:
