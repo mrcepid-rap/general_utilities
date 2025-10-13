@@ -229,7 +229,7 @@ def load_mask_genetic_data(tarball_path: Path, bgen_prefix: str = None) -> pd.Da
 
     for bolt_bgen in bolt_bgen_list:
 
-        with bgen.BgenReader(bolt_bgen, sample_path=replace_multi_suffix(bolt_bgen, '.sample'),
+        with bgen.BgenReader(bolt_bgen, sample_path=bolt_bgen.with_suffix('.sample'),
                              delay_parsing=False) as bgen_reader:
 
             for variant in bgen_reader:

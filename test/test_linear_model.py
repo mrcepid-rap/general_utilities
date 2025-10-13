@@ -110,7 +110,7 @@ def test_linear_model_null(phenofile):
 def test_load_tarball_linear_model(unpacked_tarball, expected_genes_path, bgen_prefix, tarball_type):
     """Test loading genetic data from different tarball types."""
 
-    tarball_path, genetic_data = load_linear_model_genetic_data(str(unpacked_tarball), tarball_type, bgen_prefix=bgen_prefix)
+    tarball_path, genetic_data = load_linear_model_genetic_data(unpacked_tarball, tarball_type, bgen_prefix=bgen_prefix)
 
     expected_genes = pd.read_csv(expected_genes_path, header = None)
 
