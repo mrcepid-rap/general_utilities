@@ -79,8 +79,8 @@ class ManhattanPlotter(ClusterPlotter):
 
         # Do plotting
         output_plot = Path('manhattan_plot.png')
-        options = [f'{self._plot_table_path}', f'{self._index_table_path}', self._p_column, self._test_name,
-                   self._sig_threshold, self._suggestive_threshold, self._label_qq, f'{output_plot.absolute()}']
+        options = [f'{self._plot_table_path}', f'{self._index_table_path}', f'{output_plot.absolute()}', self._p_column, self._test_name,
+                   self._sig_threshold, self._suggestive_threshold, self._label_qq]
         final_plots.append(self._run_R_script(r_script, options, output_plot))
 
         return final_plots
