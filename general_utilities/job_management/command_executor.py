@@ -281,6 +281,20 @@ class CommandExecutor:
         # Safely split the command into respective parts (e.g. --input "some file.txt" -> ['--input', 'some file.txt'])
         command_arguments = shlex.split(cmd)
 
+        # Detect file-like arguments (even if they don't exist) — possible outputs
+        possible_output_paths = []
+        for arg in command_arguments:
+            try:
+                path = Path(arg)
+                # Treat any non-flag value as potential output (e.g., --out plink_out)
+                if not arg.startswith("-") and not path.exists():
+                    possible_output_paths.append(path)
+                elif "/" in arg or path.suffix:
+                    if not path.exists():
+                        possible_output_paths.append(path)
+            except Exception:
+                continue  # defensive: skip anything weird
+
         # Start with all_mounts as a set for deduplication
         all_mounts = set()
         all_mounts.add(DockerMount(Path.cwd(), Path('/mnt/host_cwd')))
@@ -291,6 +305,13 @@ class CommandExecutor:
 
         # Collect valid file/directory paths from command arguments
         valid_paths = []
+        # Add parent directories of potential outputs (so files can be created inside container)
+        for output_path in possible_output_paths:
+            parent_dir = output_path.parent.resolve()
+            # Always include it — even if it doesn't exist yet
+            if parent_dir not in valid_paths:
+                valid_paths.append(parent_dir)
+
         # Try to resolve each argument as a file or directory in CWD if it exists
         for argument in command_arguments:
             # Handle --flag=file.txt style arguments

@@ -35,7 +35,15 @@ def download_bgen_file(chrom_bgen_index: BGENInformation) -> Tuple[Path, Path, P
     :return: None
     """
 
-    # First we have to download the actual data
+    # if filetype is not InputFileHandler, convert it
+    # this may happen if we are downloading data before it has been through
+    # the InputFileHandler class (i.e. it's a sring or a dxid)
+    for key in ['bgen', 'index', 'sample', 'vep', 'vepidx']:
+        value = chrom_bgen_index.get(key)
+        if value is not None and not isinstance(value, InputFileHandler):
+            chrom_bgen_index[key] = InputFileHandler(value)
+
+    # Download the actual data
     bgen_index = chrom_bgen_index['index'].get_file_handle()
     bgen_sample = chrom_bgen_index['sample'].get_file_handle()
     bgen = chrom_bgen_index['bgen'].get_file_handle()
@@ -44,6 +52,7 @@ def download_bgen_file(chrom_bgen_index: BGENInformation) -> Tuple[Path, Path, P
         vep = chrom_bgen_index['vep'].get_file_handle()
         vep_index = chrom_bgen_index['vepidx'].get_file_handle()
 
+    # Return the paths to the downloaded files
     return bgen, bgen_index, bgen_sample, vep, vep_index
 
 
@@ -78,7 +87,6 @@ def ingest_wes_bgen(bgen_index: Union[InputFileHandler, dict]) -> Dict[str, BGEN
 
 
 class TarballType(Enum):
-
     """An Enum to represent the type of tarball being processed
 
     The value of the enum is the dummy gene ID expected by downstream linear models.
@@ -100,7 +108,7 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
     """
     is_snp_tar = False
     is_gene_tar = False
-    is_burden_tar = True # We assume a burden tarball unless we find a SNP or GENE tarball
+    is_burden_tar = True  # We assume a burden tarball unless we find a SNP or GENE tarball
     tarball_prefixes = []
 
     # First create a list of DNANexus fileIDs to process
@@ -151,7 +159,6 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
         else:
             raise dxpy.AppError(f'Provided association tarball ({tar_file}) '
                                 f'is not a tar.gz file')
-
 
     if 0 < sum([is_burden_tar, is_gene_tar, is_snp_tar]) < 2:
         if is_snp_tar:
