@@ -114,8 +114,11 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
     # First create a list of DNANexus fileIDs to process
     tar_files = []
 
+    print(association_tarballs)
+
     # association_tarballs likely to be a single tarball or a txt file with links:
     input_str = str(association_tarballs.get_input_str())
+    print(input_str)
     if input_str.endswith('.tar.gz'):
         tar_files.append(association_tarballs)
     # When association_tarballs is a .txt file, read file IDs and process them
