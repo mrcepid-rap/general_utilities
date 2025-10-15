@@ -120,9 +120,12 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
         tar_files.append(association_tarballs)
     # When association_tarballs is a .txt file, read file IDs and process them
     elif input_str.endswith('.txt'):
+        print('here')
         txt_path = association_tarballs.get_file_handle()
+        print(txt_path)
         with open(txt_path, 'r') as f:
             for line in f:
+                print(line)
                 for token in line.strip().split():
                     if not isinstance(token, str) or not token.startswith("file-"):
                         raise dxpy.AppError(f'Invalid DNAnexus file link found in list: {token}')
@@ -130,6 +133,7 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
                     if not str(file_path).endswith('.tar.gz'):
                         raise dxpy.AppError(f'File ID {token} does not point to a .tar.gz file (got {file_path})')
                     tar_files.append(file_path)
+                    print(tar_files)
     elif isinstance(association_tarballs, list):
         # If it's a list, iterate over it
         for tarball in association_tarballs:
