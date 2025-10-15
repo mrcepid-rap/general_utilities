@@ -119,6 +119,9 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
     # association_tarballs likely to be a single tarball or a txt file with links:
     input_str = str(association_tarballs.get_input_str())
     print(input_str)
+    if re.match('file-\\w{24}', input_str):
+        input_str = InputFileHandler(input_str, download_now=True).get_file_handle()
+
     if input_str.endswith('.tar.gz'):
         tar_files.append(association_tarballs)
     # When association_tarballs is a .txt file, read file IDs and process them
