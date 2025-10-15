@@ -8,6 +8,7 @@ from importlib import import_module
 from typing import TypedDict, Dict, Any, List, Optional
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.job_management.joblauncher_interface import JobLauncherInterface, JobInfo
 from general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
@@ -520,6 +521,6 @@ def prep_current_image(required_files: List[dict]) -> CommandExecutor:
     cmd_executor = build_default_command_executor()
 
     for file in required_files:
-        download_dxfile_by_name(file, print_status=False)
+        InputFileHandler(file, download_now=True)
 
     return cmd_executor
