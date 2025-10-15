@@ -256,6 +256,11 @@ class SubjobUtility(JobLauncherInterface):
             'instance_type' specification in the dxapp.json. [None]
         :param name: Name of the job. Default names the job after the executing applet and :param:function name. [None]
         """
+        if inputs is not None and not isinstance(inputs, (str, dict, bool, int, dxpy.DXFile)):
+            raise TypeError(
+                f"Invalid input type: {type(inputs)}. "
+                f"Expected str or dict[str, Any]."
+            )
 
         # Check if the queue has been closed by submit_queue()
         if self._queue_closed is True:

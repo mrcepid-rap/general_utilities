@@ -124,9 +124,9 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
         with open(txt_path, 'r') as f:
             for line in f:
                 for token in line.strip().split():
-                    if not isinstance(token, str) and token.startswith("file-"):
+                    if not isinstance(token, str) or not token.startswith("file-"):
                         raise dxpy.AppError(f'Invalid DNAnexus file link found in list: {token}')
-                    tar_files.append(InputFileHandler(token).get_file_handle())
+                    tar_files.append(InputFileHandler(token))
     elif isinstance(association_tarballs, list):
         # If it's a list, iterate over it
         for tarball in association_tarballs:
