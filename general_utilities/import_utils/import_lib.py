@@ -122,10 +122,10 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
     if re.match('file-\\w{24}', input_str):
         input_str = InputFileHandler(input_str, download_now=True).get_file_handle()
 
-    if input_str.endswith('.tar.gz'):
+    if str(input_str).endswith('.tar.gz'):
         tar_files.append(association_tarballs)
     # When association_tarballs is a .txt file, read file IDs and process them
-    elif input_str.endswith('.txt'):
+    elif str(input_str).endswith('.txt'):
         print('here')
         txt_path = association_tarballs.get_file_handle()
         print(txt_path)
