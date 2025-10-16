@@ -87,9 +87,7 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         # --- Detect and align chromosome naming convention ---
         first_variant = next(iter(bgen_reader))
         bgen_chrom = first_variant.chrom
-        print(f"[DEBUG] First variant chromosome in file: {bgen_chrom}")
 
-        # Adjust query chromosome to match the BGEN naming style
         if bgen_chrom.lower().startswith("chr") and not chromosome.lower().startswith("chr"):
             chromosome = "chr" + str(chromosome)
         elif not bgen_chrom.lower().startswith("chr") and chromosome.lower().startswith("chr"):
@@ -98,31 +96,18 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         # Re‑open BGEN after peeking at the first variant
         bgen_reader = BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True)
 
-        # --- Fetch actual data ---
+        # Fetch actual data from the BGEN file
+        # Handle chromosome, start, and end filtering
         if chromosome is not None and start is None and end is None:
-            variants = bgen_reader.fetch(chromosome)
+            # chromosome is provided, but not start or end
+            variants = bgen_reader.fetch(chromosome)  # Fetch all variants on the specified chromosome
+
         elif [chromosome, start, end].count(None) == 2:
+            # Unclear what the user wants if they have provided two of the three
             raise ValueError("If start or end is provided, chromosome must also be provided.")
+
         else:
             variants = bgen_reader.fetch(chromosome, start, end)
-
-        # Turn generator into a list so we can inspect it multiple times
-        variants = list(variants)
-        print(f"[DEBUG] Fetched {len(variants)} variants for {chromosome}:{start}-{end}")
-
-        # Preview a few variant objects
-        for i, v in enumerate(variants[:5]):
-            print(f"[DEBUG] var {i}: chrom={v.chrom}, pos={v.pos}, rsid={v.rsid}, probs.shape={v.probabilities.shape}")
-            if hasattr(v, "probabilities"):
-                print(f"[DEBUG]    probabilities[0]: {v.probabilities[0]}")
-            else:
-                print("[DEBUG]    No probabilities found!")
-
-        # Early exit if nothing fetched
-        if len(variants) == 0:
-            raise RuntimeError(f"No variants returned by fetch for {chromosome}:{start}-{end}")
-
-        print(variants)
 
         # create a store for the variant level information
         variant_arrays = []
@@ -130,13 +115,6 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
 
         # collect genotype arrays for each variant
         for current_variant in variants:
-            print(
-                f"[DEBUG] current_variant: rsid={current_variant.rsid}, chrom={current_variant.chrom}, pos={current_variant.pos}")
-            print(f"[DEBUG]   probabilities shape: {current_variant.probabilities.shape}")
-            print(f"[DEBUG]   sample[0] probs: {current_variant.probabilities[0]}")
-
-
-            print(current_variant)
 
             if variant_filter_list is not None and current_variant.rsid not in variant_filter_list:
                 # if we have a variant filter list, skip variants that are not in the filter list Don't ask me why
