@@ -101,6 +101,24 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         else:
             variants = bgen_reader.fetch(chromosome, start, end)
 
+        # Turn generator into a list so we can inspect it multiple times
+        variants = list(variants)
+
+        print(f"[DEBUG] Fetched {len(variants)} variants for {chromosome}:{start}-{end}")
+
+        # Preview a few variant objects
+        for i, v in enumerate(variants[:5]):
+            print(f"[DEBUG] var {i}: chrom={v.chrom}, pos={v.pos}, rsid={v.rsid}, probs.shape={v.probabilities.shape}")
+            if hasattr(v, "probabilities"):
+                print(f"[DEBUG]    probabilities[0]: {v.probabilities[0]}")
+            else:
+                print("[DEBUG]    No probabilities found!")
+
+        # Early exit if nothing fetched
+        if len(variants) == 0:
+            raise RuntimeError(f"No variants returned by fetch for {chromosome}:{start}-{end}")
+
+
         print(variants)
 
         # create a store for the variant level information
@@ -109,6 +127,11 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
 
         # collect genotype arrays for each variant
         for current_variant in variants:
+
+            print(f"[DEBUG] current_variant: rsid={current_variant.rsid}, chrom={current_variant.chrom}, pos={current_variant.pos}")
+            print(f"[DEBUG]   probabilities shape: {current_variant.probabilities.shape}")
+            print(f"[DEBUG]   sample[0] probs: {current_variant.probabilities[0]}")
+
 
             print(current_variant)
 
