@@ -97,12 +97,19 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         else:
             variants = bgen_reader.fetch(chromosome, start, end)
 
+        # print the first few variants for debugging
+        print(f"First few variants fetched: {[v.rsid for v in list(variants)[:5]]}")
+        print(variants)
+
         # create a store for the variant level information
         variant_arrays = []
         variant_n = 0
 
         # collect genotype arrays for each variant
         for current_variant in variants:
+
+            print(current_variant)
+            print(current_variant.rsid)
 
             if variant_filter_list is not None and current_variant.rsid not in variant_filter_list:
                 # if we have a variant filter list, skip variants that are not in the filter list Don't ask me why
