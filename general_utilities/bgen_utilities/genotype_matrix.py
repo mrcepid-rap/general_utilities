@@ -84,6 +84,21 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
 
     with BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True) as bgen_reader:
 
+        # DEBUG: Print a sample of chromosome labels and position ranges from the file
+        print("[DEBUG] Scanning file for available chromosomes and positions...")
+
+        chrom_positions = {}
+        for i, var in enumerate(bgen_reader):
+            chrom_positions.setdefault(var.chrom, []).append(var.pos)
+            if i > 20000:
+                break  # avoid scanning whole file
+
+        for chrom, positions in chrom_positions.items():
+            print(f"[DEBUG] chrom={chrom}")
+            print(f"[DEBUG]   example positions: {positions[:3]} ... {positions[-3:]}")
+            print(f"[DEBUG]   position range: {min(positions)} - {max(positions)}")
+
+
         # FIX: remove "chr" prefix if present
         if chromosome is not None and chromosome.startswith("chr"):
             chromosome = chromosome.replace("chr", "")
