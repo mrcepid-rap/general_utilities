@@ -99,8 +99,9 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
 
         # print the first few variants for debugging
         print(f"First few variants fetched: {[v.rsid for v in list(variants)[:5]]}")
-        print(variants)
-
+        print(variants.rsid)
+        print(variants.varid)
+        print(variants.chrom)
         # create a store for the variant level information
         variant_arrays = []
         variant_n = 0
