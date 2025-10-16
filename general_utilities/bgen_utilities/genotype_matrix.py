@@ -84,6 +84,10 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
 
     with BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True) as bgen_reader:
 
+        # FIX: remove "chr" prefix if present
+        if chromosome is not None and chromosome.startswith("chr"):
+            chromosome = chromosome.replace("chr", "")
+
         # Fetch actual data from the BGEN file
         # Handle chromosome, start, and end filtering
         if chromosome is not None and start is None and end is None:
@@ -103,12 +107,6 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
 
         # collect genotype arrays for each variant
         for current_variant in variants:
-
-            # print variant metadata
-            print("Variant:",
-                  f"varid={current_variant.varid}, rsid={current_variant.rsid}, ",
-                  f"chrom={current_variant.chrom}, pos={current_variant.pos}, ",
-                  f"alleles={current_variant.alleles}")
 
             if variant_filter_list is not None and current_variant.rsid not in variant_filter_list:
                 # if we have a variant filter list, skip variants that are not in the filter list Don't ask me why
