@@ -84,41 +84,30 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
 
     with BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True) as bgen_reader:
 
-        # DEBUG: Print a sample of chromosome labels and position ranges from the file
-        print("[DEBUG] Scanning file for available chromosomes and positions...")
+        # --- Detect and align chromosome naming convention ---
+        first_variant = next(iter(bgen_reader))
+        bgen_chrom = first_variant.chrom
+        print(f"[DEBUG] First variant chromosome in file: {bgen_chrom}")
 
-        chrom_positions = {}
-        for i, var in enumerate(bgen_reader):
-            chrom_positions.setdefault(var.chrom, []).append(var.pos)
-            if i > 20000:
-                break  # avoid scanning whole file
+        # Adjust query chromosome to match the BGEN naming style
+        if bgen_chrom.lower().startswith("chr") and not chromosome.lower().startswith("chr"):
+            chromosome = "chr" + str(chromosome)
+        elif not bgen_chrom.lower().startswith("chr") and chromosome.lower().startswith("chr"):
+            chromosome = str(chromosome)[3:]
 
-        for chrom, positions in chrom_positions.items():
-            print(f"[DEBUG] chrom={chrom}")
-            print(f"[DEBUG]   example positions: {positions[:3]} ... {positions[-3:]}")
-            print(f"[DEBUG]   position range: {min(positions)} - {max(positions)}")
+        # Re‑open BGEN after peeking at the first variant
+        bgen_reader = BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True)
 
-
-        # FIX: remove "chr" prefix if present
-        if chromosome is not None and chromosome.startswith("chr"):
-            chromosome = chromosome.replace("chr", "")
-
-        # Fetch actual data from the BGEN file
-        # Handle chromosome, start, and end filtering
+        # --- Fetch actual data ---
         if chromosome is not None and start is None and end is None:
-            # chromosome is provided, but not start or end
-            variants = bgen_reader.fetch(chromosome)  # Fetch all variants on the specified chromosome
-
+            variants = bgen_reader.fetch(chromosome)
         elif [chromosome, start, end].count(None) == 2:
-            # Unclear what the user wants if they have provided two of the three
             raise ValueError("If start or end is provided, chromosome must also be provided.")
-
         else:
             variants = bgen_reader.fetch(chromosome, start, end)
 
         # Turn generator into a list so we can inspect it multiple times
         variants = list(variants)
-
         print(f"[DEBUG] Fetched {len(variants)} variants for {chromosome}:{start}-{end}")
 
         # Preview a few variant objects
@@ -133,7 +122,6 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         if len(variants) == 0:
             raise RuntimeError(f"No variants returned by fetch for {chromosome}:{start}-{end}")
 
-
         print(variants)
 
         # create a store for the variant level information
@@ -142,8 +130,8 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
 
         # collect genotype arrays for each variant
         for current_variant in variants:
-
-            print(f"[DEBUG] current_variant: rsid={current_variant.rsid}, chrom={current_variant.chrom}, pos={current_variant.pos}")
+            print(
+                f"[DEBUG] current_variant: rsid={current_variant.rsid}, chrom={current_variant.chrom}, pos={current_variant.pos}")
             print(f"[DEBUG]   probabilities shape: {current_variant.probabilities.shape}")
             print(f"[DEBUG]   sample[0] probs: {current_variant.probabilities[0]}")
 
