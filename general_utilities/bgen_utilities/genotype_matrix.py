@@ -132,8 +132,6 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
             variant_array = np.where(current_probabilities[:, 1] == 1, 1,
                                      np.where(current_probabilities[:, 2] == 1, 2, 0))
 
-            print(variant_array)
-
             # store variant level information in the array we created
             variant_arrays.append(variant_array)
 
