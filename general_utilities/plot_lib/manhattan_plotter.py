@@ -77,6 +77,14 @@ class ManhattanPlotter(ClusterPlotter):
 
         r_script = get_r_plotter()
 
+        # debug duplicate columns
+        pd.set_option('display.max_columns', None)
+        df = pd.read_csv(self._plot_table_path, sep='\t')
+        print(df.head())
+
+        df2 = pd.read_csv(self._index_table_path, sep='\t')
+        print(df2.head())
+
         # r_script = files('general_utilities.plot_lib.R_resources').joinpath('manhattan_plotter.R')
         # Add something to invert the plot... if (curr_test == paste0('ADD-INT_', interaction_var)) {
 
