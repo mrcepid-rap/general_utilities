@@ -51,6 +51,9 @@ class ManhattanPlotter(ClusterPlotter):
 
     def _write_plot_table(self):
 
+        # debug
+        print(self._results_table.head())
+
         query = f'{self._maf_column} >= {self._maf_cutoff}'
         if self._test_name:
             self._plot_table_path = Path(f'current_manh.{self._test_name}.tsv.gz')
