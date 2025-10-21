@@ -22,6 +22,8 @@ standardize_table <- function(table_path, p_val_col) {
   setnames(some_table, names(some_table), str_to_lower(names(some_table)))
   setnames(some_table, p_val_col, "p_value_selected")
 
+  some_table$p_value_selected <- as.numeric(some_table$p_value_selected)
+
   some_table[,log_p:=-log10(p_value_selected)] # Add -log10 p value
   if ('chr' %in% names(some_table)) {  # Account for BOLT-LMM results...
     setnames(some_table, 'chr', 'chrom')
@@ -129,10 +131,13 @@ plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers
     }
   }
 
+  ### CHANGED: build label safely
+  lam_label <- as.character(as.expression(bquote(lambda == .(round(lam, 3)))))
+
   qq.plot <- qq.plot +
     scale_x_continuous(name = expression(bold(Expected~-log[10](italic(p)))), limits = c(0,expected_ymax)) +
     scale_y_continuous(name = ifelse(label.y,expression(bold(Observed~-log[10](italic(p)))),expression('')), limits = c(0,ymax)) +
-    annotate('text', x = 1, y = expected_ymax * 0.9, hjust=0, vjust=0.5, label=bquote(lambda==.(lam))) +
+    annotate('text', x = 1, y = expected_ymax * 0.9, hjust=0, vjust=0.5, label = lam_label) +
     theme + theme(panel.grid.major = element_blank())
 
   if (!label.y) {
