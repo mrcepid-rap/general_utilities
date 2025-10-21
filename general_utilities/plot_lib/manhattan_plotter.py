@@ -65,7 +65,7 @@ class ManhattanPlotter(ClusterPlotter):
             self._plot_table_path = Path(f'current_manh.tsv.gz')
 
         print('printing results table tail:')
-        print(self._results_table)
+        print(self._results_table) # works
 
         self._results_table.query(query).to_csv(gzip.open(self._plot_table_path, 'wt'),
                                                 sep='\t', index=False)
@@ -89,7 +89,7 @@ class ManhattanPlotter(ClusterPlotter):
         # debug duplicate columns
         pd.set_option('display.max_columns', None)
         df = pd.read_csv(self._plot_table_path, sep='\t')
-        print(df.head())
+        print(df.head()) # works
 
         df2 = pd.read_csv(self._index_table_path, sep='\t')
         print(df2.head())
