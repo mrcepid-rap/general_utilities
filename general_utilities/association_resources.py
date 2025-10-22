@@ -237,7 +237,7 @@ def define_covariate_string(found_quantitative_covariates: List[str], found_cate
     quant_covars = [] if ignore_base else ['PC{1:10}', 'age', 'age_squared', 'sex']
     quant_covars.extend(found_quantitative_covariates)
 
-    cat_covars = [] if ignore_base else (['wes_batch', 'array_batch'] if add_array else ['wes_batch'])
+    cat_covars = [] if ignore_base else (['batch', 'array_batch'] if add_array else ['batch'])
     cat_covars.extend(found_categorical_covariates)
 
     covar_string = ''
