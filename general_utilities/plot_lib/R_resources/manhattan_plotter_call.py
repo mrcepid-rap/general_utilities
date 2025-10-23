@@ -140,10 +140,13 @@ plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers
     }
   }
 
+  ### CHANGED: build label safely
+  lam_label <- as.character(as.expression(bquote(lambda == .(round(lam, 3)))))
+
   qq.plot <- qq.plot +
     scale_x_continuous(name = expression(bold(Expected~-log[10](italic(p)))), limits = c(0,expected_ymax)) +
     scale_y_continuous(name = ifelse(label.y,expression(bold(Observed~-log[10](italic(p)))),expression('')), limits = c(0,ymax)) +
-    annotate('text', x = 1, y = expected_ymax * 0.9, hjust=0, vjust=0.5, label=bquote(lambda==.(lam))) +
+    annotate('text', x = 1, y = expected_ymax * 0.9, hjust=0, vjust=0.5, label = lam_label) + 
     theme + theme(panel.grid.major = element_blank())
 
   if (!label.y) {
@@ -163,11 +166,11 @@ plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers
 # 6: p.sugg
 # 7: label qq plots
 args <- commandArgs(trailingOnly = T)
-mean_chr_pos <- fread('/test/mean_chr_pos.tsv')
+mean_chr_pos <- fread('mean_chr_pos.tsv')
 
 manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], as.numeric(args[5]), as.numeric(args[6]), as.logical(args[7]))
 
-ggsave('/test/manhattan_plot.png', manh_plot, units='in', width = 15, height = 6)
+ggsave('manhattan_plot.png', manh_plot, units='in', width = 15, height = 6)
 """
     r_script_path = Path("manhattan_plotter.R")
     r_script_path.write_text(r_script_content)
