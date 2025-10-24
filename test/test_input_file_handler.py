@@ -78,7 +78,6 @@ def test_dna_nexus_files_explicitly(input_file, expected_file_type, expected_exc
             input_handler.get_file_type()
     else:
         input_handler = InputFileHandler(input_file)
-        print(input_handler.get_file_handle())
         assert input_handler.get_file_type() == expected_file_type
 
         assert expected_file.exists()

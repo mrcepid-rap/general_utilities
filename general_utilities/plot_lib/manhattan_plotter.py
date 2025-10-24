@@ -51,21 +51,12 @@ class ManhattanPlotter(ClusterPlotter):
 
     def _write_plot_table(self):
 
-        # debug
-        print('printing results table head:')
-        print(self._results_table.head())
-
         query = f'{self._maf_column} >= {self._maf_cutoff}'
         if self._test_name:
-            print('here')
             self._plot_table_path = Path(f'current_manh.{self._test_name}.tsv.gz')
             query += f' & TEST == "{self._test_name}"'
         else:
-            print('here')
             self._plot_table_path = Path(f'current_manh.tsv.gz')
-
-        print('printing results table tail:')
-        print(self._results_table) # works
 
         self._results_table.query(query).to_csv(gzip.open(self._plot_table_path, 'wt'),
                                                 sep='\t', index=False)
@@ -85,14 +76,6 @@ class ManhattanPlotter(ClusterPlotter):
         final_plots = []
 
         r_script = get_r_plotter()
-
-        # debug duplicate columns
-        pd.set_option('display.max_columns', None)
-        df = pd.read_csv(self._plot_table_path, sep='\t')
-        print(df.head()) # works
-
-        df2 = pd.read_csv(self._index_table_path, sep='\t')
-        print(df2.head())
 
         # r_script = files('general_utilities.plot_lib.R_resources').joinpath('manhattan_plotter.R')
         # Add something to invert the plot... if (curr_test == paste0('ADD-INT_', interaction_var)) {

@@ -168,7 +168,6 @@ def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarba
             assert result.model_run == True
 
         if result.p_val_init < 1e-4:
-            print(result)
             assert not math.isnan(result.p_val_full)
         else:
             assert math.isnan(result.p_val_full)
