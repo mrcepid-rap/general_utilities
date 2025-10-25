@@ -286,13 +286,16 @@ class CommandExecutor:
         possible_output_paths = []
         for arg in command_arguments:
             try:
+                # Skip obviously complex, non-path arguments like plugin parameter blocks
+                if "," in arg and arg.count(":") > 1:
+                    continue
+
                 path = Path(arg)
                 # Treat any non-flag value as potential output (e.g., --out plink_out)
                 if not arg.startswith("-") and not path.exists():
                     possible_output_paths.append(path)
-                elif "/" in arg or path.suffix:
-                    if not path.exists():
-                        possible_output_paths.append(path)
+                elif ("/" in arg or path.suffix) and not path.exists():
+                    possible_output_paths.append(path)
             except Exception:
                 continue  # defensive: skip anything weird
 
