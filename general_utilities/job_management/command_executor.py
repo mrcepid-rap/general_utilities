@@ -387,8 +387,10 @@ class CommandExecutor:
 
         # Rewrite the command to use the correct container file paths
         rewritten_command = cmd
-        # Replace host file paths with container paths (longest first to avoid partial replacements)
         for host_path, container_path in sorted(file_path_map.items(), key=lambda x: -len(x[0])):
+            # Skip rewriting protected container paths
+            if any(host_path.startswith(protected) for protected in protected_container_paths):
+                continue
             rewritten_command = rewritten_command.replace(host_path, container_path)
 
         full_cmd = f'{self._docker_prefix} {docker_mount_string} {self._docker_image} {rewritten_command}'
