@@ -150,7 +150,6 @@ def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarba
     final_models = []
 
     for gene in genetic_data.index.get_level_values('ENST').unique():
-        print(tarball_name)
         result = run_linear_model(null_model, genetic_data, gene, tarball_name, is_binary=False, always_run_corrected=False)
         final_models.append(result)
 
