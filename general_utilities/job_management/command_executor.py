@@ -2,7 +2,6 @@ import shlex
 import subprocess
 from pathlib import Path
 from typing import Union, List
-import re
 
 import dxpy
 
@@ -286,16 +285,17 @@ class CommandExecutor:
         possible_output_paths = []
         for arg in command_arguments:
             try:
-                # Skip obviously complex, non-path arguments like plugin parameter blocks
-                if "," in arg and arg.count(":") > 1:
+                # Skip LoFTEE/Ensembl plugin args or any multi-colon argument block
+                if "--plugin" in arg or ("," in arg and arg.count(":") > 1):
                     continue
 
                 path = Path(arg)
                 # Treat any non-flag value as potential output (e.g., --out plink_out)
                 if not arg.startswith("-") and not path.exists():
                     possible_output_paths.append(path)
-                elif ("/" in arg or path.suffix) and not path.exists():
-                    possible_output_paths.append(path)
+                elif "/" in arg or path.suffix:
+                    if not path.exists():
+                        possible_output_paths.append(path)
             except Exception:
                 continue  # defensive: skip anything weird
 
@@ -317,15 +317,8 @@ class CommandExecutor:
                 valid_paths.append(parent_dir)
 
         # Try to resolve each argument as a file or directory in CWD if it exists
-        for i, argument in enumerate(command_arguments):
-            # --- Skip parsing complex arguments that include multiple ':' or ',' ---
-            # These are typically plugin or parameter-style strings (e.g. --plugin LoF,loftee_path:...)
-            # We only want to treat ':' as a path separator if the arg looks like --flag:/path/to/file
-            if re.search(r"[:,]", argument) and not argument.startswith("--") and not argument.startswith("-"):
-                # Skip plain arguments that contain commas/colons but are not flags
-                continue
-
-            # --- Handle --flag=value style arguments ---
+        for argument in command_arguments:
+            # Handle --flag=file.txt style arguments
             if '=' in argument and not argument.startswith('='):
                 flag, value = argument.split('=', 1)
                 possible_path = Path(value)
@@ -336,9 +329,8 @@ class CommandExecutor:
                 if cwd_path.exists() and (cwd_path.is_file() or cwd_path.is_dir()):
                     valid_paths.append(cwd_path)
                     continue
-
-            # --- Handle --flag:/path style arguments ---
-            if re.match(r"^--[\w-]+:/", argument):
+            # Handle --flag:file.txt style arguments
+            if ':' in argument and not argument.startswith(':'):
                 flag, value = argument.split(':', 1)
                 possible_path = Path(value)
                 if possible_path.exists() and (possible_path.is_file() or possible_path.is_dir()):
@@ -348,13 +340,12 @@ class CommandExecutor:
                 if cwd_path.exists() and (cwd_path.is_file() or cwd_path.is_dir()):
                     valid_paths.append(cwd_path)
                     continue
-
-            # --- Handle plain positional arguments ---
+            # Try absolute path first
             possible_path = Path(argument)
             if possible_path.exists() and (possible_path.is_file() or possible_path.is_dir()):
                 valid_paths.append(possible_path)
                 continue
-
+            # Try relative to CWD
             cwd_path = Path.cwd() / argument
             if cwd_path.exists() and (cwd_path.is_file() or cwd_path.is_dir()):
                 valid_paths.append(cwd_path)
