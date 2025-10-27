@@ -134,7 +134,7 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
             cat_covars = []
         else:
             quant_covars = [f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared', 'sex']
-            cat_covars = ['batch']
+            cat_covars = ['wes_batch']
 
         quant_covars.extend(found_quantitative_covariates)
         cat_covars.extend(found_categorical_covariates)

@@ -256,7 +256,7 @@ class SubjobUtility(JobLauncherInterface):
             'instance_type' specification in the dxapp.json. [None]
         :param name: Name of the job. Default names the job after the executing applet and :param:function name. [None]
         """
-        if inputs is not None and not isinstance(inputs, (str, dict, bool, int, dxpy.DXFile)):
+        if inputs is not None and not isinstance(inputs, (str, dict, bool, int, list, dxpy.DXFile)):
             raise TypeError(
                 f"Invalid input type: {type(inputs)}. "
                 f"Expected str or dict[str, Any]."
