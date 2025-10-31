@@ -281,23 +281,17 @@ class CommandExecutor:
         # Safely split the command into respective parts (e.g. --input "some file.txt" -> ['--input', 'some file.txt'])
         command_arguments = shlex.split(cmd)
 
-        # Detect file-like arguments (even if they don't exist) — possible outputs
+        # Detect likely output paths (arguments that don't exist yet and aren't flags)
         possible_output_paths = []
-        for arg in command_arguments:
-            try:
-                # Skip LoFTEE/Ensembl plugin args or any multi-colon argument block
-                if "--plugin" in arg or ("," in arg and arg.count(":") > 1):
-                    continue
-
-                path = Path(arg)
-                # Treat any non-flag value as potential output (e.g., --out plink_out)
-                if not arg.startswith("-") and not path.exists():
-                    possible_output_paths.append(path)
-                elif "/" in arg or path.suffix:
-                    if not path.exists():
-                        possible_output_paths.append(path)
-            except Exception:
-                continue  # defensive: skip anything weird
+        for i, arg in enumerate(command_arguments):
+            # Skip flags like --out, --bfile, etc.
+            if arg.startswith("-"):
+                continue
+            path = Path(arg)
+            # If it's not a flag and doesn't exist, treat as possible output path
+            if not path.exists():
+                possible_output_paths.append(path)
+                continue
 
         # Start with all_mounts as a set for deduplication
         all_mounts = set()
@@ -309,12 +303,26 @@ class CommandExecutor:
 
         # Collect valid file/directory paths from command arguments
         valid_paths = []
-        # Add parent directories of potential outputs (so files can be created inside container)
+        # Add parent directories of potential outputs (ensure they exist for Docker)
         for output_path in possible_output_paths:
             parent_dir = output_path.parent.resolve()
-            # Always include it — even if it doesn't exist yet
+            try:
+                # Ensure the directory exists; safe if it already does
+                parent_dir.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                self._logger.warning(f"Could not ensure directory exists for {output_path}: {e}")
+                continue
+
+            # Add to valid_paths if not already included
             if parent_dir not in valid_paths:
                 valid_paths.append(parent_dir)
+
+            # Also mount it immediately to ensure Docker can write outputs
+            try:
+                mount, container_file_path = self._get_dockermount_for_file(parent_dir, safe_mount_point)
+                all_mounts.add(mount)
+            except Exception as e:
+                self._logger.warning(f"Could not create DockerMount for {parent_dir}: {e}")
 
         # Try to resolve each argument as a file or directory in CWD if it exists
         for argument in command_arguments:
