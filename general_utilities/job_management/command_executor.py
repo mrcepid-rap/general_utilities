@@ -281,17 +281,23 @@ class CommandExecutor:
         # Safely split the command into respective parts (e.g. --input "some file.txt" -> ['--input', 'some file.txt'])
         command_arguments = shlex.split(cmd)
 
-        # Detect likely output paths (arguments that don't exist yet and aren't flags)
+        # Detect file-like arguments (even if they don't exist) — possible outputs
         possible_output_paths = []
-        for i, arg in enumerate(command_arguments):
-            # Skip flags like --out, --bfile, etc.
-            if arg.startswith("-"):
-                continue
-            path = Path(arg)
-            # If it's not a flag and doesn't exist, treat as possible output path
-            if not path.exists():
-                possible_output_paths.append(path)
-                continue
+        for arg in command_arguments:
+            try:
+                # Skip LoFTEE/Ensembl plugin args or any multi-colon argument block
+                if "--plugin" in arg or ("," in arg and arg.count(":") > 1):
+                    continue
+
+                path = Path(arg)
+                # Treat any non-flag value as potential output (e.g., --out plink_out)
+                if not arg.startswith("-") and not path.exists():
+                    possible_output_paths.append(path)
+                elif "/" in arg or path.suffix:
+                    if not path.exists():
+                        possible_output_paths.append(path)
+            except Exception:
+                continue  # defensive: skip anything weird
 
         # Start with all_mounts as a set for deduplication
         all_mounts = set()
