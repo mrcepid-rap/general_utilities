@@ -289,6 +289,10 @@ class CommandExecutor:
                 if "--plugin" in arg or ("," in arg and arg.count(":") > 1):
                     continue
 
+                # Skip flag=value style arguments entirely (handled later)
+                if arg.startswith("--") and "=" in arg:
+                    continue
+
                 path = Path(arg)
                 # Treat any non-flag value as potential output (e.g., --out plink_out)
                 if not arg.startswith("-") and not path.exists():
