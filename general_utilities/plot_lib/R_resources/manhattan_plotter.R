@@ -153,10 +153,9 @@ plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers
 # 5: p.sig
 # 6: p.sugg
 # 7: label qq plots
-# 8: output file
 args <- commandArgs(trailingOnly = T)
-mean_chr_pos <- fread('mean_chr_pos.tsv')
+mean_chr_pos <- fread('/test/mean_chr_pos.tsv')
 
-manh_plot <- load_and_plot_data(args[1], args[2], args[4], args[5], as.numeric(args[6]), as.numeric(args[7]), as.logical(args[8]))
+manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], as.numeric(args[5]), as.numeric(args[6]), as.logical(args[7]))
 
-ggsave(args[3], manh_plot, units='in', width = 15, height = 6)
+ggsave('/test/manhattan_plot.png', manh_plot, units='in', width = 15, height = 6)
