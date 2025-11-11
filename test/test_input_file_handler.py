@@ -78,10 +78,11 @@ def test_dna_nexus_files_explicitly(input_file, expected_file_type, expected_exc
             input_handler.get_file_type()
     else:
         input_handler = InputFileHandler(input_file)
-        print(input_handler.get_file_handle())
         assert input_handler.get_file_type() == expected_file_type
 
-        assert expected_file.exists()
+        downloaded_file = input_handler.get_file_handle()
+
+        assert downloaded_file.exists()
 
         # remove the file so we can run the test properly
-        expected_file.unlink()
+        downloaded_file.unlink()

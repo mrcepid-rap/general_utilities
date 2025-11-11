@@ -22,12 +22,13 @@ class ExportFileHandler:
     For Local, it simply returns an empty dictionary, as no upload is performed.
     """
 
-    def __init__(self):
+    def __init__(self, delete_on_upload: bool = True):
 
         self._logger = MRCLogger(__name__).get_logger()
 
         self._platform = PlatformFactory().get_platform()
         self._gcp_check_result = None
+        self._delete_on_upload = delete_on_upload
 
     def _convert_file_to_dxlink(self, file: Union[str, Path, DXFile, dict]) -> dict:
         """
@@ -43,7 +44,9 @@ class ExportFileHandler:
         elif isinstance(file, dict) and dxpy.is_dxlink(file):
             converted_file = file
         else:
-            converted_file = dxpy.dxlink(generate_linked_dx_file(file))
+            converted_file = dxpy.dxlink(
+                generate_linked_dx_file(file, delete_on_upload=self._delete_on_upload)
+            )
         return converted_file
 
     def export_files(self, files_input: Union[str, Path, List[Union[str, Path]]]) -> Union[

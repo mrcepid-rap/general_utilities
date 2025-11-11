@@ -131,10 +131,13 @@ plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers
     }
   }
 
+  ### CHANGED: build label safely
+  lam_label <- as.character(as.expression(bquote(lambda == .(round(lam, 3)))))
+
   qq.plot <- qq.plot +
     scale_x_continuous(name = expression(bold(Expected~-log[10](italic(p)))), limits = c(0,expected_ymax)) +
     scale_y_continuous(name = ifelse(label.y,expression(bold(Observed~-log[10](italic(p)))),expression('')), limits = c(0,ymax)) +
-    annotate('text', x = 1, y = expected_ymax * 0.9, hjust=0, vjust=0.5, label=bquote(lambda==.(lam))) +
+    annotate('text', x = 1, y = expected_ymax * 0.9, hjust=0, vjust=0.5, label = lam_label) +
     theme + theme(panel.grid.major = element_blank())
 
   if (!label.y) {

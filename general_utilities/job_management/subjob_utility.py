@@ -8,6 +8,7 @@ from importlib import import_module
 from typing import TypedDict, Dict, Any, List, Optional
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name
+from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import build_default_command_executor, CommandExecutor
 from general_utilities.job_management.joblauncher_interface import JobLauncherInterface, JobInfo
 from general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
@@ -255,6 +256,31 @@ class SubjobUtility(JobLauncherInterface):
             'instance_type' specification in the dxapp.json. [None]
         :param name: Name of the job. Default names the job after the executing applet and :param:function name. [None]
         """
+        if inputs is not None:
+            allowed_types = (int, float, str, bool, dxpy.DXFile)
+            if isinstance(inputs, dict):
+                pass  # allow hash
+            elif isinstance(inputs, allowed_types):
+                pass  # allow single allowed type
+            elif isinstance(inputs, list):
+                if not inputs:
+                    pass  # allow empty list
+                else:
+                    first_type = type(inputs[0])
+                    if first_type not in allowed_types:
+                        raise TypeError(
+                            f"Invalid list element type: {first_type}. "
+                            f"Allowed types: {allowed_types}."
+                        )
+                    if not all(isinstance(x, first_type) for x in inputs):
+                        raise TypeError(
+                            "All elements in the list must be of the same allowed type."
+                        )
+            else:
+                raise TypeError(
+                    f"Invalid input type: {type(inputs)}. "
+                    f"Expected int, float, str, bool, dict, dxpy.DXFile, or list of one of these (except dict)."
+                )
 
         # Check if the queue has been closed by submit_queue()
         if self._queue_closed is True:
@@ -520,6 +546,6 @@ def prep_current_image(required_files: List[dict]) -> CommandExecutor:
     cmd_executor = build_default_command_executor()
 
     for file in required_files:
-        download_dxfile_by_name(file, print_status=False)
+        InputFileHandler(file, download_now=True)
 
     return cmd_executor

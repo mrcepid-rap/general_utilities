@@ -42,25 +42,25 @@ class Plotter(ABC):
         pass
 
     def _run_R_script(self, r_script: Traversable, options: List[Any], out_path: Path) -> Path:
-        """Run an R script, typically an R script that generates some sort of plot.
-
-        This method python-izes the required inputs to run an R-script via Docker. It takes an R script as a
-        Traversable object.
-
-        :param r_script: An Rscript as a Traversable object. This is done as the Rscript should be within a python
-            package implemented as part of some plotter and is thus found via the importlib.resources package RATHER
-            than through the typical pathlib functionality.
-        :param options: A List of Input options for the script.
-        :param out_path: The location of the resulting SINGLE output from this script. This parameter has no effect on
-            running the script and is provided as a convenience for running. i.e., this output must be set somewhere
-            independently in the scripts I/O.
-        :return: out_path
+        """
+        Run an R script (typically a plotting script) inside Docker,
+        passing all arguments and the output path explicitly.
         """
 
-        options = [f'{opt}' for opt in options]  # have to convert all opts to strings
-        options = " ".join(options)
-        plot_cmd = f'Rscript {r_script} {options}'
+        # Convert all args to strings and ensure absolute paths
+        r_script = Path(str(r_script)).resolve()
+        out_path = Path(out_path).resolve()
 
+        # Append the output path to the end of the options list
+        args = [str(opt) for opt in options] + [str(out_path)]
+
+        # Build the full Rscript command
+        plot_cmd = f"Rscript {r_script} {' '.join(args)}"
+
+        # Optional: log it for debug
+        self._logger.info(f"Running R plotting command:\n{plot_cmd}")
+
+        # Run via Docker
         self._cmd_executor.run_cmd_on_docker(plot_cmd)
 
         return out_path
