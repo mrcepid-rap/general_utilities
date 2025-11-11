@@ -281,6 +281,29 @@ class CommandExecutor:
         # Safely split the command into respective parts (e.g. --input "some file.txt" -> ['--input', 'some file.txt'])
         command_arguments = shlex.split(cmd)
 
+        # Detect file-like arguments (even if they don't exist) — possible outputs
+        possible_output_paths = []
+        for arg in command_arguments:
+            try:
+                # Skip LoFTEE/Ensembl plugin args or any multi-colon argument block
+                if "--plugin" in arg or ("," in arg and arg.count(":") > 1):
+                    continue
+
+                # Skip flag=value style arguments entirely (handled later)
+                if arg.startswith("--") and "=" in arg:
+                    continue
+
+                path = Path(arg)
+                # Treat any non-flag value as potential output (e.g., --out plink_out)
+                if not arg.startswith("-") and not path.exists():
+                    possible_output_paths.append(path)
+                elif "/" in arg or path.suffix:
+                    if not path.exists():
+                        possible_output_paths.append(path)
+            except Exception as e:
+                self._logger.warning(f"Could not parse argument `{arg}` as a file path: {e}")
+                continue
+
         # Start with all_mounts as a set for deduplication
         all_mounts = set()
         all_mounts.add(DockerMount(Path.cwd(), Path('/mnt/host_cwd')))
@@ -291,6 +314,27 @@ class CommandExecutor:
 
         # Collect valid file/directory paths from command arguments
         valid_paths = []
+        # Add parent directories of potential outputs (ensure they exist for Docker)
+        for output_path in possible_output_paths:
+            parent_dir = output_path.parent.resolve()
+            try:
+                # Ensure the directory exists; safe if it already does
+                parent_dir.mkdir(parents=True, exist_ok=True)
+            except OSError as e:
+                self._logger.warning(f"Could not ensure directory exists for {output_path}: {e}")
+                continue
+
+            # Add to valid_paths if not already included
+            if parent_dir not in valid_paths:
+                valid_paths.append(parent_dir)
+
+            # Also mount it immediately to ensure Docker can write outputs
+            try:
+                mount, container_file_path = self._get_dockermount_for_file(parent_dir, safe_mount_point)
+                all_mounts.add(mount)
+            except Exception as e:
+                self._logger.warning(f"Could not create DockerMount for {parent_dir}: {e}")
+
         # Try to resolve each argument as a file or directory in CWD if it exists
         for argument in command_arguments:
             # Handle --flag=file.txt style arguments
@@ -362,8 +406,10 @@ class CommandExecutor:
 
         # Rewrite the command to use the correct container file paths
         rewritten_command = cmd
-        # Replace host file paths with container paths (longest first to avoid partial replacements)
         for host_path, container_path in sorted(file_path_map.items(), key=lambda x: -len(x[0])):
+            # Skip rewriting protected container paths
+            if any(host_path.startswith(protected) for protected in protected_container_paths):
+                continue
             rewritten_command = rewritten_command.replace(host_path, container_path)
 
         full_cmd = f'{self._docker_prefix} {docker_mount_string} {self._docker_image} {rewritten_command}'

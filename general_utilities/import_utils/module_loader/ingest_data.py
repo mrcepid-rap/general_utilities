@@ -381,7 +381,7 @@ class IngestData(ABC):
         # The user may be ignoring the base covariates, but adding specific ones back in. So we need to make sure they
         # are providing correct names here...
         valid_base_covars = [f'PC{PC}' for PC in range(1, 41)] + \
-                            ['age', 'age_squared', 'sex', 'wes_batch', 'array_batch']
+                            ['age', 'age_squared', 'sex', 'batch', 'array_batch']
 
         if additional_covariates_path:
 
@@ -526,7 +526,7 @@ class IngestData(ABC):
             self._logger.info(f'{" ":^{5}}{"Categorical":{60}}:')
         else:
             self._logger.info(f'{" ":^{5}}{"Quantitative":{60}}: age, age^2, PC1..PC10')
-            self._logger.info(f'{" ":^{5}}{"Categorical":{60}}: {"sex, WES_batch" if sex == 2 else "WES_batch"}')
+            self._logger.info(f'{" ":^{5}}{"Categorical":{60}}: {"sex, batch" if sex == 2 else "batch"}')
 
         if len(found_quantitative_covariates) + len(found_categorical_covariates) > 0:
             self._logger.info(f'{"Number of individuals with non-null additional covariates":{65}}: {len(add_covars)}')
@@ -549,7 +549,7 @@ class IngestData(ABC):
             write_fields = ['FID', 'IID']
             if not ignore_base_options:
                 write_fields = write_fields + [f'PC{PC}' for PC in range(1, 41)]
-                write_fields = write_fields + ['age', 'age_squared', 'sex', 'wes_batch', 'array_batch']
+                write_fields = write_fields + ['age', 'age_squared', 'sex', 'batch', 'array_batch']
             write_fields = write_fields + pheno_names
             # This doesn't matter to python if we didn't find additional covariates. A list of len() == 0 does not
             # lengthen the target list (e.g. 'write_fields')
@@ -578,7 +578,7 @@ class IngestData(ABC):
                     indv_writer['age'] = int(indv['age'])
                     indv_writer['age_squared'] = indv_writer['age'] ** 2
                     indv_writer['sex'] = int(indv['sex'])
-                    indv_writer['wes_batch'] = indv['wes_batch']
+                    indv_writer['batch'] = indv['batch']
                     indv_writer['array_batch'] = indv['array_batch']
                     num_all_samples += 1
 

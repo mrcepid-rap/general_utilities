@@ -94,7 +94,7 @@ def test_linear_model_null(phenofile):
     assert null_model.phenotypes.shape == (10000, 16) # has_var isn't in the table yet, it is added later
 
     assert isinstance(null_model.model_family, sm.families.Gaussian)
-    assert null_model.model_formula == 'phenotype ~ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10 + age + age_squared + sex + C(wes_batch) + C(batman) + has_var'
+    assert null_model.model_formula == 'phenotype ~ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10 + age + age_squared + sex + C(batch) + C(batman) + has_var'
 
     assert null_model.null_model.index.name == 'FID'
     assert null_model.null_model.shape == (10000, 1)
@@ -168,7 +168,6 @@ def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarba
             assert result.model_run == True
 
         if result.p_val_init < 1e-4:
-            print(result)
             assert not math.isnan(result.p_val_full)
         else:
             assert math.isnan(result.p_val_full)

@@ -19,3 +19,4 @@ test/dx_run.log
 /test/test_data/linear_model/*.tar.gz
 /test/test_data/linear_model/phenotype.tsv
 /test/test_data/linear_model/*.covariates
+general_utilities/job_management/__pycache__

@@ -35,7 +35,7 @@ def download_bgen_file(chrom_bgen_index: BGENInformation) -> Tuple[Path, Path, P
     :return: None
     """
 
-    # First we have to download the actual data
+    # Download the actual data
     bgen_index = chrom_bgen_index['index'].get_file_handle()
     bgen_sample = chrom_bgen_index['sample'].get_file_handle()
     bgen = chrom_bgen_index['bgen'].get_file_handle()
@@ -43,7 +43,11 @@ def download_bgen_file(chrom_bgen_index: BGENInformation) -> Tuple[Path, Path, P
     if chrom_bgen_index['vep'] is not None:
         vep = chrom_bgen_index['vep'].get_file_handle()
         vep_index = chrom_bgen_index['vepidx'].get_file_handle()
+    else:
+        vep = None
+        vep_index = None
 
+    # Return the paths to the downloaded files
     return bgen, bgen_index, bgen_sample, vep, vep_index
 
 
@@ -78,7 +82,6 @@ def ingest_wes_bgen(bgen_index: Union[InputFileHandler, dict]) -> Dict[str, BGEN
 
 
 class TarballType(Enum):
-
     """An Enum to represent the type of tarball being processed
 
     The value of the enum is the dummy gene ID expected by downstream linear models.
@@ -100,25 +103,31 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
     """
     is_snp_tar = False
     is_gene_tar = False
-    is_burden_tar = True # We assume a burden tarball unless we find a SNP or GENE tarball
+    is_burden_tar = True  # We assume a burden tarball unless we find a SNP or GENE tarball
     tarball_prefixes = []
 
     # First create a list of DNANexus fileIDs to process
     tar_files = []
 
-    # association_tarballs likely to be a single tarball:
-    if '.tar.gz' in str(association_tarballs.get_input_str()):
-        tar_files.append(association_tarballs)
-    if isinstance(association_tarballs, list):
-        # If it's a list, iterate over it
-        for tarball in association_tarballs:
-            unzipped = tarball.get_file_handle()
-            tar_files.append(unzipped)
-    elif isinstance(association_tarballs, InputFileHandler):
-        # If it's a single InputFileHandler instance, append it directly
-        tar_files = [association_tarballs.get_file_handle()]
-    else:
-        raise TypeError("association_tarballs must be an InputFileHandler or a list of InputFileHandler instances")
+    try:
+        # association_tarballs likely to be a single tarball or a txt file with links:
+        input_str = str(association_tarballs.get_input_str())
+        if re.match('file-\\w{24}', input_str):
+            input_str = InputFileHandler(input_str, download_now=True).get_file_handle()
+
+        # if the input is a tar.gz file, append it directly
+        if tarfile.is_tarfile(input_str):
+            tar_files.append(association_tarballs.get_file_handle())
+        # When association_tarballs is a .txt file, read file IDs and process them
+        else:
+            # input must be a text file if not a tar.gz or a list - if not true, the user should investigate what they passed
+            with input_str.open('r') as f:
+                for line in f:
+                    file_path = InputFileHandler(line).get_file_handle()
+                    tar_files.append(file_path)
+    except Exception as e:
+        LOGGER.error(f"Error processing association_tarballs: {e}, please check the input provided.")
+        raise
 
     # Now process them in order
     for tar_file in tar_files:
@@ -127,19 +136,6 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
             tarball_prefixes.append(tarball_prefix)
             tar = tarfile.open(tar_file, 'r:gz')
             tar.extractall()
-
-            # Construct regex dynamically from tarball_prefixes
-            prefix_pattern = "|".join(
-                re.escape(prefix) for prefix in tarball_prefixes)  # Escape in case of special characters
-            pattern = rf'^(?:{prefix_pattern})\.([^.]+?)\.(?:BOLT|REGENIE|SAIGE|STAAR)'
-            # Extract matches
-            matches = set()
-            for name in tar.getnames():
-                match = re.search(pattern, name)
-                if match:
-                    extracted_value = match.group(1)  # Extract the second part after the prefix
-                    if extracted_value not in {"SNP", "GENE"}:  # Remove SNP and GENE
-                        matches.add(extracted_value)
 
             if Path(f'{tarball_prefix}.SNP.BOLT.bgen').exists():
                 is_snp_tar = True
@@ -151,7 +147,6 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
         else:
             raise dxpy.AppError(f'Provided association tarball ({tar_file}) '
                                 f'is not a tar.gz file')
-
 
     if 0 < sum([is_burden_tar, is_gene_tar, is_snp_tar]) < 2:
         if is_snp_tar:
