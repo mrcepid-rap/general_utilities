@@ -15,6 +15,7 @@ from general_utilities.association_resources import replace_multi_suffix
 
 LOGGER = MRCLogger(__name__).get_logger()
 
+
 @dataclass
 class LinearModelPack:
     """
@@ -77,6 +78,9 @@ class LinearModelResult:
     n_car_affected: int = 0
     n_car_unaffected: int = 0
 
+    def todict(self):
+        return self.__dict__
+
     def set_carrier_stats(self, n_noncar_affected: int, n_noncar_unaffected: int,
                           n_car_affected: int, n_car_unaffected: int) -> None:
         """Setter function to set carrier stats for the linear model result all in one function call
@@ -114,8 +118,8 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
     # load covariates and phenotypes
     pheno_covars = pd.read_csv(phenofile,
                                sep=" ",
-                               index_col="FID",
-                               dtype={'IID': str})
+                               dtype={'IID': str, 'FID': str})
+    pheno_covars.set_index('FID', inplace=True)
     pheno_covars.index = pheno_covars.index.astype(str)
 
     # Check if a binary trait and make sure there is more than one level after filtering
@@ -134,7 +138,7 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
             cat_covars = []
         else:
             quant_covars = [f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared', 'sex']
-            cat_covars = ['wes_batch']
+            cat_covars = ['batch']
 
         quant_covars.extend(found_quantitative_covariates)
         cat_covars.extend(found_categorical_covariates)
@@ -168,7 +172,8 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
         raise dxpy.AppError(f'Phenotype {phenotype} has no individuals after filtering, exiting...')
 
 
-def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[str, pd.DataFrame]:
+def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[
+    str, pd.DataFrame]:
     """Load a tarball containing BGEN files for linear model association testing.
 
     This method decides which function to call (either :func:'load_mask_linear_model' or
@@ -197,9 +202,11 @@ def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballTyp
     if tarball_type == TarballType.GENOMEWIDE:
         genetic_data = load_mask_genetic_data(tarball_path, bgen_prefix=bgen_prefix)
     elif tarball_type == TarballType.GENE:
-        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.GENE.STAAR.mtx'), tarball_type.value)
+        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.GENE.STAAR.mtx'),
+                                                     tarball_type.value)
     elif tarball_type == TarballType.SNP:
-        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.SNP.STAAR.mtx'), tarball_type.value)
+        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.SNP.STAAR.mtx'),
+                                                     tarball_type.value)
     else:
         raise ValueError(f'Unexpected tarball type {tarball_type} encountered for tarball prefix {tarball_prefix}')
 
@@ -232,7 +239,8 @@ def load_mask_genetic_data(tarball_path: Path, bgen_prefix: str = None) -> pd.Da
 
     for bolt_bgen in bolt_bgen_list:
 
-        with bgen.BgenReader(bolt_bgen, sample_path=replace_multi_suffix(bolt_bgen, '.sample'),
+        sample_file = bolt_bgen.with_suffix('.sample')
+        with bgen.BgenReader(bolt_bgen, sample_path=sample_file,
                              delay_parsing=False) as bgen_reader:
 
             for variant in bgen_reader:
@@ -317,6 +325,7 @@ def run_linear_model(linear_model_pack: LinearModelPack, genotype_table: pd.Data
     :param always_run_corrected: A boolean indicating if the full model should always be run, even if the initial p-value is not significant.
     :return: A LinearModelResult object containing the results of the association test for this gene.
     """
+
     if gene in genotype_table.index.levels[0]:
         indv_w_var = genotype_table.loc[gene]
 
@@ -325,7 +334,7 @@ def run_linear_model(linear_model_pack: LinearModelPack, genotype_table: pd.Data
         n_car = len(internal_frame.loc[internal_frame['has_var'] >= 1])
         cMAC = internal_frame['has_var'].sum()
 
-        if n_car <= 2: # Don't run models that won't converge
+        if n_car <= 2:  # Don't run models that won't converge
             gene_dict = LinearModelResult(gene, mask_name, linear_model_pack.pheno_name,
                                           n_car, cMAC, linear_model_pack.n_model, False)
         else:
@@ -371,7 +380,14 @@ def run_linear_model(linear_model_pack: LinearModelPack, genotype_table: pd.Data
                         n_car_affected=len(internal_frame.query(f'has_var >= 1 & {pheno_name} == 1')),
                         n_car_unaffected=len(internal_frame.query(f'has_var >= 1 & {pheno_name} == 0')))
     else:
-        gene_dict = LinearModelResult(0, 0, linear_model_pack.n_model, gene, mask_name,
-                                      linear_model_pack.pheno_name)
+        gene_dict = LinearModelResult(
+            ENST=gene,
+            mask_name=mask_name,
+            pheno_name=linear_model_pack.pheno_name,
+            n_car=0,
+            cMAC=0,
+            n_model=linear_model_pack.n_model,
+            model_run=False,
+        )
 
     return gene_dict

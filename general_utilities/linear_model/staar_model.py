@@ -97,8 +97,7 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
           f'{phenotype} ' \
           f'{is_binary} ' \
           f'{sparse_kinship_file} ' \
-          f'{sparse_kinship_samples} ' \
-          f'{output_file}'
+          f'{sparse_kinship_samples} '
 
     # Set covariates for the model
     if ignore_base:
@@ -108,7 +107,7 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
         quant_covars = [f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared']
         if sex == 2:
             quant_covars.append('sex')
-        cat_covars = ['wes_batch']
+        cat_covars = ['batch']
 
     quant_covars.extend(found_quantitative_covariates)
     cat_covars.extend(found_categorical_covariates)
@@ -116,15 +115,17 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
     if len(quant_covars) > 0:
         cmd += f'{",".join(quant_covars)} '
     else:
-        cmd += f'NULL '
+        cmd += 'NULL '
     if len(cat_covars) > 0:
         cmd += f'{",".join(cat_covars)} '
     else:
-        cmd += f'NULL '
+        cmd += 'NULL '
 
-    cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
+    cmd += f'{output_file}'
 
-    return Path(f'{phenotype}.STAAR_null.rds')
+    cmd_executor.run_cmd_on_docker(cmd)
+
+    return output_file
 
 
 def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None) -> Dict[str, Dict[str, GeneInformation]]:
@@ -210,7 +211,7 @@ def staar_genes(staar_null_path: Path, pheno_name: str, gene: str, mask_name: st
           f'{gene} ' \
           f'{output_path}'
 
-    cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
+    cmd_executor.run_cmd_on_docker(cmd)
 
     # Read in the outputs and format into a model pack
     staar_json = json.load(output_path.open('r'))

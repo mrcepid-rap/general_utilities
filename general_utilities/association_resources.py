@@ -1,5 +1,6 @@
 import csv
 import gzip
+import re
 from pathlib import Path
 from typing import List, Union, Tuple, IO, Dict
 
@@ -7,7 +8,6 @@ import dxpy
 import pandas as pd
 import pandas.core.series
 import pysam
-
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
 
@@ -61,7 +61,8 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False,
     return chromosomes
 
 
-def build_transcript_table(transcripts_path: Path = Path('transcripts.tsv.gz'), filter_genes: bool = True) -> pd.DataFrame:
+def build_transcript_table(transcripts_path: Path = Path('transcripts.tsv.gz'),
+                           filter_genes: bool = True) -> pd.DataFrame:
     """A wrapper around pd.read_csv to load transcripts.tsv.gz into a pd.DataFrame
 
     Read the transcripts.tsv.gz file downloaded during ingest_data into a pd.DataFrame. This file contains information
@@ -179,6 +180,52 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
     return gene_info, chromosomes
 
 
+def process_gene_or_snp_wgs(identifier: str, tarball_prefix: str, chunk: str) -> set:
+    """
+    Given a gene symbol/ENST or a SNP identifier (chr:pos:ref:alt),
+    check whether it exists in a chunk’s STAAR variant table.
+
+    :param identifier: The gene symbol or ENST or SNP identifier.
+    :param tarball_prefix: The prefix of the tarball files.
+    :param chunk: The chunk identifier (e.g., chromosome number) to list through.
+
+    :return chromosomes: set of chromosome(s) found in that chunk (empty if none)
+    """
+
+    tarball_prefix = Path(tarball_prefix)
+    variant_table_path = f"{tarball_prefix}.{chunk}.STAAR.variants_table.tsv"
+
+    result = set()
+
+    if not Path(variant_table_path).exists():
+        LOGGER.warning(f"Variant table not found: {variant_table_path}")
+    else:
+        is_variant = bool(re.match(r"^chr?\w+:\d+:[ACGTN]+:[ACGTN]+$", identifier, re.IGNORECASE))
+        chromosomes = set()
+        match_found = False
+
+        with open(variant_table_path, "r") as f:
+            reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
+            for row in reader:
+                chrom = str(row.get("CHROM") or row.get("chrom"))
+                gene_id = row.get("ENST") or row.get("gene")
+                var_id = row.get("varID")
+
+                chromosomes.add(chrom)
+
+                if (is_variant and var_id == identifier) or (not is_variant and gene_id == identifier):
+                    match_found = True
+                    break
+
+        if match_found:
+            LOGGER.info(f"Found {identifier} in chunk {chunk} (chromosome(s): {chromosomes})")
+            result = chromosomes
+        else:
+            LOGGER.debug(f"No matches for {identifier} in chunk {chunk}")
+
+    return result
+
+
 def define_field_names_from_pandas(id_field: str, default_fields: List[str] = None) -> List[str]:
     """These two methods help the different tools in defining the correct field names to include in outputs
 
@@ -197,12 +244,16 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     :return: A List of field string names to use for outputs
     """
     # Test what columns we have in the 'SNP' field, so we can name them...
-    split_id_field = id_field['SNP'].split("-")
+    if 'SNP' in id_field:
+        split_id_field = id_field['SNP'].split("-")
+    else:
+        split_id_field = id_field.split("-")
     field_names = [] if default_fields is None else default_fields
     num_default = len(field_names)
     if len(split_id_field) == num_default + 1:  # This is the bare minimum; we found 1 additional field to the default
         field_names.append('var1')
-    elif len(split_id_field) == num_default + 2:  # This could be the standard naming format... check that column [2] is MAF/AC
+    elif len(
+            split_id_field) == num_default + 2:  # This could be the standard naming format... check that column [2] is MAF/AC
         if 'MAF' in split_id_field[num_default + 1] or 'AC' in split_id_field[num_default + 1]:
             field_names.extend(['MASK', 'MAF'])
         else:  # This means we didn't hit on MAF in column [2] and a different naming convention is used...
@@ -237,7 +288,7 @@ def define_covariate_string(found_quantitative_covariates: List[str], found_cate
     quant_covars = [] if ignore_base else ['PC{1:10}', 'age', 'age_squared', 'sex']
     quant_covars.extend(found_quantitative_covariates)
 
-    cat_covars = [] if ignore_base else (['wes_batch', 'array_batch'] if add_array else ['wes_batch'])
+    cat_covars = [] if ignore_base else (['batch', 'array_batch'] if add_array else ['batch'])
     cat_covars.extend(found_categorical_covariates)
 
     covar_string = ''
@@ -305,7 +356,8 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
 
 
 def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
-                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3, force: bool = False) -> Tuple[Path, Path]:
+                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3, force: bool = False) -> Tuple[
+    Path, Path]:
     """Compress a file using bgzip and create a tabix index.
 
     This function uses pysam to compress a file with bgzip and create a corresponding tabix index.
