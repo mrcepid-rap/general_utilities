@@ -109,23 +109,25 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
     # First create a list of DNANexus fileIDs to process
     tar_files = []
 
-    # association_tarballs likely to be a single tarball or a txt file with links:
-    input_str = str(association_tarballs.get_input_str())
-    if re.match('file-\\w{24}', input_str):
-        input_str = InputFileHandler(input_str, download_now=True).get_file_handle()
+    try:
+        # association_tarballs likely to be a single tarball or a txt file with links:
+        input_str = str(association_tarballs.get_input_str())
+        if re.match('file-\\w{24}', input_str):
+            input_str = InputFileHandler(input_str, download_now=True).get_file_handle()
 
-    # if the input is a tar.gz file, append it directly
-    if tarfile.is_tarfile(input_str):
-        tar_files.append(association_tarballs.get_file_handle())
-    # When association_tarballs is a .txt file, read file IDs and process them
-    elif not tarfile.is_tarfile(input_str):
-        # input must be a text file if not a tar.gz or a list - if not true, the user should investigate what they passed
-        with open(input_str, 'r') as f:
-            for line in f:
-                file_path = InputFileHandler(line).get_file_handle()
-                tar_files.append(file_path)
-    else:
-        raise TypeError("association_tarballs must be an InputFileHandler or a list of InputFileHandler instances")
+        # if the input is a tar.gz file, append it directly
+        if tarfile.is_tarfile(input_str):
+            tar_files.append(association_tarballs.get_file_handle())
+        # When association_tarballs is a .txt file, read file IDs and process them
+        else:
+            # input must be a text file if not a tar.gz or a list - if not true, the user should investigate what they passed
+            with input_str.open('r') as f:
+                for line in f:
+                    file_path = InputFileHandler(line).get_file_handle()
+                    tar_files.append(file_path)
+    except Exception as e:
+        LOGGER.error(f"Error processing association_tarballs: {e}, please check the input provided.")
+        raise
 
     # Now process them in order
     for tar_file in tar_files:

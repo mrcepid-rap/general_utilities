@@ -300,8 +300,9 @@ class CommandExecutor:
                 elif "/" in arg or path.suffix:
                     if not path.exists():
                         possible_output_paths.append(path)
-            except Exception:
-                continue  # defensive: skip anything weird
+            except Exception as e:
+                self._logger.warning(f"Could not parse argument `{arg}` as a file path: {e}")
+                continue
 
         # Start with all_mounts as a set for deduplication
         all_mounts = set()
@@ -319,7 +320,7 @@ class CommandExecutor:
             try:
                 # Ensure the directory exists; safe if it already does
                 parent_dir.mkdir(parents=True, exist_ok=True)
-            except Exception as e:
+            except OSError as e:
                 self._logger.warning(f"Could not ensure directory exists for {output_path}: {e}")
                 continue
 
