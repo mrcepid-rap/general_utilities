@@ -108,8 +108,8 @@ def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_t
         staar_table[field_names] = staar_table['SNP'].str.split("-", expand=True)
 
         # Select STAAR columns we need to merge in/match on
-        staar_table = staar_table[['ENST', 'pheno_name', 'n_var', 'relatedness_correction', 'p_val_O',
-                                   'p_val_SKAT', 'p_val_burden', 'p_val_ACAT']]
+        staar_table = staar_table[['ENST', 'pheno_name', 'n_var', 'relatedness.correction', 'staar.O.p', 'staar.SKAT.p',
+                                   'staar.burden.p', 'staar.ACAT.p']]
 
         final_table = glm_table.merge(right=staar_table, on=['ENST', 'pheno_name'])
 
@@ -120,11 +120,12 @@ def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_t
         outputs = [gene_path]
 
     else:
-        glm_table = pd.read_csv(f'{output_prefix}.lm_results.tsv.gz', sep='\t')
-        staar_table = pd.read_csv(f'{output_prefix}.staar_results.tsv.gz', sep='\t')
+        glm_table = pd.read_csv(f'{output_prefix}.genes.glm.stats.tsv.gz', sep='\t')
+        staar_table = pd.read_csv(f'{output_prefix}.genes.STAAR.stats.tsv.gz', sep='\t')
 
         # Select STAAR columns we need to merge in/match on
-        staar_table = staar_table[['ENST', 'MASK', 'MAF', 'pheno_name', 'n_var', 'relatedness_correction', 'p_val_O',
+        staar_table = staar_table[['ENST', 'MASK', 'MAF', 'pheno_name', 'n_var',
+                                   'relatedness_correction', 'p_val_O',
                                    'p_val_SKAT', 'p_val_burden', 'p_val_ACAT']]
 
         final_table = glm_table.merge(right=staar_table, on=['ENST', 'MASK', 'MAF', 'pheno_name'])
