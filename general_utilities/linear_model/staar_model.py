@@ -157,9 +157,11 @@ def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None) -> Dic
     variant_matricies = {}
 
     for staar_variants in staar_variants_list:
-        # get the bgen prefix out of the staar variants path with a regex:
-        current_prefix = re.match(rf'{tarball_path.name}\.(\w*)\.STAAR\.variants_table\.tsv',
-                                  staar_variants.name).group(1)
+        # extract bgen prefix allowing letters, digits, underscores, and hyphens
+        match = re.match(r'.*\\.(?P<prefix>[\w\-]+)\.STAAR\.variants_table\.tsv', staar_variants.name)
+        if not match:
+            raise ValueError(f"Unable to extract BGEN prefix from filename: {staar_variants.name}")
+        current_prefix = match.group('prefix')
 
         variant_table = pd.read_csv(staar_variants, delimiter='\t')
         variant_matrix = make_variant_list(variant_table)
