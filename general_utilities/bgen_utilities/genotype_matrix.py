@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple, Dict, Any, Set, TypedDict, List
+from typing import Tuple, Dict, Any, Set, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -55,8 +55,7 @@ def make_variant_list(variant_list: pd.DataFrame) -> Dict[str, GeneInformation]:
 
 def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_filter_list: Set[str],
                                   chromosome: str = None, start: int = None, end: int = None,
-                                  should_collapse_matrix: bool = True,
-                                  sample_filter_list: List[str] = None) -> Tuple[csr_matrix, Dict[str, Any]]:
+                                  should_collapse_matrix: bool = True) -> Tuple[csr_matrix, Dict[str, Any]]:
     """
     Convert BGEN genotypes into a sparse matrix format.
 
@@ -78,7 +77,6 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
     :param end: End position to filter variants by (optional).
     :param should_collapse_matrix: If True (default) collapse variants - sum variants per gene.
         If False, don't sum variants per gene and return the matrix instead.
-    :param sample_filter_list: Optional list of sample IDs to include. If None, all samples are used.
     :return: A tuple containing:
         - csr_matrix: A sparse matrix with shape (n_samples, n_genes_or_variants).
         - summary_dict: A dictionary with summary information for each gene.
@@ -99,19 +97,6 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
 
         # Re‑open BGEN after peeking at the first variant
         bgen_reader = BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True)
-
-        # Create sample mask if sample_filter_list is provided
-        if sample_filter_list is not None:
-            all_samples = bgen_reader.samples
-            # Create a boolean mask for samples to keep
-            sample_mask = np.array([s in sample_filter_list for s in all_samples])
-            n_samples = np.sum(sample_mask)
-
-            if n_samples == 0:
-                raise ValueError("No samples from sample_filter_list found in BGEN file")
-        else:
-            sample_mask = None
-            n_samples = len(bgen_reader.samples)
 
         # Fetch actual data from the BGEN file
         # Handle chromosome, start, and end filtering
@@ -149,10 +134,6 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
             variant_array = np.where(current_probabilities[:, 1] == 1, 1,
                                      np.where(current_probabilities[:, 2] == 1, 2, 0))
 
-            # Apply sample filter if provided
-            if sample_mask is not None:
-                variant_array = variant_array[sample_mask]
-
             # store variant level information in the array we created
             variant_arrays.append(variant_array)
 
@@ -176,6 +157,6 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         }
 
         # convert this to a csr matrix
-        final_genotypes = csr_matrix(stacked_variants, shape=(n_samples, variant_n))
+        final_genotypes = csr_matrix(stacked_variants, shape=(len(bgen_reader.samples), variant_n))
 
     return final_genotypes, summary_dict
