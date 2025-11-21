@@ -35,18 +35,26 @@ colnames(genotypes) <- as.character(variants[,varID])
 obj_nullmodel <- readRDS(null_model_file)
 
 # Trim the genotypes/sparse kinship mtx down to individuals included in the null model file:
-poss <- obj_nullmodel$id_include # this gets possible individuals from the null model
+# Get rownames from genotype matrix
+geno_ids <- rownames(genotypes)
 
-# Filter
-keep <- rownames(genotypes) %in% poss
-genotypes <- genotypes[keep, , drop=FALSE]
+# Restrict null model list to samples that exist in the genotypes
+poss <- intersect(obj_nullmodel$id_include, geno_ids)
 
-# Reorder genotypes to match null model ordering
+if (length(poss) == 0) {
+    stop("ERROR: No overlapping samples between genotype matrix and null model!")
+}
+
+# Filter genotypes to samples present in poss
+keep_idx <- geno_ids %in% poss
+genotypes <- genotypes[keep_idx, , drop=FALSE]
+
+# Reorder genotypes to the NULL model order
 order_idx <- match(poss, rownames(genotypes))
-order_idx <- order_idx[!is.na(order_idx)]  # keep those found
 genotypes <- genotypes[order_idx, , drop=FALSE]
 
-cat(sprintf("After reordering: %d samples in correct order\n", nrow(genotypes)))
+cat(sprintf("Final alignment: %d samples retained (NULL model expected %d)\n",
+            nrow(genotypes), length(poss)))
 
 # I don't exclude variants that don't exist in the subset of individuals with a given phenotype
 # So we have to check here how many variants we actually have for genotypes
