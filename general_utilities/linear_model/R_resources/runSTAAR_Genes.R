@@ -13,75 +13,103 @@ library(jsonlite)
 # 4. [4] The null model file from runSTAAR_Null.R
 # 5. [5] Gene name for subsetting the variants file
 # 6. [6] Output file path
-args <- commandArgs(trailingOnly = T)
-matrix_file <- args[1]
-variants_file <- args[2]
-samples_file <- args[3]
+args <- commandArgs(trailingOnly = TRUE)
+matrix_file     <- args[1]
+variants_file   <- args[2]
+samples_file    <- args[3]
 null_model_file <- args[4]
-gene <- args[5]
-output_file <- args[6]
+gene            <- args[5]
+output_file     <- args[6]
 
-# Load RDS genotype matrix
+# Load genotype matrix, variants and samples
 genotypes <- readMM(matrix_file)
-variants <- fread(variants_file, sep='\t')
-variants <- variants[ENST == gene]
-samples <- fread(samples_file, sep='\t')
+variants  <- fread(variants_file, sep = "\t")
+variants  <- variants[ENST == gene]
+samples   <- fread(samples_file, sep = "\t")
 
-# Assign appropriate column and row names to the genotype matrix
-rownames(genotypes) <- as.character(samples[,sampID])
-colnames(genotypes) <- as.character(variants[,varID])
+# Assign appropriate row and column names
+rownames(genotypes) <- as.character(samples[, sampID])
+colnames(genotypes) <- as.character(variants[, varID])
 
 # Load the null model file:
 obj_nullmodel <- readRDS(null_model_file)
 
-# Trim the genotypes/sparse kinship mtx down to individuals included in the null model file:
-# Get rownames from genotype matrix
-geno_ids <- rownames(genotypes)
+# --- Align genotypes with NULL model + GRM ---
 
-# Restrict null model list to samples that exist in the genotypes
-poss <- intersect(obj_nullmodel$id_include, geno_ids)
+# NULL model sample lists
+null_ids <- obj_nullmodel$id_include
+grm_ids  <- obj_nullmodel$sample.id   # sparse GRM sample IDs
 
-if (length(poss) == 0) {
-    stop("ERROR: No overlapping samples between genotype matrix and null model!")
+# 1. Intersect all sample sets
+valid_ids <- intersect(null_ids, grm_ids)
+valid_ids <- intersect(valid_ids, rownames(genotypes))
+
+if (length(valid_ids) == 0) {
+    stop("No overlapping samples between genotypes, NULL model, and GRM")
 }
 
-# Filter genotypes to samples present in poss
-keep_idx <- geno_ids %in% poss
-genotypes <- genotypes[keep_idx, , drop=FALSE]
+# 2. Sort valid_ids in the EXACT order expected by the NULL model
+valid_ids <- null_ids[null_ids %in% valid_ids]
 
-# Reorder genotypes to the NULL model order
-order_idx <- match(poss, rownames(genotypes))
-genotypes <- genotypes[order_idx, , drop=FALSE]
+# 3. Reorder genotype matrix to NULL model order
+genotypes <- genotypes[match(valid_ids, rownames(genotypes)), , drop = FALSE]
 
-cat(sprintf("Final alignment: %d samples retained (NULL model expected %d)\n",
-            nrow(genotypes), length(poss)))
+cat(sprintf("Final aligned samples: %d\n", nrow(genotypes)))
+cat(sprintf("NULL model (id_include): %d\n", length(null_ids)))
+cat(sprintf("GRM (sample.id):         %d\n", length(grm_ids)))
 
-# I don't exclude variants that don't exist in the subset of individuals with a given phenotype
-# So we have to check here how many variants we actually have for genotypes
+# 4. Rewrite NULL MODEL internals to the same ordering
+# Sigma_i == sparse GRM matrix in NULL model
+if (!is.null(obj_nullmodel$Sigma_i)) {
+    idx <- match(valid_ids, obj_nullmodel$sample.id)
+    obj_nullmodel$Sigma_i <- obj_nullmodel$Sigma_i[idx, idx]
+}
+
+# Update model sample lists too
+obj_nullmodel$id_include <- valid_ids
+obj_nullmodel$sample.id  <- valid_ids
+
+# --- Variant counts ---
 tot_vars <- 0
 for (i in seq_len(ncol(genotypes))) {
-  if (sum(genotypes[,i]) > 0) {
-    tot_vars <- tot_vars + 1
-  }
+    if (sum(genotypes[, i]) > 0) {
+        tot_vars <- tot_vars + 1
+    }
 }
 cMAC <- sum(genotypes)
 
 # Only run STAAR if there is greater than one non-ref variant and there are cases
-if (obj_nullmodel$zero_cases == TRUE | cMAC <= 2) {
-  # Else just return NaN to indicate the test was not run
-  gene.results <- list(n_model=nrow(genotypes), relatedness_correction=obj_nullmodel$corrected_for_relateds,
-                       p_val_O=NaN, p_val_SKAT=NaN,
-                       p_val_burden=NaN, p_val_ACAT=NaN,
-                       n_var=tot_vars, cMAC=cMAC, model_run=FALSE)
-
+if (obj_nullmodel$zero_cases == TRUE || cMAC <= 2) {
+    gene.results <- list(
+        n_model               = nrow(genotypes),
+        relatedness_correction= obj_nullmodel$corrected_for_relateds,
+        p_val_O               = NaN,
+        p_val_SKAT            = NaN,
+        p_val_burden          = NaN,
+        p_val_ACAT            = NaN,
+        n_var                 = tot_vars,
+        cMAC                  = cMAC,
+        model_run             = FALSE
+    )
 } else {
-  staar_result <- STAAR(genotype = genotypes, obj_nullmodel = obj_nullmodel, rare_maf_cutoff = 1)
-  gene.results <- list(n_model=nrow(genotypes), relatedness_correction=obj_nullmodel$corrected_for_relateds,
-                       p_val_O=staar_result$results_STAAR_O, p_val_SKAT=staar_result$results_STAAR_S_1_25[[1]],
-                       p_val_burden=staar_result$results_STAAR_B_1_1[[1]], p_val_ACAT=staar_result$results_STAAR_A_1_25[[1]],
-                       n_var=tot_vars, cMAC=cMAC, model_run=TRUE)
+    staar_result <- STAAR(
+        genotype     = genotypes,
+        obj_nullmodel= obj_nullmodel,
+        rare_maf_cutoff = 1
+    )
+    gene.results <- list(
+        n_model               = nrow(genotypes),
+        relatedness_correction= obj_nullmodel$corrected_for_relateds,
+        p_val_O               = staar_result$results_STAAR_O,
+        p_val_SKAT            = staar_result$results_STAAR_S_1_25[[1]],
+        p_val_burden          = staar_result$results_STAAR_B_1_1[[1]],
+        p_val_ACAT            = staar_result$results_STAAR_A_1_25[[1]],
+        n_var                 = tot_vars,
+        cMAC                  = cMAC,
+        model_run             = TRUE
+    )
 }
 
-# And write the final output table
-export_JSON <- toJSON(gene.results, flatten = T, digits = NA, auto_unbox = T)
+# Write the final output table
+export_JSON <- toJSON(gene.results, flatten = TRUE, digits = NA, auto_unbox = TRUE)
 write(export_JSON, output_file)
