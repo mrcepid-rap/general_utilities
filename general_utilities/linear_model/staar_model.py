@@ -144,8 +144,8 @@ def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None) -> Dic
 
     tarball_path = Path(tarball_prefix)
 
-    staar_variants_list = tarball_path.parent.glob(
-        replace_multi_suffix(tarball_path, '.*.STAAR.variants_table.tsv').name)
+    pattern = f"{tarball_path.name}.*.STAAR.variants_table.tsv"
+    staar_variants_list = list(tarball_path.parent.glob(pattern))
     # If requested to load a single bgen prefix, filter the list to only include that prefix
     if bgen_prefix is not None:
         if tarball_path.parent / f'{tarball_path.name}.{bgen_prefix}.STAAR.variants_table.tsv' in staar_variants_list:
