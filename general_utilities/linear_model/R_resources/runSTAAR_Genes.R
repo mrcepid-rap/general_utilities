@@ -36,7 +36,18 @@ obj_nullmodel <- readRDS(null_model_file)
 
 # Trim the genotypes/sparse kinship mtx down to individuals included in the null model file:
 poss <- obj_nullmodel$id_include # this gets possible individuals from the null model
-genotypes <- genotypes[poss, ,drop=F] # And then use that list to pare down the genotype matrix, drop required to not convert 1d matricies to vectors
+# Match sample IDs instead of using as indices
+matched_samples <- rownames(genotypes) %in% poss
+genotypes <- genotypes[matched_samples, ,drop=F] # And then use that list to pare down the genotype matrix, drop required to not convert 1d matricies to vectors
+
+# Print diagnostic info
+cat(sprintf("Total samples in matrix: %d\n", length(rownames(genotypes)) + sum(!matched_samples)))
+cat(sprintf("Samples in null model: %d\n", length(poss)))
+cat(sprintf("Matched samples: %d\n", nrow(genotypes)))
+
+if (nrow(genotypes) == 0) {
+  stop("ERROR: No samples matched between genotype matrix and null model!")
+}
 
 # I don't exclude variants that don't exist in the subset of individuals with a given phenotype
 # So we have to check here how many variants we actually have for genotypes
