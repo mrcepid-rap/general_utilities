@@ -27,16 +27,33 @@ variants <- fread(variants_file, sep='\t')
 variants <- variants[ENST == gene]
 samples <- fread(samples_file, sep='\t')
 
-# Assign appropriate column and row names to the genotype matrix
-rownames(genotypes) <- as.character(samples[,sampID])
+# Assign column names
 colnames(genotypes) <- as.character(variants[,varID])
 
 # Load the null model file:
 obj_nullmodel <- readRDS(null_model_file)
+poss <- obj_nullmodel$id_include
 
-# Trim the genotypes/sparse kinship mtx down to individuals included in the null model file:
-poss <- obj_nullmodel$id_include # this gets possible individuals from the null model
-genotypes <- genotypes[poss, ,drop=F] # And then use that list to pare down the genotype matrix, drop required to not convert 1d matricies to vectors
+# CRITICAL FIX: Handle dimension mismatch between matrix and samples table
+if (nrow(genotypes) != nrow(samples)) {
+  cat(sprintf("Matrix has %d rows, samples table has %d rows\n", nrow(genotypes), nrow(samples)))
+
+  # The matrix has all BGEN samples, but samples table has filtered samples
+  # Use the 'row' column to subset the matrix to the correct rows
+  if ("row" %in% colnames(samples)) {
+    # R is 1-indexed, so add 1 to the row indices
+    genotypes <- genotypes[samples$row + 1, , drop=F]
+    cat(sprintf("Subsetted matrix to %d rows using row indices\n", nrow(genotypes)))
+  } else {
+    stop("Sample dimension mismatch and no 'row' column found in samples table")
+  }
+}
+
+# Now assign rownames (dimensions should match now)
+rownames(genotypes) <- as.character(samples[,sampID])
+
+# Trim the genotypes down to individuals included in the null model file
+genotypes <- genotypes[rownames(genotypes) %in% poss, ,drop=F]
 
 # I don't exclude variants that don't exist in the subset of individuals with a given phenotype
 # So we have to check here how many variants we actually have for genotypes
