@@ -105,17 +105,19 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
             print(f"DEBUG: sample_filter_list provided with {len(sample_filter_list)} samples")
             all_samples = bgen_reader.samples
             print(f"DEBUG: BGEN has {len(all_samples)} total samples")
+            print(f"DEBUG: First 10 BGEN samples: {all_samples[:10]}")
+            print(f"DEBUG: First 10 filter samples: {sample_filter_list[:10]}")
+
             # Create a boolean mask for samples to keep
             sample_mask = np.array([s in sample_filter_list for s in all_samples])
             n_samples = np.sum(sample_mask)
             print(f"DEBUG: After filtering, keeping {n_samples} samples")
 
             if n_samples == 0:
+                # Show what the mismatch looks like
+                print(f"DEBUG: BGEN sample type: {type(all_samples[0])}")
+                print(f"DEBUG: Filter sample type: {type(sample_filter_list[0])}")
                 raise ValueError("No samples from sample_filter_list found in BGEN file")
-        else:
-            print("DEBUG: No sample_filter_list provided, using all samples")
-            sample_mask = None
-            n_samples = len(bgen_reader.samples)
 
         # Fetch actual data from the BGEN file
         # Handle chromosome, start, and end filtering
