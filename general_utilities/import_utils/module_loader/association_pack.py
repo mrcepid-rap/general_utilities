@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 from pathlib import Path
 from general_utilities.import_utils.file_handlers.input_file_handler import InputFileHandler
 from general_utilities.job_management.command_executor import CommandExecutor
@@ -18,13 +18,13 @@ class ProgramArgs(ABC):
 
     phenofile: List[InputFileHandler]
     phenoname: str
-    covarfile: InputFileHandler
+    covarfile: Optional[InputFileHandler]
     categorical_covariates: List[str]
     quantitative_covariates: List[str]
     is_binary: bool
     sex: int
-    exclusion_list: InputFileHandler
-    inclusion_list: InputFileHandler
+    exclusion_list: Optional[InputFileHandler]
+    inclusion_list: Optional[InputFileHandler]
     transcript_index: InputFileHandler
     base_covariates: InputFileHandler
     ignore_base: bool
@@ -57,7 +57,7 @@ class AssociationPack(ABC):
     :param cmd_executor: Class to run system calls via the shell or Docker.
     """
 
-    def __init__(self, is_binary: bool, sex: int, threads: int, pheno_names: List[str], ignore_base_covariates: bool,
+    def __init__(self, is_binary: bool, sex: int, threads: int, pheno_names: List[str],
                  found_quantitative_covariates: List[str], found_categorical_covariates: List[str], cmd_executor: CommandExecutor,
                  final_covariates: Path, inclusion_samples: Path, exclusion_samples: Path, transcript_index: Path
                  ):
@@ -65,7 +65,6 @@ class AssociationPack(ABC):
         self.sex = sex
         self.threads = threads
         self.pheno_names = pheno_names
-        self.ignore_base_covariates = ignore_base_covariates
         self.found_quantitative_covariates = found_quantitative_covariates
         self.found_categorical_covariates = found_categorical_covariates
         self.cmd_executor = cmd_executor
