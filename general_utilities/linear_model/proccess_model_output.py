@@ -77,8 +77,8 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
         # Sort if we are dealing with a genomewide mask
         if tarball_type == TarballType.GENOMEWIDE:
             # Sort by chromosome, start, and end for genomewide masks
-            gene_rows = sorted(gene_rows, key=lambda row: (row['chrom'], row['start']))
-
+            # Use .get() with defaults to handle missing transcript info
+            gene_rows = sorted(gene_rows, key=lambda row: (row.get('chrom', 'chrZ'), row.get('start', 0)))
         output_csv.writerows(gene_rows)
 
     if tarball_type == TarballType.GENOMEWIDE:
