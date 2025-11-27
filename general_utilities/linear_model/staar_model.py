@@ -3,7 +3,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import pandas as pd
 from importlib_resources import files
@@ -63,7 +63,7 @@ class STAARModelResult:
 def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bool,
                found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
                sex: int, sparse_kinship_file: Path, sparse_kinship_samples: Path,
-               cmd_executor: CommandExecutor = build_default_command_executor()) -> Path:
+               cmd_executor: CommandExecutor = build_default_command_executor()) -> Tuple[str, Path]:
     """This method wraps an R script that generates the STAAR Null model.
 
     The STAAR model residualises the phenotype on covariates and a sparse kinship matrix to account for relatedness. The
@@ -125,7 +125,7 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
 
     cmd_executor.run_cmd_on_docker(cmd)
 
-    return output_file
+    return phenotype, output_file
 
 
 def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None) -> Dict[str, Dict[str, GeneInformation]]:
