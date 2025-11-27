@@ -56,7 +56,17 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
 
             model_dict = dataclasses.asdict(model)
             model_dict.update(mask_maf_columns)
-            gene_info = transcripts_table.loc[model.ENST].to_dict() if tarball_type == TarballType.GENOMEWIDE else {}
+
+            if tarball_type == TarballType.GENOMEWIDE:
+                try:
+                    gene_info = transcripts_table.loc[model.ENST].to_dict()
+                except KeyError:
+                    # Log warning and use empty dict if transcript not found
+                    gene_info = {}
+            else:
+                # Empty dict
+                gene_info = {}
+
             model_dict.update(gene_info)
 
             gene_rows.append(model_dict)
