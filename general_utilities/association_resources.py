@@ -75,14 +75,20 @@ def build_transcript_table(transcripts_path: Path = Path('transcripts.tsv.gz'),
     """
 
     transcripts_table = pd.read_csv(transcripts_path, sep="\t", index_col='ENST')
-    if filter_genes:
-        transcripts_table = transcripts_table[transcripts_table['fail'] == False]
-        transcripts_table = transcripts_table.drop(columns=['syn.count', 'fail.cat', 'fail'])
-        transcripts_table = transcripts_table[transcripts_table['chrom'] != 'Y']
 
-    # ensure columns are in the expected order:
-    transcripts_table = transcripts_table[['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
-                                           'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']]
+    if filter_genes:
+        # Only filter if the 'fail' column exists (i.e., we're reading the original file)
+        if 'fail' in transcripts_table.columns:
+            transcripts_table = transcripts_table[transcripts_table['fail'] == False]
+            transcripts_table = transcripts_table.drop(columns=['syn.count', 'fail.cat', 'fail'])
+            transcripts_table = transcripts_table[transcripts_table['chrom'] != 'Y']
+
+        # Select specific columns
+        expected_cols = ['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
+                         'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']
+        available_cols = [col for col in expected_cols if col in transcripts_table.columns]
+        transcripts_table = transcripts_table[available_cols]
+    # When filter_genes=False, don't modify the dataframe at all - keep ALL columns
 
     # Also generate a table of mean chromosome positions for plotting
     mean_chr_pos = transcripts_table[['chrom', 'manh.pos']].groupby('chrom').mean()
