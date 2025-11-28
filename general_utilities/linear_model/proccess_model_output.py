@@ -7,7 +7,7 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Union
 
-from build.lib.general_utilities.mrc_logger import MRCLogger
+from general_utilities.mrc_logger import MRCLogger
 from general_utilities.import_utils.import_lib import TarballType
 from general_utilities.linear_model.staar_model import STAARModelResult
 from general_utilities.linear_model.linear_model import LinearModelResult
