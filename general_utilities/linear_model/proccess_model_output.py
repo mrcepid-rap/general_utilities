@@ -7,10 +7,13 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Union
 
+from build.lib.general_utilities.mrc_logger import MRCLogger
 from general_utilities.import_utils.import_lib import TarballType
 from general_utilities.linear_model.staar_model import STAARModelResult
 from general_utilities.linear_model.linear_model import LinearModelResult
 from general_utilities.association_resources import define_field_names_from_pandas, bgzip_and_tabix
+
+LOGGER = MRCLogger(__name__).get_logger()
 
 def process_model_outputs(input_models: Union[List[STAARModelResult], List[LinearModelResult]], output_path: Path,
                           tarball_type: TarballType, transcripts_table: pd.DataFrame) -> List[Path]:
@@ -61,8 +64,9 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
                 try:
                     gene_info = transcripts_table.loc[model.ENST].to_dict()
                 except KeyError:
-                    # Log warning and use empty dict if transcript not found
-                    gene_info = {}
+                    # Skip transcripts missing from reference table - they can't be tabix indexed without chrom/start
+                    LOGGER.warning(f"Transcript {model.ENST} not found in transcripts table, skipping")
+                    continue
             else:
                 # Empty dict
                 gene_info = {}
