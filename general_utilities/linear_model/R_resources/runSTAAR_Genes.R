@@ -34,21 +34,6 @@ colnames(genotypes) <- as.character(variants[,varID])
 obj_nullmodel <- readRDS(null_model_file)
 poss <- obj_nullmodel$id_include
 
-# CRITICAL FIX: Handle dimension mismatch between matrix and samples table
-if (nrow(genotypes) != nrow(samples)) {
-  cat(sprintf("Matrix has %d rows, samples table has %d rows\n", nrow(genotypes), nrow(samples)))
-
-  # The matrix has all BGEN samples, but samples table has filtered samples
-  # Use the 'row' column to subset the matrix to the correct rows
-  if ("row" %in% colnames(samples)) {
-    # R is 1-indexed, so add 1 to the row indices
-    genotypes <- genotypes[samples$row + 1, , drop=F]
-    cat(sprintf("Subsetted matrix to %d rows using row indices\n", nrow(genotypes)))
-  } else {
-    stop("Sample dimension mismatch and no 'row' column found in samples table")
-  }
-}
-
 # Now assign rownames (dimensions should match now)
 rownames(genotypes) <- as.character(samples[,sampID])
 
