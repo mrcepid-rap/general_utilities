@@ -128,33 +128,6 @@ def get_gene_id(gene_id: str, transcripts_table: pandas.DataFrame) -> pandas.cor
             LOGGER.info(f'Found one matching ENST ({gene_id} - {gene_info["coord"]})... proceeding...')
         except KeyError:
             raise KeyError(f'Did not find a transcript with ENST value {gene_id}... terminating...')
-
-    # if we are dealing with a variant
-    elif re.match(r"^chr?\w+:\d+[:_][ACGTN]+[:_][ACGTN]+$", gene_id, re.IGNORECASE):
-        LOGGER.info("gene_id – " + gene_id + " – looks like a variant... ")
-        # Parse variant string
-        match = re.match(r"^chr?(\w+):(\d+)", gene_id, re.IGNORECASE)
-        if not match:
-            raise ValueError(f"Could not parse variant ID: {gene_id}")
-        chrom, pos = match.group(1), int(match.group(2))
-        # Remove 'chr' prefix if present in transcripts_table
-        if chrom.startswith('chr'):
-            chrom = chrom[3:]
-        # Find gene containing the variant
-        found_rows = transcripts_table[
-            (transcripts_table['chrom'].astype(str) == str(chrom)) &
-            (transcripts_table['start'] <= pos) &
-            (transcripts_table['end'] >= pos)
-            ]
-        if len(found_rows) == 1:
-            gene_info = found_rows.iloc[0]
-            LOGGER.info(f"Found gene {gene_info['SYMBOL']} ({gene_info.name}) for variant {gene_id}")
-        elif len(found_rows) > 1:
-            raise ValueError(f"Multiple genes found for variant {gene_id}: {', '.join(found_rows['SYMBOL'])}")
-        else:
-            raise KeyError(f'Did not find a transcript containing variant position {gene_id}... terminating...')
-
-
     # Otherwise see if we can find a SINGLE gene with a given SYMBOL in the table using ==
     else:
         LOGGER.warning("gene_id – " + gene_id + " – does not look like an ENST value, searching for symbol instead...")
