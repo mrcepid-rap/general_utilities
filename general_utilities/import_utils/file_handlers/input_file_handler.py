@@ -220,15 +220,23 @@ class InputFileHandler:
         """
 
         # Parse GCS URI
-        bucket_name, blob_name = self._input_str.groups()
+        match = re.match(r'^gs://([^/]+)/(.+)$', str(self._input_str))
+        if not match:
+            raise ValueError(f"Could not parse GCS URI: {self._input_str}")
+
+        bucket_name, blob_name = match.groups()
+
+        # We generally want to preserve the filename, not the full directory structure
         output_path = Path(blob_name).name
         output_path = Path(output_path)
 
         if output_path.exists():
+            self._logger.info(f"File {output_path} already exists locally.")
             return output_path.resolve()
 
-        # Download the blob
         try:
+            # FIX: Ensure storage is imported
+            from google.cloud import storage
             client = storage.Client()
             bucket = client.bucket(bucket_name)
             blob = bucket.blob(blob_name)

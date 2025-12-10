@@ -13,12 +13,14 @@ from general_utilities.import_utils.file_handlers.input_file_handler import Inpu
         ("project-GbZqJpQJ9bvfF97z25B9Gkjv:file-Fx2x21QJ06f47gV73kZPjkQQ", FileType.DNA_NEXUS_FILE, None),
         ("project-Fx2x0fQJ06KfqV7Y3fFZq1jp:/H. Sapiens - GRCh38 with alt contigs - hs38DH/hs38DH.fa.fai",
          FileType.DNA_NEXUS_FILE, None),
-        ("test_data/transcripts.tsv.gz", FileType.LOCAL_PATH, None),
-        (Path("test_data/transcripts.tsv.gz"), FileType.LOCAL_PATH, None),
+        ("test/test_data/transcripts.tsv.gz", FileType.LOCAL_PATH, None),
+        (Path("test/test_data/transcripts.tsv.gz"), FileType.LOCAL_PATH, None),
         ("gs://bucket-name/file-name", FileType.GCLOUD_FILE, None),
         ("invalid-input", None, FileNotFoundError),
         ({'$dnanexus_link': 'file-Fx2x21QJ06f47gV73kZPjkQQ'}, FileType.DNA_NEXUS_FILE, None),
-        ({'$dnanexus_link': 'file-Fx2x21QJ06f47gXX3kZPjkQQ'}, FileType.DNA_NEXUS_FILE, dxpy.exceptions.ResourceNotFound),
+        ({'$dnanexus_link': 'file-Fx2x21QJ06f47gXX3kZPjkQQ'}, FileType.DNA_NEXUS_FILE,
+         dxpy.exceptions.ResourceNotFound),
+        ("gs://bucket-name/file-name", FileType.GCLOUD_FILE, None),
 
     ],
 )
@@ -42,7 +44,8 @@ def test_input_file_handler_get_file_type(input_file, expected_file_type, expect
         ("file-Fx2x21QJ06f47gV73kZPjkQQGXXX", FileType.DNA_NEXUS_FILE, dxpy.DXError, Path("hs38DH.fa.fai")),
         ("project-Fx2x0fQJ06KfqV7Y3fFZq1jp:file-Fx2x21QJ06f47gV73kZPjkQQ", FileType.DNA_NEXUS_FILE, None,
          Path("hs38DH.fa.fai")),
-        ("project-Fx2x0fQJ06KfqV7Y3fFZq1jpXXX:file-Fx2x21QJ06f47gV73kZPjkQQ", FileType.DNA_NEXUS_FILE, dxpy.exceptions.InvalidInput,
+        ("project-Fx2x0fQJ06KfqV7Y3fFZq1jpXXX:file-Fx2x21QJ06f47gV73kZPjkQQ", FileType.DNA_NEXUS_FILE,
+         dxpy.exceptions.InvalidInput,
          Path("hs38DH.fa.fai")),
         ("project-Fx2x0fQJ06KfqV7Y3fFZq1jp:file-Fx2x21QJ06f47gV73kZPjkQQXXX", FileType.DNA_NEXUS_FILE, TypeError,
          Path("hs38DH.fa.fai")),
@@ -62,9 +65,10 @@ def test_input_file_handler_get_file_type(input_file, expected_file_type, expect
         ("project-Fx2x0fQJ06KfqV7Y3fFZq1jp:H. Sapiens - GRCh38 with alt contigs - hs38DH/hs38DH.fa.fai",
          FileType.DNA_NEXUS_FILE, None,
          Path("hs38DH.fa.fai")),
-        ("test_data/transcripts.tsv.gz", FileType.LOCAL_PATH, None, Path("transcripts.tsv.gz")),
+        ("test/test_data/transcripts.tsv.gz", FileType.LOCAL_PATH, None, Path("test_data/transcripts.tsv.gz")),
         ({'$dnanexus_link': 'file-Fx2x21QJ06f47gV73kZPjkQQ'}, FileType.DNA_NEXUS_FILE, None, Path("hs38DH.fa.fai")),
-        ({'$dnanexus_link': 'file-Fx2x21QJ06f4DDD73kZPjkQQ'}, FileType.DNA_NEXUS_FILE, dxpy.exceptions.ResourceNotFound, Path("hs38DH.fa.fai")),
+        ({'$dnanexus_link': 'file-Fx2x21QJ06f4DDD73kZPjkQQ'}, FileType.DNA_NEXUS_FILE, dxpy.exceptions.ResourceNotFound,
+         Path("hs38DH.fa.fai")),
 
     ],
 )
@@ -81,8 +85,8 @@ def test_dna_nexus_files_explicitly(input_file, expected_file_type, expected_exc
         assert input_handler.get_file_type() == expected_file_type
 
         downloaded_file = input_handler.get_file_handle()
-
         assert downloaded_file.exists()
 
-        # remove the file so we can run the test properly
-        downloaded_file.unlink()
+        # Only delete the file if it is NOT a local source file
+        if expected_file_type != FileType.LOCAL_PATH:
+            downloaded_file.unlink()
