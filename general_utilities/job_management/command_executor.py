@@ -1,4 +1,5 @@
 import shlex
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Union, List
@@ -80,8 +81,19 @@ class CommandExecutor:
             self._authenticate_aws_ecr(aws_credentials)
 
         self._docker_image = docker_image
-        # self._docker_configured = self._ingest_docker_file(docker_image)
-        self._docker_configured = False
+
+        # Check if 'docker' binary exists on the system.
+        # If running in AoU Batch (inside a container already), this returns None.
+        if docker_image and shutil.which('docker'):
+            self._docker_configured = self._ingest_docker_file(docker_image)
+        else:
+            if not shutil.which('docker'):
+                self._logger.warning(
+                    "Docker binary not found! Running commands directly in local shell (Docker-in-Docker bypassed).")
+            else:
+                self._logger.warning("No docker image provided.")
+            self._docker_configured = False
+
         self._docker_prefix = self._construct_docker_prefix(docker_mounts)
 
     def _authenticate_aws_ecr(self, aws_credentials: Path) -> None:
