@@ -80,7 +80,8 @@ class CommandExecutor:
             self._authenticate_aws_ecr(aws_credentials)
 
         self._docker_image = docker_image
-        self._docker_configured = self._ingest_docker_file(docker_image)
+        # self._docker_configured = self._ingest_docker_file(docker_image)
+        self._docker_configured = False
         self._docker_prefix = self._construct_docker_prefix(docker_mounts)
 
     def _authenticate_aws_ecr(self, aws_credentials: Path) -> None:
