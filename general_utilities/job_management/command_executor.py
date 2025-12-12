@@ -9,6 +9,7 @@ import dxpy
 from general_utilities.mrc_logger import MRCLogger
 from general_utilities.platform_utils.platform_factory import PlatformFactory, Platform
 
+# Initialize platform detection
 platform = PlatformFactory().get_platform()
 
 
@@ -251,18 +252,8 @@ class CommandExecutor:
         Run a command in the shell with Docker, automatically mounting parent directories of any absolute file paths
         found in the command string so files can be referenced by their full path inside Docker.
 
-        We are now using absolute paths for all files we run on Docker. Filepaths are created using InputFileHandler.
-        This means that we can automatically mount parent directories of absolute paths found in the command string.
-        You do not need to add files and/or file mounts manually - these will be detected and mounted automatically by
-        the function. The only exception is if you want a custom mount point, which you can set via the
-        'safe_mount_point' parameter.
-
-        This method is a wrapper around the existing run_cmd method that automatically constructs the full Docker
-        command to run the requested process within Docker.
-
-        NOTE: if your command is failing, check whether or not you are supplying full paths as arguments. If you used
-        InputFileHandler to create your input files, you should be fine. If you are creating files manually, you must
-        ensure that you are using absolute paths with Path(some_file.txt).
+        If the platform is GCP (All of Us), we skip the Docker wrapper entirely and run the command directly,
+        as we are likely already inside the required container.
 
         :param cmd: The command to be run.
         :param stdout_file: Capture stdout from the process into the given file
@@ -282,6 +273,11 @@ class CommandExecutor:
             tries to overwrite one of these paths, it will be skipped and a warning will be logged. Default is None.
         :return: The exit code of the underlying process
         """
+
+        # If we are on Google Cloud Platform, we bypass the Docker wrapping logic entirely.
+        if platform == Platform.GCP:
+            self._logger.info(f"Platform is GCP. Bypassing Docker wrapper for command: {cmd}")
+            return self.run_cmd(cmd, stdout_file, print_cmd, livestream_out, dry_run, ignore_error)
 
         # Check if the list is None before trying to iterate over it
         if force_include_paths is None:

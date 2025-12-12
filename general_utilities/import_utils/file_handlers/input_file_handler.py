@@ -1,11 +1,13 @@
 import re
+import os
 import shutil
-import subprocess
 from enum import Enum, auto
 from pathlib import Path
 from typing import Union, Tuple
 
 import dxpy
+# Import the storage library for GCS handling
+from google.cloud import storage
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name, find_dxlink
 from general_utilities.mrc_logger import MRCLogger
 
@@ -14,7 +16,7 @@ class FileType(Enum):
     """Enum representing different file types."""
     DNA_NEXUS_FILE = auto()
     LOCAL_PATH = auto()
-    GCLOUD_FILE = auto()  # Added support for GCS files
+    GCLOUD_FILE = auto()  # Added support for Google Cloud Storage files
 
 
 class InputFileHandler:
@@ -138,7 +140,7 @@ class InputFileHandler:
         method_map = {
             FileType.DNA_NEXUS_FILE: self._resolve_dnanexus_file,
             FileType.LOCAL_PATH: self._resolve_local_file,
-            FileType.GCLOUD_FILE: self._resolve_gsutil_file,
+            FileType.GCLOUD_FILE: self._resolve_gcloud_file,
         }
 
         if file_type in method_map:
@@ -179,7 +181,8 @@ class InputFileHandler:
         elif re.match('project-\\w{24}', self._input_str):
             project, folder, file = self._split_dnanexus_path()
             dxfile = find_dxlink(name=file, folder=folder, project=project)
-            file_path = download_dxfile_by_name(file=dxfile['$dnanexus_link']['id'], project_id=project, print_status=False)
+            file_path = download_dxfile_by_name(file=dxfile['$dnanexus_link']['id'], project_id=project,
+                                                print_status=False)
         else:
             raise FileNotFoundError(f"DNA Nexus input string {self._input_str} could not be resolved.")
 
@@ -201,10 +204,12 @@ class InputFileHandler:
         else:
             raise FileNotFoundError(f"Local file not found: {self._input_str}")
 
-    def _resolve_gsutil_file(self) -> Path:
+    def _resolve_gcloud_file(self) -> Path:
         """
-        Download a file from Google Cloud Storage (GCS) bucket using the system gsutil command.
-        This provides better compatibility with All of Us Batch VMs than the python library.
+        Download a file from Google Cloud Storage (GCS) using the python client library.
+
+        This method is designed to handle 'Requester Pays' buckets by looking up the
+        GOOGLE_PROJECT environment variable, which is automatically set by dsub or the user's environment.
 
         The input file path must be a valid GCS URI (e.g., `gs://bucket-name/file-name`). The method downloads
         the file to the current working directory.
@@ -212,13 +217,12 @@ class InputFileHandler:
         :return: A `Path` object representing the resolved local file path of the downloaded file.
         :raises FileNotFoundError: If the GCS file path is invalid or download fails.
         """
-        # Parse GCS URI
         match = re.match(r'^gs://([^/]+)/(.+)$', str(self._input_str))
         if not match:
             raise ValueError(f"Could not parse GCS URI: {self._input_str}")
 
-        # Extract just the filename to save locally
-        output_path = Path(self._input_str.split('/')[-1])
+        bucket_name, blob_name = match.groups()
+        output_path = Path(blob_name.split('/')[-1])  # Extract filename (ignore directories for local download)
 
         if output_path.exists():
             self._logger.info(f"File {output_path} already exists locally.")
@@ -226,24 +230,38 @@ class InputFileHandler:
 
         try:
             self._logger.info(f"Downloading from GCS: {self._input_str} -> {output_path}")
-            # Use gsutil -q (quiet) cp. The shell=True ensures environment vars and config files are respected.
-            cmd = f"gsutil -q cp {self._input_str} {output_path}"
-            subprocess.run(cmd, shell=True, check=True)
+
+            # Retrieve the billing project from environment (set by .boto or dsub)
+            billing_project = os.environ.get("GOOGLE_PROJECT")
+
+            if not billing_project:
+                self._logger.warning(
+                    "GOOGLE_PROJECT environment variable not set. Attempting to infer default credentials...")
+                import google.auth
+                _, billing_project = google.auth.default()
+
+            # Initialize client with the billing project to satisfy "Requester Pays"
+            storage_client = storage.Client(project=billing_project)
+            bucket = storage_client.bucket(bucket_name, user_project=billing_project)
+            blob = bucket.blob(blob_name)
+
+            blob.download_to_filename(str(output_path))
             return output_path.resolve()
 
-        except subprocess.CalledProcessError as e:
+        except Exception as e:
             self._logger.error(f"Failed to download from GCS: {e}")
             raise FileNotFoundError(f"Failed to download {self._input_str}")
 
     def _decide_filetype(self) -> FileType:
         """
-        Determine the type of the input and classify it as a DNA Nexus file, a local path, or an existing file object.
+        Determine the type of the input and classify it as a DNA Nexus file, a local path, a GCloud file, or an existing file object.
 
         This method evaluates the input string to identify whether it represents a DNA Nexus file ID, a local file path,
         or an existing `DXFile` or `Path` object. It handles the following scenarios:
         - If the input is `None` or the string 'None', it raises a `ValueError`.
         - If the input is already a `DXFile` or `Path` object, it returns the corresponding file type.
         - If the input is a local path, it ensures the path is absolute and checks if it exists.
+        - If the input is a GCS URI (starts with gs://), it returns GCLOUD_FILE.
         - If the input matches the format of a DNA Nexus file ID, it validates the ID and returns the corresponding file type.
         - If the input is a file name, it attempts to locate the file on DNA Nexus and returns the corresponding `DXFile` object.
         Note: for this last example, the input string should be in the format 'project-<24chars>:file-<24chars>'. If the format is
