@@ -1,12 +1,12 @@
 import re
 import shutil
+import subprocess  # Added for gsutil support
 from enum import Enum, auto
 from pathlib import Path
 from typing import Union, Tuple
 
 import dxpy
-from google.cloud import storage
-
+# Removed google.cloud.storage to rely on system gsutil for better Batch compatibility
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import download_dxfile_by_name, find_dxlink
 from general_utilities.mrc_logger import MRCLogger
 
@@ -15,7 +15,7 @@ class FileType(Enum):
     """Enum representing different file types."""
     DNA_NEXUS_FILE = auto()
     LOCAL_PATH = auto()
-    GCLOUD_FILE = auto()
+    GCLOUD_FILE = auto()  # Added support for GCS files
 
 
 class InputFileHandler:
@@ -208,9 +208,8 @@ class InputFileHandler:
 
     def _resolve_gsutil_file(self) -> Path:
         """
-        Download a file from a Google Cloud Storage (GCS) bucket using the Google Cloud Storage Python client.
-
-        NOTE: google-cloud-storage must be configured and authenticated for this to work.
+        Download a file from Google Cloud Storage (GCS) bucket using the system gsutil command.
+        This provides better compatibility with All of Us Batch VMs than the python library.
 
         The input file path must be a valid GCS URI (e.g., `gs://bucket-name/file-name`). The method downloads
         the file to the current working directory.
@@ -218,34 +217,26 @@ class InputFileHandler:
         :return: A `Path` object representing the resolved local file path of the downloaded file.
         :raises FileNotFoundError: If the GCS file path is invalid or download fails.
         """
-
         # Parse GCS URI
         match = re.match(r'^gs://([^/]+)/(.+)$', str(self._input_str))
         if not match:
             raise ValueError(f"Could not parse GCS URI: {self._input_str}")
 
-        bucket_name, blob_name = match.groups()
-
-        # We generally want to preserve the filename, not the full directory structure
-        output_path = Path(blob_name).name
-        output_path = Path(output_path)
+        # Extract just the filename to save locally
+        output_path = Path(self._input_str.split('/')[-1])
 
         if output_path.exists():
             self._logger.info(f"File {output_path} already exists locally.")
             return output_path.resolve()
 
         try:
-            # FIX: Ensure storage is imported
-            from google.cloud import storage
-            client = storage.Client()
-            bucket = client.bucket(bucket_name)
-            blob = bucket.blob(blob_name)
-
-            blob.download_to_filename(str(output_path))
-            self._logger.debug(f"Downloaded file using GCS API: {output_path}")
+            self._logger.info(f"Downloading from GCS: {self._input_str} -> {output_path}")
+            # Use gsutil -q (quiet) cp
+            cmd = f"gsutil -q cp {self._input_str} {output_path}"
+            subprocess.run(cmd, shell=True, check=True)
             return output_path.resolve()
 
-        except Exception as e:
+        except subprocess.CalledProcessError as e:
             self._logger.error(f"Failed to download from GCS: {e}")
             raise FileNotFoundError(f"Failed to download {self._input_str}")
 
@@ -288,7 +279,7 @@ class InputFileHandler:
                 return FileType.LOCAL_PATH
 
         # Check if the input is a GCloud file
-        elif re.match(r'^gs://([^/]+)/(.+)$', self._input_str):
+        elif isinstance(self._input_str, str) and self._input_str.startswith('gs://'):
             return FileType.GCLOUD_FILE
 
         # Check if it's a DNA Nexus file ID
