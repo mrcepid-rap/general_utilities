@@ -14,7 +14,7 @@ class FileType(Enum):
     """Enum representing different file types."""
     DNA_NEXUS_FILE = auto()
     LOCAL_PATH = auto()
-    GCLOUD_FILE = auto()
+    GCLOUD_FILE = auto()  # Added support for GCS files
 
 
 class InputFileHandler:
@@ -179,8 +179,7 @@ class InputFileHandler:
         elif re.match('project-\\w{24}', self._input_str):
             project, folder, file = self._split_dnanexus_path()
             dxfile = find_dxlink(name=file, folder=folder, project=project)
-            file_path = download_dxfile_by_name(file=dxfile['$dnanexus_link']['id'], project_id=project,
-                                                print_status=False)
+            file_path = download_dxfile_by_name(file=dxfile['$dnanexus_link']['id'], project_id=project, print_status=False)
         else:
             raise FileNotFoundError(f"DNA Nexus input string {self._input_str} could not be resolved.")
 
@@ -205,13 +204,14 @@ class InputFileHandler:
     def _resolve_gsutil_file(self) -> Path:
         """
         Download a file from Google Cloud Storage (GCS) bucket using the system gsutil command.
-        This method uses subprocess to call 'gsutil cp', ensuring it respects the ~/.boto
-        configuration for 'Requester Pays' buckets.
+        This provides better compatibility with All of Us Batch VMs than the python library.
+
+        The input file path must be a valid GCS URI (e.g., `gs://bucket-name/file-name`). The method downloads
+        the file to the current working directory.
 
         :return: A `Path` object representing the resolved local file path of the downloaded file.
         :raises FileNotFoundError: If the GCS file path is invalid or download fails.
         """
-
         # Parse GCS URI
         match = re.match(r'^gs://([^/]+)/(.+)$', str(self._input_str))
         if not match:
@@ -237,7 +237,22 @@ class InputFileHandler:
 
     def _decide_filetype(self) -> FileType:
         """
-        Determine the type of the input and classify it as a DNA Nexus file, a local path, or a GCS file.
+        Determine the type of the input and classify it as a DNA Nexus file, a local path, or an existing file object.
+
+        This method evaluates the input string to identify whether it represents a DNA Nexus file ID, a local file path,
+        or an existing `DXFile` or `Path` object. It handles the following scenarios:
+        - If the input is `None` or the string 'None', it raises a `ValueError`.
+        - If the input is already a `DXFile` or `Path` object, it returns the corresponding file type.
+        - If the input is a local path, it ensures the path is absolute and checks if it exists.
+        - If the input matches the format of a DNA Nexus file ID, it validates the ID and returns the corresponding file type.
+        - If the input is a file name, it attempts to locate the file on DNA Nexus and returns the corresponding `DXFile` object.
+        Note: for this last example, the input string should be in the format 'project-<24chars>:file-<24chars>'. If the format is
+        just folder path + filename, it will not work.
+
+        :return: A `FileType` Enum value representing the type of the input, or a `DXFile` object if found on DNA Nexus.
+        :raises FileNotFoundError: If the input is `None`, or the file is not found locally or on DNA Nexus.
+        :raises ValueError: If the local path is not absolute.
+        :raises dxpy.exceptions.DXError: If the DNA Nexus file ID is invalid or cannot be described.
         """
         # if the input is None (note that 'None' could be spelt as a string), then we should raise an error
         if self._input_str is None or self._input_str == 'None':
