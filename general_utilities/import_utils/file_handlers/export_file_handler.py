@@ -1,8 +1,10 @@
+import os
 from pathlib import Path
 from typing import List, Union
 
 import dxpy
 from dxpy import DXFile
+from google.cloud import storage
 
 from general_utilities.import_utils.file_handlers.dnanexus_utilities import generate_linked_dx_file
 from general_utilities.mrc_logger import MRCLogger
@@ -14,12 +16,9 @@ class ExportFileHandler:
     This class is designed to recognize the platform on which it is running (Local, DNANexus, or GCP) and then
     upload files accordingly.
 
-    For DNA Nexus, it converts the input files to DX links using the `dxpy.dxlink` function, and returns a
-    dictionary or list of dictionaries containing the DX links.
-
-    For GCP, the upload logic is not implemented yet, but it can be extended in the future.
-
-    For Local, it simply returns an empty dictionary, as no upload is performed.
+    For DNA Nexus, it converts the input files to DX links.
+    For GCP, it manually uploads files to the location specified by the GCP_OUTPUT_URL env var and returns the gs:// path.
+    For Local, it simply returns the local path.
     """
 
     def __init__(self, delete_on_upload: bool = True):
@@ -33,12 +32,7 @@ class ExportFileHandler:
     def _convert_file_to_dxlink(self, file: Union[str, Path, DXFile, dict]) -> dict:
         """
         Converts a file input to a DX link.
-        This method handles different types of inputs robustly by using the InputFileHandler class.
-
-        :param file: The input file to be converted to a DX link.
-        :return: A DX link dictionary for the file.
         """
-
         if isinstance(file, dxpy.DXFile):
             converted_file = dxpy.dxlink(file)
         elif isinstance(file, dict) and dxpy.is_dxlink(file):
@@ -49,37 +43,65 @@ class ExportFileHandler:
             )
         return converted_file
 
+    def _upload_gcp_file(self, file_path: Union[str, Path]) -> str:
+        """
+        Manually uploads a file to GCS and returns the gs:// path.
+        Requires the 'GCP_OUTPUT_URL' environment variable to be set (e.g. gs://my-bucket/my-output-folder).
+        """
+        file_path = Path(file_path)
+        output_url = os.environ.get('GCP_OUTPUT_URL')
+
+        if not output_url:
+            raise ValueError("GCP_OUTPUT_URL environment variable is missing. Cannot upload file.")
+
+        if not output_url.startswith("gs://"):
+            raise ValueError(f"GCP_OUTPUT_URL must start with 'gs://'. Found: {output_url}")
+
+        # Parse bucket and prefix from the URL
+        # gs://bucket_name/folder/subfolder -> parts: ['', '', 'bucket_name', 'folder', 'subfolder']
+        parts = output_url.split('/')
+        bucket_name = parts[2]
+        # Join the rest to get the folder prefix. Filter empty strings to avoid double slashes.
+        blob_prefix = "/".join([p for p in parts[3:] if p])
+
+        # Define the full blob name (prefix + filename)
+        destination_blob_name = f"{blob_prefix}/{file_path.name}" if blob_prefix else file_path.name
+
+        self._logger.info(f"Uploading {file_path.name} to gs://{bucket_name}/{destination_blob_name}...")
+
+        # Initialize client (uses dsub default credentials automatically)
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(destination_blob_name)
+
+        blob.upload_from_filename(str(file_path))
+
+        full_gs_path = f"gs://{bucket_name}/{destination_blob_name}"
+        self._logger.info(f"Upload successful: {full_gs_path}")
+
+        return full_gs_path
+
     def export_files(self, files_input: Union[str, Path, List[Union[str, Path]]]) -> Union[
         Union[str, Path], List[Union[str, Path]], List[dict], dict]:
         """
-        Export files according to platform
-
-        This method handles the export of files based on the detected platform:
-        - For Local platform, it does not perform any upload and returns an empty dictionary.
-        - For GCP platform, it currently logs a message that upload logic is not implemented.
-        - For DNANexus platform, it converts the input files to DX links using the `_convert_file_to_dxlink` method.
-
-        :param files_input: A single file (Path or str), or list of files.
-        :return: Raw file path(s), or DX link(s) depending on platform.
+        Export files according to platform.
         """
-
         result = []
 
-        # Check if the platform is Local, in which case no upload is performed
         if self._platform == Platform.LOCAL:
             self._logger.info("Local platform detected: returning raw file paths.")
             if isinstance(files_input, list):
                 result = [Path(f) for f in files_input]
             else:
                 result = Path(files_input)
-        # Check if the platform is GCP, in which case upload logic is not implemented yet
-        elif self._platform == Platform.GCP:
-            self._logger.info("GCP platform detected: upload logic not implemented yet.")
-            result = []
 
-        # Check if the platform is DNANexus, in which case we convert files to DX links
-        # Note that the input can be a single file, a list of files, or a dictionary of files
-        # The output will be a DX link or a list/dictionary of DX links, so that it can be used in DNANexus jobs.
+        elif self._platform == Platform.GCP:
+            self._logger.info("GCP platform detected: Uploading to GCS...")
+            if isinstance(files_input, list):
+                result = [self._upload_gcp_file(f) for f in files_input]
+            else:
+                result = self._upload_gcp_file(files_input)
+
         elif self._platform == Platform.DX:
             if isinstance(files_input, list):
                 result = [self._convert_file_to_dxlink(f) for f in files_input]
@@ -87,7 +109,6 @@ class ExportFileHandler:
                 result = self._convert_file_to_dxlink(files_input)
 
         else:
-            # If the above didn't work then we have an error somewhere
             raise RuntimeError(f"Unsupported input type for export_files: {type(files_input)}")
 
         return result
