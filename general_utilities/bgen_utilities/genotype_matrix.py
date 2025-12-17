@@ -83,9 +83,20 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
     """
 
     with BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True) as bgen_reader:
-
-        # Re‑open BGEN after peeking at the first variant
-        bgen_reader = BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True)
+        #
+        # # --- Detect and align chromosome naming convention ---
+        # first_variant = next(iter(bgen_reader))
+        # bgen_chrom = first_variant.chrom
+        #
+        # if isinstance(chromosome, int):
+        #     chromosome = str(chromosome)
+        # elif bgen_chrom.lower().startswith("chr") and not chromosome.lower().startswith("chr"):
+        #     chromosome = "chr" + str(chromosome)
+        # elif not bgen_chrom.lower().startswith("chr") and chromosome.lower().startswith("chr"):
+        #     chromosome = str(chromosome)[3:]
+        #
+        # # Re‑open BGEN after peeking at the first variant
+        # bgen_reader = BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True)
 
         # Fetch actual data from the BGEN file
         # Handle chromosome, start, and end filtering
