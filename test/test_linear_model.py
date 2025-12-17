@@ -140,7 +140,7 @@ def test_run_linear_model(tmp_path, phenofile, transcripts_table, unpacked_tarba
                                    found_categorical_covariates=['batman']
                                    )
 
-    tarball_name, genetic_data = load_linear_model_genetic_data(unpacked_tarball, tarball_type, bgen_prefix=None)
+    tarball_name, genetic_data = load_linear_model_genetic_data(str(unpacked_tarball), tarball_type, bgen_prefix=None)
 
     expected_genes = set()
     with expected_genes_path.open('r') as expected_genes_reader:

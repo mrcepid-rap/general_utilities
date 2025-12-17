@@ -257,8 +257,7 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     num_default = len(field_names)
     if len(split_id_field) == num_default + 1:  # This is the bare minimum; we found 1 additional field to the default
         field_names.append('var1')
-    elif len(
-            split_id_field) == num_default + 2:  # This could be the standard naming format... check that column [2] is MAF/AC
+    elif len(split_id_field) == num_default + 2:  # This could be the standard naming format... check that column [2] is MAF/AC
         if 'MAF' in split_id_field[num_default + 1] or 'AC' in split_id_field[num_default + 1]:
             field_names.extend(['MASK', 'MAF'])
         else:  # This means we didn't hit on MAF in column [2] and a different naming convention is used...

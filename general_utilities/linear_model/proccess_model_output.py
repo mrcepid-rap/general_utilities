@@ -61,14 +61,8 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
             model_dict.update(mask_maf_columns)
 
             if tarball_type == TarballType.GENOMEWIDE:
-                try:
-                    gene_info = transcripts_table.loc[model.ENST].to_dict()
-                except KeyError:
-                    # Skip transcripts missing from reference table - they can't be tabix indexed without chrom/start
-                    LOGGER.warning(f"Transcript {model.ENST} not found in transcripts table, skipping")
-                    continue
+                gene_info = transcripts_table.loc[model.ENST].to_dict()
             else:
-                # Empty dict
                 gene_info = {}
 
             model_dict.update(gene_info)
@@ -81,8 +75,7 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
         # Sort if we are dealing with a genomewide mask
         if tarball_type == TarballType.GENOMEWIDE:
             # Sort by chromosome, start, and end for genomewide masks
-            # Use .get() with defaults to handle missing transcript info
-            gene_rows = sorted(gene_rows, key=lambda row: (row.get('chrom', 'chrZ'), row.get('start', 0)))
+            gene_rows = sorted(gene_rows, key=lambda row: (row['chrom'], row['start'], row['end']))
         output_csv.writerows(gene_rows)
 
     if tarball_type == TarballType.GENOMEWIDE:

@@ -40,16 +40,16 @@ def download_bgen_file(chrom_bgen_index: BGENInformation) -> Tuple[Path, Path, P
     bgen_sample = chrom_bgen_index['sample'].get_file_handle()
     bgen = chrom_bgen_index['bgen'].get_file_handle()
 
-    # Now we need to download the VEP file if it exists
+    # Download the VEP file if it exists
     if chrom_bgen_index['vep'] is not None:
         vep = chrom_bgen_index['vep'].get_file_handle()
-        # Check if vepidx exists before trying to download it
-        if chrom_bgen_index['vepidx'] is not None:
-            vep_index = chrom_bgen_index['vepidx'].get_file_handle()
-        else:
-            vep_index = None
     else:
         vep = None
+
+    # Download the VEP index file if it exists
+    if chrom_bgen_index['vepidx'] is not None:
+        vep_index = chrom_bgen_index['vepidx'].get_file_handle()
+    else:
         vep_index = None
 
     # Return the paths to the downloaded files
