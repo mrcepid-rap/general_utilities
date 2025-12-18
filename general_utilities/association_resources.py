@@ -60,6 +60,23 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False,
 
     return chromosomes
 
+def get_chromosome_from_bgen(bgen_chrom: str, chromosome: str) -> str:
+    """
+    Aligns the chromosome naming convention between BGEN file and user input. Some BGEN files use 'chr' prefix, others don't.
+    This function makes sure that we are using the correct chromosome naming convention for matrix generation.
+
+    :param bgen_chrom: The chromosome name as it appears in the BGEN file.
+    :param chromosome: The chromosome name provided by the user.
+    :return: The chromosome name to use for matrix generation.
+    """
+    if isinstance(chromosome, int):
+        chromosome = str(chromosome)
+    elif bgen_chrom.lower().startswith("chr") and not chromosome.lower().startswith("chr"):
+        chromosome = "chr" + str(chromosome)
+    elif not bgen_chrom.lower().startswith("chr") and chromosome.lower().startswith("chr"):
+        chromosome = str(chromosome)[3:]
+    return chromosome
+
 
 def build_transcript_table(transcripts_path: Path = Path('transcripts.tsv.gz'),
                            filter_genes: bool = True) -> pd.DataFrame:

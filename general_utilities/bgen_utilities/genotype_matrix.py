@@ -6,6 +6,7 @@ import pandas as pd
 from bgen import BgenReader
 from scipy.sparse import csr_matrix
 
+from general_utilities.association_resources import get_chromosome_from_bgen
 from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger(__name__).get_logger()
@@ -87,13 +88,7 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         # --- Detect and align chromosome naming convention ---
         first_variant = next(iter(bgen_reader))
         bgen_chrom = first_variant.chrom
-
-        if isinstance(chromosome, int):
-            chromosome = str(chromosome)
-        elif bgen_chrom.lower().startswith("chr") and not chromosome.lower().startswith("chr"):
-            chromosome = "chr" + str(chromosome)
-        elif not bgen_chrom.lower().startswith("chr") and chromosome.lower().startswith("chr"):
-            chromosome = str(chromosome)[3:]
+        chromosome = get_chromosome_from_bgen(bgen_chrom, chromosome)
 
         # Re‑open BGEN after peeking at the first variant
         bgen_reader = BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True)
