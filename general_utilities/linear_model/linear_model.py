@@ -15,7 +15,6 @@ from general_utilities.association_resources import replace_multi_suffix
 
 LOGGER = MRCLogger(__name__).get_logger()
 
-
 @dataclass
 class LinearModelPack:
     """
@@ -78,9 +77,6 @@ class LinearModelResult:
     n_car_affected: int = 0
     n_car_unaffected: int = 0
 
-    def todict(self):
-        return self.__dict__
-
     def set_carrier_stats(self, n_noncar_affected: int, n_noncar_unaffected: int,
                           n_car_affected: int, n_car_unaffected: int) -> None:
         """Setter function to set carrier stats for the linear model result all in one function call
@@ -120,7 +116,6 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
                                sep=" ",
                                dtype={'IID': str, 'FID': str})
     pheno_covars.set_index('FID', inplace=True)
-    pheno_covars.index = pheno_covars.index.astype(str)
 
     # Check if a binary trait and make sure there is more than one level after filtering
     if (is_binary is True and len(pheno_covars[phenotype].value_counts()) > 1) or \
