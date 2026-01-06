@@ -3,7 +3,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import pandas as pd
 from importlib_resources import files
@@ -63,7 +63,7 @@ class STAARModelResult:
 def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bool,
                found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
                sex: int, sparse_kinship_file: Path, sparse_kinship_samples: Path,
-               cmd_executor: CommandExecutor = build_default_command_executor()) -> Path:
+               cmd_executor: CommandExecutor = build_default_command_executor()) -> Tuple[str, Path]:
     """This method wraps an R script that generates the STAAR Null model.
 
     The STAAR model residualises the phenotype on covariates and a sparse kinship matrix to account for relatedness. The
@@ -97,8 +97,7 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
           f'{phenotype} ' \
           f'{is_binary} ' \
           f'{sparse_kinship_file} ' \
-          f'{sparse_kinship_samples} ' \
-          f'{output_file}'
+          f'{sparse_kinship_samples} '
 
     # Set covariates for the model
     if ignore_base:
@@ -108,7 +107,7 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
         quant_covars = [f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared']
         if sex == 2:
             quant_covars.append('sex')
-        cat_covars = ['wes_batch']
+        cat_covars = ['batch']
 
     quant_covars.extend(found_quantitative_covariates)
     cat_covars.extend(found_categorical_covariates)
@@ -116,15 +115,17 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
     if len(quant_covars) > 0:
         cmd += f'{",".join(quant_covars)} '
     else:
-        cmd += f'NULL '
+        cmd += 'NULL '
     if len(cat_covars) > 0:
         cmd += f'{",".join(cat_covars)} '
     else:
-        cmd += f'NULL '
+        cmd += 'NULL '
 
-    cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
+    cmd += f'{output_file}'
 
-    return Path(f'{phenotype}.STAAR_null.rds')
+    cmd_executor.run_cmd_on_docker(cmd)
+
+    return phenotype, output_file
 
 
 def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None) -> Dict[str, Dict[str, GeneInformation]]:
@@ -143,8 +144,8 @@ def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None) -> Dic
 
     tarball_path = Path(tarball_prefix)
 
-    staar_variants_list = tarball_path.parent.glob(
-        replace_multi_suffix(tarball_path, '.*.STAAR.variants_table.tsv').name)
+    pattern = f"{tarball_path.name}.*.STAAR.variants_table.tsv"
+    staar_variants_list = list(tarball_path.parent.glob(pattern))
     # If requested to load a single bgen prefix, filter the list to only include that prefix
     if bgen_prefix is not None:
         if tarball_path.parent / f'{tarball_path.name}.{bgen_prefix}.STAAR.variants_table.tsv' in staar_variants_list:
@@ -156,9 +157,12 @@ def load_staar_genetic_data(tarball_prefix: str, bgen_prefix: str = None) -> Dic
     variant_matricies = {}
 
     for staar_variants in staar_variants_list:
-        # get the bgen prefix out of the staar variants path with a regex:
-        current_prefix = re.match(rf'{tarball_path.name}\.(\w*)\.STAAR\.variants_table\.tsv',
-                                  staar_variants.name).group(1)
+        # extract BGEN prefix safely — match literal tarball prefix + prefix + STAAR
+        pattern = rf'{re.escape(tarball_path.name)}\.(?P<prefix>[\w\-]+)\.STAAR\.variants_table\.tsv$'
+        match = re.match(pattern, staar_variants.name)
+        if not match:
+            raise ValueError(f"Unable to extract BGEN prefix from filename: {staar_variants.name}")
+        current_prefix = match.group("prefix")
 
         variant_table = pd.read_csv(staar_variants, delimiter='\t')
         variant_matrix = make_variant_list(variant_table)
@@ -210,7 +214,7 @@ def staar_genes(staar_null_path: Path, pheno_name: str, gene: str, mask_name: st
           f'{gene} ' \
           f'{output_path}'
 
-    cmd_executor.run_cmd_on_docker(cmd, docker_mounts=[script_mount])
+    cmd_executor.run_cmd_on_docker(cmd)
 
     # Read in the outputs and format into a model pack
     staar_json = json.load(output_path.open('r'))

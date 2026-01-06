@@ -4,11 +4,13 @@ from typing import Tuple, Dict, Any, Set, TypedDict
 import numpy as np
 import pandas as pd
 from bgen import BgenReader
-from general_utilities.mrc_logger import MRCLogger
 from scipy.sparse import csr_matrix
 
+from general_utilities.association_resources import get_chromosome_from_bgen
+from general_utilities.mrc_logger import MRCLogger
 
 LOGGER = MRCLogger(__name__).get_logger()
+
 
 class GeneInformation(TypedDict):
     """TypedDict to hold information about a gene and it's variants."""
@@ -42,7 +44,6 @@ def make_variant_list(variant_list: pd.DataFrame) -> Dict[str, GeneInformation]:
     # Format into a dictionary to make the information more accessible
     gene_dict = {}
     for current_gene in search_list.itertuples():
-
         gene_dict[current_gene.Index] = GeneInformation(
             chrom=current_gene.CHROM,
             min=current_gene.MIN,
@@ -87,11 +88,7 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         # --- Detect and align chromosome naming convention ---
         first_variant = next(iter(bgen_reader))
         bgen_chrom = first_variant.chrom
-
-        if bgen_chrom.lower().startswith("chr") and not chromosome.lower().startswith("chr"):
-            chromosome = "chr" + str(chromosome)
-        elif not bgen_chrom.lower().startswith("chr") and chromosome.lower().startswith("chr"):
-            chromosome = str(chromosome)[3:]
+        chromosome = get_chromosome_from_bgen(bgen_chrom, chromosome)
 
         # Re‑open BGEN after peeking at the first variant
         bgen_reader = BgenReader(bgen_path, sample_path=sample_path, delay_parsing=True)
@@ -123,7 +120,7 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
                 # statement, which would otherwise raise an error when using 'in' for NoneType.
                 continue
 
-            variant_n += 1 # Have to increment variant_n here, as enumerate would capture skipped variants
+            variant_n += 1  # Have to increment variant_n here, as enumerate would capture skipped variants
 
             # pull out the actual genotypes
             current_probabilities = current_variant.probabilities
@@ -150,7 +147,7 @@ def generate_csr_matrix_from_bgen(bgen_path: Path, sample_path: Path, variant_fi
         # record the collapsing stats in a dict
         summary_dict = {
             'allele_count': np.sum(stacked_variants),  # use np.sum to get total of all values
-            'n_variants': len(variant_arrays), # get number of variants, based on pre-collapse number of variants!
+            'n_variants': len(variant_arrays),  # get number of variants, based on pre-collapse number of variants!
             'n_columns': variant_n
         }
 

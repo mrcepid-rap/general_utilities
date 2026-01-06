@@ -1,5 +1,6 @@
 import csv
 import gzip
+import re
 from pathlib import Path
 from typing import List, Union, Tuple, IO, Dict
 
@@ -7,7 +8,6 @@ import dxpy
 import pandas as pd
 import pandas.core.series
 import pysam
-
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
 
@@ -60,8 +60,26 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False,
 
     return chromosomes
 
+def get_chromosome_from_bgen(bgen_chrom: str, chromosome: str) -> str:
+    """
+    Aligns the chromosome naming convention between BGEN file and user input. Some BGEN files use 'chr' prefix, others don't.
+    This function makes sure that we are using the correct chromosome naming convention for matrix generation.
 
-def build_transcript_table(transcripts_path: Path = Path('transcripts.tsv.gz'), filter_genes: bool = True) -> pd.DataFrame:
+    :param bgen_chrom: The chromosome name as it appears in the BGEN file.
+    :param chromosome: The chromosome name provided by the user.
+    :return: The chromosome name to use for matrix generation.
+    """
+    if isinstance(chromosome, int):
+        chromosome = str(chromosome)
+    elif bgen_chrom.lower().startswith("chr") and not chromosome.lower().startswith("chr"):
+        chromosome = "chr" + str(chromosome)
+    elif not bgen_chrom.lower().startswith("chr") and chromosome.lower().startswith("chr"):
+        chromosome = str(chromosome)[3:]
+    return chromosome
+
+
+def build_transcript_table(transcripts_path: Path = Path('transcripts.tsv.gz'),
+                           filter_genes: bool = True) -> pd.DataFrame:
     """A wrapper around pd.read_csv to load transcripts.tsv.gz into a pd.DataFrame
 
     Read the transcripts.tsv.gz file downloaded during ingest_data into a pd.DataFrame. This file contains information
@@ -74,14 +92,20 @@ def build_transcript_table(transcripts_path: Path = Path('transcripts.tsv.gz'), 
     """
 
     transcripts_table = pd.read_csv(transcripts_path, sep="\t", index_col='ENST')
-    if filter_genes:
-        transcripts_table = transcripts_table[transcripts_table['fail'] == False]
-        transcripts_table = transcripts_table.drop(columns=['syn.count', 'fail.cat', 'fail'])
-        transcripts_table = transcripts_table[transcripts_table['chrom'] != 'Y']
 
-    # ensure columns are in the expected order:
-    transcripts_table = transcripts_table[['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
-                                           'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']]
+    if filter_genes:
+        # Only filter if the 'fail' column exists (i.e., we're reading the original file)
+        if 'fail' in transcripts_table.columns:
+            transcripts_table = transcripts_table[transcripts_table['fail'] == False]
+            transcripts_table = transcripts_table.drop(columns=['syn.count', 'fail.cat', 'fail'])
+            transcripts_table = transcripts_table[transcripts_table['chrom'] != 'Y']
+
+        # Select specific columns
+        expected_cols = ['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
+                         'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']
+        available_cols = [col for col in expected_cols if col in transcripts_table.columns]
+        transcripts_table = transcripts_table[available_cols]
+    # When filter_genes=False, don't modify the dataframe at all - keep ALL columns
 
     # Also generate a table of mean chromosome positions for plotting
     mean_chr_pos = transcripts_table[['chrom', 'manh.pos']].groupby('chrom').mean()
@@ -121,7 +145,6 @@ def get_gene_id(gene_id: str, transcripts_table: pandas.DataFrame) -> pandas.cor
             LOGGER.info(f'Found one matching ENST ({gene_id} - {gene_info["coord"]})... proceeding...')
         except KeyError:
             raise KeyError(f'Did not find a transcript with ENST value {gene_id}... terminating...')
-
     # Otherwise see if we can find a SINGLE gene with a given SYMBOL in the table using ==
     else:
         LOGGER.warning("gene_id – " + gene_id + " – does not look like an ENST value, searching for symbol instead...")
@@ -179,6 +202,52 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
     return gene_info, chromosomes
 
 
+def process_gene_or_snp_wgs(identifier: str, tarball_prefix: str, chunk: str) -> set:
+    """
+    Given a gene symbol/ENST or a SNP identifier (chr:pos:ref:alt),
+    check whether it exists in a chunk’s STAAR variant table.
+
+    :param identifier: The gene symbol or ENST or SNP identifier.
+    :param tarball_prefix: The prefix of the tarball files.
+    :param chunk: The chunk identifier (e.g., chromosome number) to list through.
+
+    :return chromosomes: set of chromosome(s) found in that chunk (empty if none)
+    """
+
+    tarball_prefix = Path(tarball_prefix)
+    variant_table_path = f"{tarball_prefix}.{chunk}.STAAR.variants_table.tsv"
+
+    result = set()
+
+    if not Path(variant_table_path).exists():
+        LOGGER.warning(f"Variant table not found: {variant_table_path}")
+    else:
+        is_variant = bool(re.match(r"^chr?\w+:\d+:[ACGTN]+:[ACGTN]+$", identifier, re.IGNORECASE))
+        chromosomes = set()
+        match_found = False
+
+        with open(variant_table_path, "r") as f:
+            reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
+            for row in reader:
+                chrom = str(row.get("CHROM") or row.get("chrom"))
+                gene_id = row.get("ENST") or row.get("gene")
+                var_id = row.get("varID")
+
+                chromosomes.add(chrom)
+
+                if (is_variant and var_id == identifier) or (not is_variant and gene_id == identifier):
+                    match_found = True
+                    break
+
+        if match_found:
+            LOGGER.info(f"Found {identifier} in chunk {chunk} (chromosome(s): {chromosomes})")
+            result = chromosomes
+        else:
+            LOGGER.debug(f"No matches for {identifier} in chunk {chunk}")
+
+    return result
+
+
 def define_field_names_from_pandas(id_field: str, default_fields: List[str] = None) -> List[str]:
     """These two methods help the different tools in defining the correct field names to include in outputs
 
@@ -197,7 +266,10 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     :return: A List of field string names to use for outputs
     """
     # Test what columns we have in the 'SNP' field, so we can name them...
-    split_id_field = id_field['SNP'].split("-")
+    if 'SNP' in id_field:
+        split_id_field = id_field['SNP'].split("-")
+    else:
+        split_id_field = id_field.split("-")
     field_names = [] if default_fields is None else default_fields
     num_default = len(field_names)
     if len(split_id_field) == num_default + 1:  # This is the bare minimum; we found 1 additional field to the default
@@ -305,7 +377,8 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
 
 
 def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
-                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3, force: bool = False) -> Tuple[Path, Path]:
+                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3, force: bool = False) -> Tuple[
+    Path, Path]:
     """Compress a file using bgzip and create a tabix index.
 
     This function uses pysam to compress a file with bgzip and create a corresponding tabix index.

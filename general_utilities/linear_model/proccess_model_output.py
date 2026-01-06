@@ -7,10 +7,13 @@ import pandas as pd
 from pathlib import Path
 from typing import List, Union
 
+from general_utilities.mrc_logger import MRCLogger
 from general_utilities.import_utils.import_lib import TarballType
 from general_utilities.linear_model.staar_model import STAARModelResult
 from general_utilities.linear_model.linear_model import LinearModelResult
 from general_utilities.association_resources import define_field_names_from_pandas, bgzip_and_tabix
+
+LOGGER = MRCLogger(__name__).get_logger()
 
 def process_model_outputs(input_models: Union[List[STAARModelResult], List[LinearModelResult]], output_path: Path,
                           tarball_type: TarballType, transcripts_table: pd.DataFrame) -> List[Path]:
@@ -56,7 +59,12 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
 
             model_dict = dataclasses.asdict(model)
             model_dict.update(mask_maf_columns)
-            gene_info = transcripts_table.loc[model.ENST].to_dict() if tarball_type == TarballType.GENOMEWIDE else {}
+
+            if tarball_type == TarballType.GENOMEWIDE:
+                gene_info = transcripts_table.loc[model.ENST].to_dict()
+            else:
+                gene_info = {}
+
             model_dict.update(gene_info)
 
             gene_rows.append(model_dict)
@@ -67,8 +75,7 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
         # Sort if we are dealing with a genomewide mask
         if tarball_type == TarballType.GENOMEWIDE:
             # Sort by chromosome, start, and end for genomewide masks
-            gene_rows = sorted(gene_rows, key=lambda row: (row['chrom'], row['start']))
-
+            gene_rows = sorted(gene_rows, key=lambda row: (row['chrom'], row['start'], row['end']))
         output_csv.writerows(gene_rows)
 
     if tarball_type == TarballType.GENOMEWIDE:
@@ -124,8 +131,9 @@ def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_t
         staar_table = pd.read_csv(f'{output_prefix}.genes.STAAR.stats.tsv.gz', sep='\t')
 
         # Select STAAR columns we need to merge in/match on
-        staar_table = staar_table[['ENST', 'MASK', 'MAF', 'pheno_name', 'n_var', 'relatedness.correction', 'staar.O.p',
-                                   'staar.SKAT.p', 'staar.burden.p', 'staar.ACAT.p']]
+        staar_table = staar_table[['ENST', 'MASK', 'MAF', 'pheno_name', 'n_var',
+                                   'relatedness_correction', 'p_val_O',
+                                   'p_val_SKAT', 'p_val_burden', 'p_val_ACAT']]
 
         final_table = glm_table.merge(right=staar_table, on=['ENST', 'MASK', 'MAF', 'pheno_name'])
 
