@@ -34,6 +34,9 @@ Repository = "https://github.com/mrcepid-rap/general_utilities"
 [tool.setuptools]
 include-package-data = true
 
+[tool.setuptools.packages.find]
+include = ["general_utilities*"]
+
 [tool.setuptools.package-data]
 "general_utilities.linear_model.R_resources" = ["*.R"]
 "general_utilities.plot_lib.R_resources" = ["*.R"]
