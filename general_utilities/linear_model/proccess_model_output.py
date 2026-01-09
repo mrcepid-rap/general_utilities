@@ -3,6 +3,7 @@ import dxpy
 import pysam
 import dataclasses
 import pandas as pd
+import os
 
 from pathlib import Path
 from typing import List, Union
@@ -55,7 +56,8 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
         # result in too much in memory as the number of genes is relatively small
         gene_rows = []
         for model in input_models:
-            mask_maf_columns = (dict(zip(mask_maf_fields, model.mask_name.split('-'))))
+            clean_name = os.path.basename(str(model.mask_name))
+            mask_maf_columns = (dict(zip(mask_maf_fields, clean_name.split('-'))))
 
             model_dict = dataclasses.asdict(model)
             model_dict.update(mask_maf_columns)
@@ -88,7 +90,6 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
     return outputs
 
 def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False) -> List[Path]:
-
     if is_gene_tar or is_snp_tar:
         if is_gene_tar:
             prefix = 'GENE'

@@ -1,5 +1,6 @@
 import csv
 import gzip
+import os
 import re
 from pathlib import Path
 from typing import List, Union, Tuple, IO, Dict
@@ -265,22 +266,36 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     :param default_fields: A list of additional fields to include in the output.
     :return: A List of field string names to use for outputs
     """
-    # Test what columns we have in the 'SNP' field, so we can name them...
-    if 'SNP' in id_field:
-        split_id_field = id_field['SNP'].split("-")
+
+    # If it's a Path, we only want the filename (e.g., 'HC_PTV-MAF_001'),
+    # not the whole directory string which contains extra dashes/slashes.
+    if isinstance(id_field, Path):
+        id_field = id_field.name
     else:
-        split_id_field = id_field.split("-")
+        id_field = str(id_field)
+        # If it's a string path, try to get the last part
+        id_field = os.path.basename(str(id_field))
+
+    # Check for the literal 'SNP' in the string
+    # We use the split string for logic
+    split_id_field = id_field.split("-")
+
     field_names = [] if default_fields is None else default_fields
     num_default = len(field_names)
-    if len(split_id_field) == num_default + 1:  # This is the bare minimum; we found 1 additional field to the default
+
+    # Logic to identify standard mrcepid-collapsevariants format: MASK-MAF or MASK-AC
+    if len(split_id_field) == num_default + 1:
         field_names.append('var1')
-    elif len(split_id_field) == num_default + 2:  # This could be the standard naming format... check that column [2] is MAF/AC
+    elif len(split_id_field) == num_default + 2:
+        # Check if the last part looks like a frequency definition (MAF or AC)
         if 'MAF' in split_id_field[num_default + 1] or 'AC' in split_id_field[num_default + 1]:
             field_names.extend(['MASK', 'MAF'])
-        else:  # This means we didn't hit on MAF in column [2] and a different naming convention is used...
+        else:
             field_names.extend(['var1', 'var2'])
     else:
-        for i in range(2, len(split_id_field) + 1):
+        # Last resort: Generate generic names for the number of parts found
+        # starting from the count of already present default_fields
+        for i in range(len(field_names) + 1, len(split_id_field) + 1):
             field_names.append('var%i' % i)
 
     return field_names
