@@ -320,11 +320,11 @@ def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: p
 
 # Helper function to decide what covariates are included in the various REGENIE commands
 def define_covariate_string(found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
-                            is_binary: bool, add_array: bool, ignore_base: bool) -> str:
-    quant_covars = [] if ignore_base else ['PC{1:10}', 'age', 'age_squared', 'sex']
+                            is_binary: bool, add_array: bool) -> str:
+    quant_covars = ['PC{1:10}', 'age', 'age_squared', 'sex']
     quant_covars.extend(found_quantitative_covariates)
 
-    cat_covars = [] if ignore_base else (['batch', 'array_batch'] if add_array else ['batch'])
+    cat_covars = (['batch', 'array_batch'] if add_array else ['batch'])
     cat_covars.extend(found_categorical_covariates)
 
     covar_string = ''
