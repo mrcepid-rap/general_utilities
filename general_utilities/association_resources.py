@@ -321,38 +321,17 @@ def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: p
 
 # Helper function to decide what covariates are included in the various REGENIE commands
 def define_covariate_string(found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
-                            is_binary: bool, add_array: bool) -> str:
+                            is_binary: bool) -> str:
 
-    quant_covars = []
-
-    # Standard mandatory quantitative covars
-    for base in ['age', 'age_squared', 'sex']:
-        if base not in found_quantitative_covariates:
-            quant_covars.append(base)
-
-    quant_covars.extend(found_quantitative_covariates)
-
-    # 2. Handle Categorical Covariates
-    cat_covars = list(found_categorical_covariates)
-
-    if 'batch' not in cat_covars:
-        cat_covars.append('batch')
-
-    if add_array:
-        if 'array_batch' not in cat_covars:
-            cat_covars.append('array_batch')
-    else:
-        cat_covars = [c for c in cat_covars if c != 'array_batch']
-
-    # 3. Build String
+    # Build String
     covar_string = ''
-    if quant_covars:
+    if found_quantitative_covariates:
         # Use a dict to preserve order while removing any potential duplicates
-        unique_quant = list(dict.fromkeys(quant_covars))
+        unique_quant = list(dict.fromkeys(found_quantitative_covariates))
         covar_string += f'--covarColList {",".join(unique_quant)} '
 
-    if cat_covars:
-        unique_cat = list(dict.fromkeys(cat_covars))
+    if found_categorical_covariates:
+        unique_cat = list(dict.fromkeys(found_categorical_covariates))
         covar_string += f'--catCovarList {",".join(unique_cat)} '
 
     if is_binary:
