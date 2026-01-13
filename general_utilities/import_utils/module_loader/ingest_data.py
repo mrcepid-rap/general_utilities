@@ -504,6 +504,8 @@ class IngestData(ABC):
                 f'{" ":^{5}}{"Quantitative":{60}}: {", ".join(found_quantitative_covariates) if len(found_quantitative_covariates) > 0 else "None"}')
             self._logger.info(
                 f'{" ":^{5}}{"Categorical":{60}}: {", ".join(found_categorical_covariates) if len(found_categorical_covariates) > 0 else "None"}')
+            self._logger.info(
+                f'Note that array_batch will only be used for array-based, and not sequencing-based analyses.')
         else:
             self._logger.info(f'No additional covariates provided/found...')
 

@@ -97,7 +97,8 @@ class LinearModelResult:
 
 def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
                       found_quantitative_covariates: List[str],
-                      found_categorical_covariates: List[str]) -> LinearModelPack:
+                      found_categorical_covariates: List[str],
+                      array_covariate: bool = False) -> LinearModelPack:
     """Perform initial linear model setup.
 
     This function loads the phenotype and covariate data, checks if the phenotype is binary, and sets up the
@@ -109,6 +110,7 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
     :param ignore_base: Boolean indicating if base covariates should be ignored.
     :param found_quantitative_covariates: List of additional quantitative covariates to include in the model.
     :param found_categorical_covariates: List of additional categorical covariates to include in the model.
+    :param array_covariate: Boolean indicating if the array_batch covariate should be included.
     :return: A LinearModelPack object containing the model setup.
     """
 
@@ -135,21 +137,33 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
         quant_covars.update(found_quantitative_covariates)
         cat_covars.update(found_categorical_covariates)
 
-        quant_covars = list(quant_covars)
-        cat_covars = list(cat_covars)
+        # Handle array_batch manually
+        if not array_covariate:
+            LOGGER.info("Excluding array_batch from linear model covariates")
+            cat_covars.discard('array_batch')
+        else:
+            cat_covars.add('array_batch')
+
+        quant_covars = sorted(list(quant_covars))
+        cat_covars = sorted(list(cat_covars))
 
         columns = [phenotype] + quant_covars + cat_covars
-        cat_covars = [f'C({covar})' for covar in cat_covars]
+        cat_covars_formula = [f'C({covar})' for covar in cat_covars]
 
-        if len(quant_covars) + len(cat_covars) == 0:
+        if len(quant_covars) + len(cat_covars_formula) == 0:
             form_null = f'{phenotype} ~ 1'
         else:
-            covars = ' + '.join(quant_covars + cat_covars)
+            covars = ' + '.join(quant_covars + cat_covars_formula)
             form_null = f'{phenotype} ~ {covars}'
 
         form_full = f'{form_null} + has_var'
 
-        # Just make sure we subset if doing phewas to save space...
+        LOGGER.info(f'GLM Null model: {form_full}')
+
+        # De-duplicate columns in the raw dataframe first to ensure indices match for subsetting
+        pheno_covars = pheno_covars.loc[:, ~pheno_covars.columns.duplicated()]
+
+        # Subset to only the columns we need for this specific model
         pheno_covars = pheno_covars[columns]
 
         # Build the null model and extract residuals:
@@ -224,7 +238,10 @@ def load_mask_genetic_data(tarball_path: Path, bgen_prefix: str = None) -> pd.Da
     geno_tables = []
 
     # This finds any .bgen file in the directory
-    all_bgens = list(tarball_path.parent.glob("*.bgen"))
+    all_bgens = [f for f in tarball_path.parent.glob("*.bgen") if not f.name.startswith('.')]
+
+    # Initialize the list with ALL bgens by default so it is defined even if bgen_prefix is None
+    bolt_bgen_list = all_bgens
 
     if bgen_prefix is not None:
         # Look for the file that actually contains the chunk name (e.g., 'chr1_chunk1')

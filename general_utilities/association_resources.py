@@ -302,6 +302,7 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
 
 
 def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: pd.DataFrame) -> pd.DataFrame:
+    tarball_prefix = str(tarball_prefix)
     tarball_prefix_split = tarball_prefix.split("-")
     if len(tarball_prefix_split) == 2:  # This could be the standard naming format. Check that column [1] is MAF/AC
         if 'MAF' in tarball_prefix_split[1] or 'AC' in tarball_prefix_split[1]:
@@ -321,20 +322,38 @@ def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: p
 # Helper function to decide what covariates are included in the various REGENIE commands
 def define_covariate_string(found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
                             is_binary: bool, add_array: bool) -> str:
-    quant_covars = ['PC{1:10}', 'age', 'age_squared', 'sex']
+
+    quant_covars = []
+
+    # Standard mandatory quantitative covars
+    for base in ['age', 'age_squared', 'sex']:
+        if base not in found_quantitative_covariates:
+            quant_covars.append(base)
+
     quant_covars.extend(found_quantitative_covariates)
 
-    cat_covars = (['batch', 'array_batch'] if add_array else ['batch'])
-    cat_covars.extend(found_categorical_covariates)
+    # 2. Handle Categorical Covariates
+    cat_covars = list(found_categorical_covariates)
 
+    if 'batch' not in cat_covars:
+        cat_covars.append('batch')
+
+    if add_array:
+        if 'array_batch' not in cat_covars:
+            cat_covars.append('array_batch')
+    else:
+        cat_covars = [c for c in cat_covars if c != 'array_batch']
+
+    # 3. Build String
     covar_string = ''
-    if len(quant_covars) > 0:
-        quant_covars_join = ','.join(quant_covars)
-        covar_string += f'--covarColList {quant_covars_join} '
+    if quant_covars:
+        # Use a dict to preserve order while removing any potential duplicates
+        unique_quant = list(dict.fromkeys(quant_covars))
+        covar_string += f'--covarColList {",".join(unique_quant)} '
 
-    if len(cat_covars) > 0:
-        cat_covars_join = ','.join(cat_covars)
-        covar_string += f'--catCovarList {cat_covars_join} '
+    if cat_covars:
+        unique_cat = list(dict.fromkeys(cat_covars))
+        covar_string += f'--catCovarList {",".join(unique_cat)} '
 
     if is_binary:
         covar_string += '--bt --firth --approx '
@@ -508,6 +527,10 @@ def replace_multi_suffix(original_path: Path, new_suffix: str) -> Path:
     :param new_suffix: The new suffix to add
     :return: A Pathlike to the new file
     """
+
+    # Ensure we are working with a Path object to use .suffix and .with_suffix
+    if isinstance(original_path, str):
+        original_path = Path(original_path)
 
     while original_path.suffix:
         original_path = original_path.with_suffix('')

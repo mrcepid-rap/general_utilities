@@ -139,17 +139,14 @@ def ingest_tarballs(association_tarballs: Union[InputFileHandler, List[InputFile
     # Now process them in order
     for tar_file in tar_files:
         if tarfile.is_tarfile(tar_file):
-            tarball_prefix = replace_multi_suffix(tar_file, '')
-            if not tarball_prefix.with_suffix('.tar.gz').exists():
-                # The only reason I do this is I am paranoid that users will drop random '.' into their filenames and
-                # break replace_multi_suffix()
-                raise ValueError(
-                    'Tarball prefix generation failed; unexpected file suffixes. Do you have extra periods '
-                    'in your filenames?')
+            # Get just the filename so absolute paths don't leak into the system
+            clean_name = Path(tar_file).name
+            tarball_prefix = replace_multi_suffix(clean_name, '')
 
+            # Since we extract to CWD, we check for existence locally
             tarball_prefixes.append(tarball_prefix)
             tar = tarfile.open(tar_file, 'r:gz')
-            tar.extractall(path=Path(tar_file).parent)
+            tar.extractall(path=Path.cwd())  # Extract to root, not parent
 
             if tarball_prefix.with_suffix('.SNP.BOLT.bgen').exists():
                 is_snp_tar = True

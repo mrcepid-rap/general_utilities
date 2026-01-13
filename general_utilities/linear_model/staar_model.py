@@ -13,6 +13,9 @@ from general_utilities.bgen_utilities.genotype_matrix import GeneInformation
 from general_utilities.bgen_utilities.genotype_matrix import make_variant_list
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.job_management.command_executor import build_default_command_executor
+from general_utilities.mrc_logger import MRCLogger
+
+LOGGER = MRCLogger(__name__).get_logger()
 
 
 @dataclass
@@ -63,7 +66,8 @@ class STAARModelResult:
 def staar_null(phenofile: Path, phenotype: str, is_binary: bool,
                found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
                sex: int, sparse_kinship_file: Path, sparse_kinship_samples: Path,
-               cmd_executor: CommandExecutor = build_default_command_executor()) -> Tuple[str, Path]:
+               cmd_executor: CommandExecutor = build_default_command_executor(),
+               array_covariate: bool = False) -> Tuple[str, Path]:
     """This method wraps an R script that generates the STAAR Null model.
 
     The STAAR model residualises the phenotype on covariates and a sparse kinship matrix to account for relatedness. The
@@ -100,23 +104,31 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool,
           f'{sparse_kinship_file} ' \
           f'{sparse_kinship_samples} '
 
-    # Set covariates for the model
-    # We now rely on the GeneticsLoader/Ingester to have provided all necessary
-    # covariates (both base and additional) via the found_covariates lists.
-    quant_covars = found_quantitative_covariates
-    cat_covars = found_categorical_covariates
+    # Use sets to handle de-duplication and allow for .discard()/.add()
+    quant_set = set(found_quantitative_covariates)
+    cat_set = set(found_categorical_covariates)
 
-    if len(quant_covars) > 0:
-        cmd += f'{",".join(quant_covars)} '
+    # Handle array_batch manually
+    if not array_covariate:
+        LOGGER.info("Excluding array_batch from STAAR model covariates")
+        cat_set.discard('array_batch')
+    else:
+        cat_set.add('array_batch')
+
+    # Build covariate strings for the command
+    if len(quant_set) > 0:
+        cmd += f'{",".join(sorted(list(quant_set)))} '
     else:
         cmd += 'NULL '
 
-    if len(cat_covars) > 0:
-        cmd += f'{",".join(cat_covars)} '
+    if len(cat_set) > 0:
+        cmd += f'{",".join(sorted(list(cat_set)))} '
     else:
         cmd += 'NULL '
 
     cmd += f'{output_file}'
+
+    LOGGER.info(f'STAAR Null model: {cmd}')
 
     cmd_executor.run_cmd_on_docker(cmd)
 
