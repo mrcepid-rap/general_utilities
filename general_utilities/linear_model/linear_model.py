@@ -106,7 +106,6 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
     :param phenofile: Path to the phenotype and covariate file.
     :param phenotype: Name of the phenotype to analyze.
     :param is_binary: Boolean indicating if the phenotype is binary.
-    :param ignore_base: Boolean indicating if base covariates should be ignored.
     :param found_quantitative_covariates: List of additional quantitative covariates to include in the model.
     :param found_categorical_covariates: List of additional categorical covariates to include in the model.
     :return: A LinearModelPack object containing the model setup.
@@ -129,11 +128,8 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
             family = sm.families.Gaussian()
 
         # And finally define the formula to be used by all models:
-        quant_covars = set([f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared', 'sex'])
-        cat_covars = {'batch'}
-
-        quant_covars.update(found_quantitative_covariates)
-        cat_covars.update(found_categorical_covariates)
+        quant_covars = set(found_quantitative_covariates)
+        cat_covars = set(found_categorical_covariates)
 
         quant_covars = list(quant_covars)
         cat_covars = list(cat_covars)
