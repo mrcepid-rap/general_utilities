@@ -97,8 +97,7 @@ class LinearModelResult:
 
 def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
                       found_quantitative_covariates: List[str],
-                      found_categorical_covariates: List[str],
-                      array_covariate: bool = False) -> LinearModelPack:
+                      found_categorical_covariates: List[str]) -> LinearModelPack:
     """Perform initial linear model setup.
 
     This function loads the phenotype and covariate data, checks if the phenotype is binary, and sets up the
@@ -110,7 +109,6 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
     :param ignore_base: Boolean indicating if base covariates should be ignored.
     :param found_quantitative_covariates: List of additional quantitative covariates to include in the model.
     :param found_categorical_covariates: List of additional categorical covariates to include in the model.
-    :param array_covariate: Boolean indicating if the array_batch covariate should be included.
     :return: A LinearModelPack object containing the model setup.
     """
 
@@ -130,22 +128,8 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
         else:
             family = sm.families.Gaussian()
 
-        # And finally define the formula to be used by all models:
-        quant_covars = set([f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared', 'sex'])
-        cat_covars = {'batch'}
-
-        quant_covars.update(found_quantitative_covariates)
-        cat_covars.update(found_categorical_covariates)
-
-        # Handle array_batch manually
-        if not array_covariate:
-            LOGGER.info("Excluding array_batch from linear model covariates")
-            cat_covars.discard('array_batch')
-        else:
-            cat_covars.add('array_batch')
-
-        quant_covars = sorted(list(quant_covars))
-        cat_covars = sorted(list(cat_covars))
+        quant_covars = sorted(list(found_quantitative_covariates))
+        cat_covars = sorted(list(found_categorical_covariates))
 
         columns = [phenotype] + quant_covars + cat_covars
         cat_covars_formula = [f'C({covar})' for covar in cat_covars]
