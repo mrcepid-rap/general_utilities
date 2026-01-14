@@ -203,7 +203,7 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
     return gene_info, chromosomes
 
 
-def process_gene_or_snp_wgs(identifier: str, tarball_prefix: str, chunk: str) -> set:
+def process_gene_or_snp_wgs(identifier: str, tarball_prefix: Path, chunk: str) -> set:
     """
     Given a gene symbol/ENST or a SNP identifier (chr:pos:ref:alt),
     check whether it exists in a chunk’s STAAR variant table.
@@ -215,13 +215,13 @@ def process_gene_or_snp_wgs(identifier: str, tarball_prefix: str, chunk: str) ->
     :return chromosomes: set of chromosome(s) found in that chunk (empty if none)
     """
 
-    tarball_prefix = Path(tarball_prefix)
+    tarball_prefix = Path(tarball_prefix.name)
     variant_table_path = f"{tarball_prefix}.{chunk}.STAAR.variants_table.tsv"
 
     result = set()
 
     if not Path(variant_table_path).exists():
-        LOGGER.warning(f"Variant table not found: {variant_table_path}")
+        raise FileNotFoundError(f"Variant table not found: {variant_table_path}")
     else:
         is_variant = bool(re.match(r"^chr?\w+:\d+:[ACGTN]+:[ACGTN]+$", identifier, re.IGNORECASE))
         chromosomes = set()
@@ -269,12 +269,9 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
 
     # If it's a Path, we only want the filename (e.g., 'HC_PTV-MAF_001'),
     # not the whole directory string which contains extra dashes/slashes.
-    if isinstance(id_field, Path):
-        id_field = id_field.name
-    else:
-        id_field = str(id_field)
-        # If it's a string path, try to get the last part
-        id_field = os.path.basename(str(id_field))
+    id_field = str(id_field)
+    # If it's a string path, try to get the last part
+    id_field = os.path.basename(str(id_field))
 
     # Check for the literal 'SNP' in the string
     # We use the split string for logic
@@ -496,7 +493,7 @@ def fix_plink_bgen_sample_sex(sample_file: Path) -> Path:
     return fixed_sample
 
 
-def replace_multi_suffix(original_path: Path, new_suffix: str) -> Path:
+def replace_multi_suffix(original_path: Union[Path, str], new_suffix: str) -> Path:
     """A helper function to replace a path on a file with multiple suffixes (e.g., .tsv.gz)
 
     This function just loops through the path and recursively removes the string after '.'. Once there are no more
