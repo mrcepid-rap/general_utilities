@@ -298,7 +298,7 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     return field_names
 
 
-def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: pd.DataFrame) -> pd.DataFrame:
+def define_field_names_from_tarball_prefix(tarball_prefix: Path, variant_table: pd.DataFrame) -> pd.DataFrame:
     tarball_prefix = str(tarball_prefix)
     tarball_prefix_split = tarball_prefix.split("-")
     if len(tarball_prefix_split) == 2:  # This could be the standard naming format. Check that column [1] is MAF/AC
