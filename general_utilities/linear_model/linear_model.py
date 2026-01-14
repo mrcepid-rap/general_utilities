@@ -165,7 +165,7 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
         raise dxpy.AppError(f'Phenotype {phenotype} has no individuals after filtering, exiting...')
 
 
-def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[
+def load_linear_model_genetic_data(tarball_prefix: Path, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[
     str, pd.DataFrame]:
     """Load a tarball containing BGEN files for linear model association testing.
 
@@ -189,8 +189,8 @@ def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballTyp
 
     LOGGER.info(f'Loading tarball prefix: {tarball_prefix}')
 
-    # Convert to a path object to allow for file operations.
-    tarball_path = Path(tarball_prefix)
+    # Label as a path so it's easy on the eyes
+    tarball_path = tarball_prefix
 
     if tarball_type == TarballType.GENOMEWIDE:
         genetic_data = load_mask_genetic_data(tarball_path, bgen_prefix=bgen_prefix)
