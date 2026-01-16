@@ -108,13 +108,13 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool,
     cat_set = set(found_categorical_covariates)
 
     # Build covariate strings for the command
-    if len(quant_set) > 0:
-        cmd += f'{",".join(sorted(list(quant_set)))} '
+    if quant_set:
+        cmd += f'{",".join(sorted(quant_set))} '
     else:
         cmd += 'NULL '
 
-    if len(cat_set) > 0:
-        cmd += f'{",".join(sorted(list(cat_set)))} '
+    if cat_set:
+        cmd += f'{",".join(sorted(cat_set))} '
     else:
         cmd += 'NULL '
 

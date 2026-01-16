@@ -144,9 +144,6 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
 
         LOGGER.info(f'GLM Null model: {form_full}')
 
-        # De-duplicate columns in the raw dataframe first to ensure indices match for subsetting
-        pheno_covars = pheno_covars.loc[:, ~pheno_covars.columns.duplicated()]
-
         # Subset to only the columns we need for this specific model
         pheno_covars = pheno_covars[columns]
 
@@ -222,7 +219,7 @@ def load_mask_genetic_data(tarball_path: Path, bgen_prefix: str = None) -> pd.Da
     geno_tables = []
 
     # This finds any .bgen file in the directory
-    all_bgens = [f for f in tarball_path.parent.glob("*.bgen") if not f.name.startswith('.')]
+    all_bgens = list(tarball_path.parent.glob("*.bgen"))
 
     # Initialize the list with ALL bgens by default so it is defined even if bgen_prefix is None
     bolt_bgen_list = all_bgens
