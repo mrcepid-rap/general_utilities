@@ -384,7 +384,7 @@ class IngestData(ABC):
 
         # Create sets of all covariates so we can use set logic rather than list logic on members
         base_categorical_covariates = {'batch', 'array_batch'}
-        base_quantitative_covariates = set([f'PC{PC}' for PC in range(1, 41)] + \
+        base_quantitative_covariates = set([f'PC{PC}' for PC in range(1, 11)] + \
                                            ['age', 'age_squared', 'sex'])
 
         additional_categorical_covariates = set(categorical_covariates)

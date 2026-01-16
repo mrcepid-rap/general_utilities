@@ -267,16 +267,11 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     :return: A List of field string names to use for outputs
     """
 
-    # If it's a Path, we only want the filename (e.g., 'HC_PTV-MAF_001'),
-    # not the whole directory string which contains extra dashes/slashes.
-    id_field = str(id_field)
-    # If it's a string path, try to get the last part
-    id_field = os.path.basename(str(id_field))
-
-    # Check for the literal 'SNP' in the string
-    # We use the split string for logic
-    split_id_field = id_field.split("-")
-
+    # Test what columns we have in the 'SNP' field, so we can name them...
+    if 'SNP' in id_field:
+        split_id_field = id_field['SNP'].split("-")
+    else:
+        split_id_field = id_field.split("-")
     field_names = [] if default_fields is None else default_fields
     num_default = len(field_names)
 
@@ -298,7 +293,8 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     return field_names
 
 
-def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: pd.DataFrame) -> pd.DataFrame:
+def define_field_names_from_tarball_prefix(tarball_prefix: Path, variant_table: pd.DataFrame) -> pd.DataFrame:
+    tarball_prefix = str(tarball_prefix)
     tarball_prefix_split = tarball_prefix.split("-")
     if len(tarball_prefix_split) == 2:  # This could be the standard naming format. Check that column [1] is MAF/AC
         if 'MAF' in tarball_prefix_split[1] or 'AC' in tarball_prefix_split[1]:
@@ -317,21 +313,18 @@ def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: p
 
 # Helper function to decide what covariates are included in the various REGENIE commands
 def define_covariate_string(found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
-                            is_binary: bool, add_array: bool, ignore_base: bool) -> str:
-    quant_covars = [] if ignore_base else ['PC{1:10}', 'age', 'age_squared', 'sex']
-    quant_covars.extend(found_quantitative_covariates)
+                            is_binary: bool) -> str:
 
-    cat_covars = [] if ignore_base else (['batch', 'array_batch'] if add_array else ['batch'])
-    cat_covars.extend(found_categorical_covariates)
-
+    # Build String
     covar_string = ''
-    if len(quant_covars) > 0:
-        quant_covars_join = ','.join(quant_covars)
-        covar_string += f'--covarColList {quant_covars_join} '
+    if found_quantitative_covariates:
+        # Use a dict to preserve order while removing any potential duplicates
+        unique_quant = list(dict.fromkeys(found_quantitative_covariates))
+        covar_string += f'--covarColList {",".join(unique_quant)} '
 
-    if len(cat_covars) > 0:
-        cat_covars_join = ','.join(cat_covars)
-        covar_string += f'--catCovarList {cat_covars_join} '
+    if found_categorical_covariates:
+        unique_cat = list(dict.fromkeys(found_categorical_covariates))
+        covar_string += f'--catCovarList {",".join(unique_cat)} '
 
     if is_binary:
         covar_string += '--bt --firth --approx '

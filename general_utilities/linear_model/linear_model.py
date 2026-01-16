@@ -106,6 +106,7 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
     :param phenofile: Path to the phenotype and covariate file.
     :param phenotype: Name of the phenotype to analyze.
     :param is_binary: Boolean indicating if the phenotype is binary.
+    :param ignore_base: Boolean indicating if base covariates should be ignored.
     :param found_quantitative_covariates: List of additional quantitative covariates to include in the model.
     :param found_categorical_covariates: List of additional categorical covariates to include in the model.
     :return: A LinearModelPack object containing the model setup.
@@ -127,25 +128,23 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
         else:
             family = sm.families.Gaussian()
 
-        # And finally define the formula to be used by all models:
-        quant_covars = set(found_quantitative_covariates)
-        cat_covars = set(found_categorical_covariates)
-
-        quant_covars = list(quant_covars)
-        cat_covars = list(cat_covars)
+        quant_covars = sorted(list(found_quantitative_covariates))
+        cat_covars = sorted(list(found_categorical_covariates))
 
         columns = [phenotype] + quant_covars + cat_covars
-        cat_covars = [f'C({covar})' for covar in cat_covars]
+        cat_covars_formula = [f'C({covar})' for covar in cat_covars]
 
-        if len(quant_covars) + len(cat_covars) == 0:
+        if len(quant_covars) + len(cat_covars_formula) == 0:
             form_null = f'{phenotype} ~ 1'
         else:
-            covars = ' + '.join(quant_covars + cat_covars)
+            covars = ' + '.join(quant_covars + cat_covars_formula)
             form_null = f'{phenotype} ~ {covars}'
 
         form_full = f'{form_null} + has_var'
 
-        # Just make sure we subset if doing phewas to save space...
+        LOGGER.info(f'GLM Null model: {form_full}')
+
+        # Subset to only the columns we need for this specific model
         pheno_covars = pheno_covars[columns]
 
         # Build the null model and extract residuals:
@@ -163,7 +162,7 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
         raise dxpy.AppError(f'Phenotype {phenotype} has no individuals after filtering, exiting...')
 
 
-def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[
+def load_linear_model_genetic_data(tarball_prefix: Path, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[
     str, pd.DataFrame]:
     """Load a tarball containing BGEN files for linear model association testing.
 
@@ -187,8 +186,8 @@ def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballTyp
 
     LOGGER.info(f'Loading tarball prefix: {tarball_prefix}')
 
-    # Convert to a path object to allow for file operations.
-    tarball_path = Path(tarball_prefix)
+    # Label as a path so it's easy on the eyes
+    tarball_path = tarball_prefix
 
     if tarball_type == TarballType.GENOMEWIDE:
         genetic_data = load_mask_genetic_data(tarball_path, bgen_prefix=bgen_prefix)
@@ -221,6 +220,9 @@ def load_mask_genetic_data(tarball_path: Path, bgen_prefix: str = None) -> pd.Da
 
     # This finds any .bgen file in the directory
     all_bgens = list(tarball_path.parent.glob("*.bgen"))
+
+    # Initialize the list with ALL bgens by default so it is defined even if bgen_prefix is None
+    bolt_bgen_list = all_bgens
 
     if bgen_prefix is not None:
         # Look for the file that actually contains the chunk name (e.g., 'chr1_chunk1')
