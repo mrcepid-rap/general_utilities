@@ -55,8 +55,7 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
         # result in too much in memory as the number of genes is relatively small
         gene_rows = []
         for model in input_models:
-            clean_name = model.mask_name
-            mask_maf_columns = (dict(zip(mask_maf_fields, clean_name.split('-'))))
+            mask_maf_columns = (dict(zip(mask_maf_fields, model.mask_name.split('-'))))
 
             model_dict = dataclasses.asdict(model)
             model_dict.update(mask_maf_columns)
