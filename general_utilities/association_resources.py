@@ -267,16 +267,11 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     :return: A List of field string names to use for outputs
     """
 
-    # If it's a Path, we only want the filename (e.g., 'HC_PTV-MAF_001'),
-    # not the whole directory string which contains extra dashes/slashes.
-    id_field = str(id_field)
-    # If it's a string path, try to get the last part
-    id_field = os.path.basename(str(id_field))
-
-    # Check for the literal 'SNP' in the string
-    # We use the split string for logic
-    split_id_field = id_field.split("-")
-
+    # Test what columns we have in the 'SNP' field, so we can name them...
+    if 'SNP' in id_field:
+        split_id_field = id_field['SNP'].split("-")
+    else:
+        split_id_field = id_field.split("-")
     field_names = [] if default_fields is None else default_fields
     num_default = len(field_names)
 
