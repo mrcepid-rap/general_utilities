@@ -60,7 +60,7 @@ class STAARModelResult:
 
 
 # Generate the NULL model for STAAR
-def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bool,
+def staar_null(phenofile: Path, phenotype: str, is_binary: bool,
                found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
                sex: int, sparse_kinship_file: Path, sparse_kinship_samples: Path,
                cmd_executor: CommandExecutor = build_default_command_executor()) -> Tuple[str, Path]:
@@ -90,6 +90,7 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
 
     r_script = files('general_utilities.linear_model.R_resources').joinpath('runSTAAR_Null.R')
     output_file = Path(f'{phenotype}.STAAR_null.rds')
+
     # This script then generates an RDS output file containing the NULL model
     # See the README.md for more information on these parameters
     cmd = f'Rscript {r_script} ' \
@@ -100,22 +101,16 @@ def staar_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bo
           f'{sparse_kinship_samples} '
 
     # Set covariates for the model
-    if ignore_base:
-        quant_covars = []
-        cat_covars = []
-    else:
-        quant_covars = [f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared']
-        if sex == 2:
-            quant_covars.append('sex')
-        cat_covars = ['batch']
-
-    quant_covars.extend(found_quantitative_covariates)
-    cat_covars.extend(found_categorical_covariates)
+    # We now rely on the GeneticsLoader/Ingester to have provided all necessary
+    # covariates (both base and additional) via the found_covariates lists.
+    quant_covars = found_quantitative_covariates
+    cat_covars = found_categorical_covariates
 
     if len(quant_covars) > 0:
         cmd += f'{",".join(quant_covars)} '
     else:
         cmd += 'NULL '
+
     if len(cat_covars) > 0:
         cmd += f'{",".join(cat_covars)} '
     else:

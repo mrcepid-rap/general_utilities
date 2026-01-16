@@ -88,7 +88,6 @@ def process_model_outputs(input_models: Union[List[STAARModelResult], List[Linea
     return outputs
 
 def merge_glm_staar_runs(output_prefix: str, is_snp_tar: bool = False, is_gene_tar: bool = False) -> List[Path]:
-
     if is_gene_tar or is_snp_tar:
         if is_gene_tar:
             prefix = 'GENE'

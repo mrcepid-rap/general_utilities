@@ -194,12 +194,12 @@ class ModuleLoader(ABC):
         self._parser.add_argument('--categorical_covariates',
                                   help="A space-separated list (e.g. covar1 covar2 covar3) of categorical "
                                        "(e.g. WES batch) in <covarfile>. Names MUST match column header.",
-                                  type=str, dest='categorical_covariates', required=False, default=None,
+                                  type=str, dest='categorical_covariates', required=False, default=[],
                                   nargs='*', metavar=('CAT_COVAR1', 'CAT_COVAR2'))
         self._parser.add_argument('--quantitative_covariates',
                                   help="A space-separated list (e.g. covar1 covar2 covar3) of categorical (e.g. PC1) "
                                        "in <covarfile>. Names MUST match column header.",
-                                  type=str, dest='quantitative_covariates', required=False, default=None,
+                                  type=str, dest='quantitative_covariates', required=False, default=[],
                                   nargs='*', metavar=('QUANT_COVAR1', 'QUANT_COVAR2'))
         self._parser.add_argument('--is_binary',
                                   help="Is the phenotype binary?",

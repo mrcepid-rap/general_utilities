@@ -1,5 +1,6 @@
 import csv
 import gzip
+import os
 import re
 from pathlib import Path
 from typing import List, Union, Tuple, IO, Dict
@@ -202,7 +203,7 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
     return gene_info, chromosomes
 
 
-def process_gene_or_snp_wgs(identifier: str, tarball_prefix: str, chunk: str) -> set:
+def process_gene_or_snp_wgs(identifier: str, tarball_prefix: Path, chunk: str) -> set:
     """
     Given a gene symbol/ENST or a SNP identifier (chr:pos:ref:alt),
     check whether it exists in a chunk’s STAAR variant table.
@@ -214,13 +215,13 @@ def process_gene_or_snp_wgs(identifier: str, tarball_prefix: str, chunk: str) ->
     :return chromosomes: set of chromosome(s) found in that chunk (empty if none)
     """
 
-    tarball_prefix = Path(tarball_prefix)
+    tarball_prefix = Path(tarball_prefix.name)
     variant_table_path = f"{tarball_prefix}.{chunk}.STAAR.variants_table.tsv"
 
     result = set()
 
     if not Path(variant_table_path).exists():
-        LOGGER.warning(f"Variant table not found: {variant_table_path}")
+        raise FileNotFoundError(f"Variant table not found: {variant_table_path}")
     else:
         is_variant = bool(re.match(r"^chr?\w+:\d+:[ACGTN]+:[ACGTN]+$", identifier, re.IGNORECASE))
         chromosomes = set()
@@ -265,22 +266,33 @@ def define_field_names_from_pandas(id_field: str, default_fields: List[str] = No
     :param default_fields: A list of additional fields to include in the output.
     :return: A List of field string names to use for outputs
     """
-    # Test what columns we have in the 'SNP' field, so we can name them...
-    if 'SNP' in id_field:
-        split_id_field = id_field['SNP'].split("-")
-    else:
-        split_id_field = id_field.split("-")
+
+    # If it's a Path, we only want the filename (e.g., 'HC_PTV-MAF_001'),
+    # not the whole directory string which contains extra dashes/slashes.
+    id_field = str(id_field)
+    # If it's a string path, try to get the last part
+    id_field = os.path.basename(str(id_field))
+
+    # Check for the literal 'SNP' in the string
+    # We use the split string for logic
+    split_id_field = id_field.split("-")
+
     field_names = [] if default_fields is None else default_fields
     num_default = len(field_names)
-    if len(split_id_field) == num_default + 1:  # This is the bare minimum; we found 1 additional field to the default
+
+    # Logic to identify standard mrcepid-collapsevariants format: MASK-MAF or MASK-AC
+    if len(split_id_field) == num_default + 1:
         field_names.append('var1')
-    elif len(split_id_field) == num_default + 2:  # This could be the standard naming format... check that column [2] is MAF/AC
+    elif len(split_id_field) == num_default + 2:
+        # Check if the last part looks like a frequency definition (MAF or AC)
         if 'MAF' in split_id_field[num_default + 1] or 'AC' in split_id_field[num_default + 1]:
             field_names.extend(['MASK', 'MAF'])
-        else:  # This means we didn't hit on MAF in column [2] and a different naming convention is used...
+        else:
             field_names.extend(['var1', 'var2'])
     else:
-        for i in range(2, len(split_id_field) + 1):
+        # Last resort: Generate generic names for the number of parts found
+        # starting from the count of already present default_fields
+        for i in range(len(field_names) + 1, len(split_id_field) + 1):
             field_names.append('var%i' % i)
 
     return field_names
@@ -483,7 +495,7 @@ def fix_plink_bgen_sample_sex(sample_file: Path) -> Path:
     return fixed_sample
 
 
-def replace_multi_suffix(original_path: Path, new_suffix: str) -> Path:
+def replace_multi_suffix(original_path: Union[Path, str], new_suffix: str) -> Path:
     """A helper function to replace a path on a file with multiple suffixes (e.g., .tsv.gz)
 
     This function just loops through the path and recursively removes the string after '.'. Once there are no more
@@ -493,6 +505,10 @@ def replace_multi_suffix(original_path: Path, new_suffix: str) -> Path:
     :param new_suffix: The new suffix to add
     :return: A Pathlike to the new file
     """
+
+    # Ensure we are working with a Path object to use .suffix and .with_suffix
+    if isinstance(original_path, str):
+        original_path = Path(original_path)
 
     while original_path.suffix:
         original_path = original_path.with_suffix('')

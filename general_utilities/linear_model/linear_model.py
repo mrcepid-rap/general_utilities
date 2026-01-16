@@ -15,6 +15,7 @@ from general_utilities.association_resources import replace_multi_suffix
 
 LOGGER = MRCLogger(__name__).get_logger()
 
+
 @dataclass
 class LinearModelPack:
     """
@@ -94,7 +95,7 @@ class LinearModelResult:
         self.n_car_unaffected = n_car_unaffected
 
 
-def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_base: bool,
+def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
                       found_quantitative_covariates: List[str],
                       found_categorical_covariates: List[str]) -> LinearModelPack:
     """Perform initial linear model setup.
@@ -105,7 +106,6 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
     :param phenofile: Path to the phenotype and covariate file.
     :param phenotype: Name of the phenotype to analyze.
     :param is_binary: Boolean indicating if the phenotype is binary.
-    :param ignore_base: Boolean indicating if base covariates should be ignored.
     :param found_quantitative_covariates: List of additional quantitative covariates to include in the model.
     :param found_categorical_covariates: List of additional categorical covariates to include in the model.
     :return: A LinearModelPack object containing the model setup.
@@ -128,15 +128,11 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
             family = sm.families.Gaussian()
 
         # And finally define the formula to be used by all models:
-        if ignore_base:
-            quant_covars = []
-            cat_covars = []
-        else:
-            quant_covars = [f'PC{PC}' for PC in range(1, 11)] + ['age', 'age_squared', 'sex']
-            cat_covars = ['batch']
+        quant_covars = set(found_quantitative_covariates)
+        cat_covars = set(found_categorical_covariates)
 
-        quant_covars.extend(found_quantitative_covariates)
-        cat_covars.extend(found_categorical_covariates)
+        quant_covars = list(quant_covars)
+        cat_covars = list(cat_covars)
 
         columns = [phenotype] + quant_covars + cat_covars
         cat_covars = [f'C({covar})' for covar in cat_covars]
@@ -167,7 +163,8 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool, ignore_b
         raise dxpy.AppError(f'Phenotype {phenotype} has no individuals after filtering, exiting...')
 
 
-def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[str, pd.DataFrame]:
+def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballType, bgen_prefix: str = None) -> Tuple[
+    str, pd.DataFrame]:
     """Load a tarball containing BGEN files for linear model association testing.
 
     This method decides which function to call (either :func:'load_mask_linear_model' or
@@ -196,9 +193,11 @@ def load_linear_model_genetic_data(tarball_prefix: str, tarball_type: TarballTyp
     if tarball_type == TarballType.GENOMEWIDE:
         genetic_data = load_mask_genetic_data(tarball_path, bgen_prefix=bgen_prefix)
     elif tarball_type == TarballType.GENE:
-        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.GENE.STAAR.mtx'), tarball_type.value)
+        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.GENE.STAAR.mtx'),
+                                                     tarball_type.value)
     elif tarball_type == TarballType.SNP:
-        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.SNP.STAAR.mtx'), tarball_type.value)
+        genetic_data = load_gene_or_snp_genetic_data(replace_multi_suffix(tarball_path, '.SNP.STAAR.mtx'),
+                                                     tarball_type.value)
     else:
         raise ValueError(f'Unexpected tarball type {tarball_type} encountered for tarball prefix {tarball_prefix}')
 
@@ -220,7 +219,16 @@ def load_mask_genetic_data(tarball_path: Path, bgen_prefix: str = None) -> pd.Da
 
     geno_tables = []
 
-    bolt_bgen_list = tarball_path.parent.glob(replace_multi_suffix(tarball_path, '.*.BOLT.bgen').name)
+    # This finds any .bgen file in the directory
+    all_bgens = list(tarball_path.parent.glob("*.bgen"))
+
+    if bgen_prefix is not None:
+        # Look for the file that actually contains the chunk name (e.g., 'chr1_chunk1')
+        bolt_bgen_list = [f for f in all_bgens if bgen_prefix in f.name]
+
+        if not bolt_bgen_list:
+            raise ValueError(f'BGEN prefix {bgen_prefix} not found...')
+
     # If requested to load a single bgen prefix, filter the list to only include that prefix
     if bgen_prefix is not None:
         if tarball_path.parent / f'{tarball_path.name}.{bgen_prefix}.BOLT.bgen' in bolt_bgen_list:
