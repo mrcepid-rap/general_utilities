@@ -285,6 +285,11 @@ class CommandExecutor:
         possible_output_paths = []
         for arg in command_arguments:
             try:
+                # If an argument contains logic characters, it's a BCF filter, not a file path.
+                # This prevents strings like "binom(FMT/AD)" from being treated as directories.
+                if any(char in arg for char in "()|&;"):
+                    continue
+
                 # Skip LoFTEE/Ensembl plugin args or any multi-colon argument block
                 if "--plugin" in arg or ("," in arg and arg.count(":") > 1):
                     continue

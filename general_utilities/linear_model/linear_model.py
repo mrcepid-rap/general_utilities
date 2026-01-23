@@ -142,8 +142,6 @@ def linear_model_null(phenofile: Path, phenotype: str, is_binary: bool,
 
         form_full = f'{form_null} + has_var'
 
-        LOGGER.info(f'GLM Null model: {form_full}')
-
         # Subset to only the columns we need for this specific model
         pheno_covars = pheno_covars[columns]
 
