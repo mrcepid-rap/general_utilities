@@ -92,6 +92,7 @@ plot_manh <- function(stats, ymax, p_sig, p_sugg, label_data) {
     theme + theme(panel.grid.major = element_blank())
 
   if (nrow(label_data) != 0) {
+    label_data[,symbol:=ifelse(symbol == ".", "", symbol)]
     manh.plot <- manh.plot + geom_text(inherit.aes = F, data = label_data, aes(manh.pos, log_p, label = symbol),hjust=0,angle=45, size=3)
   }
 
