@@ -1,5 +1,7 @@
 import csv
 import gzip
+import os
+import re
 from pathlib import Path
 from typing import List, Union, Tuple, IO, Dict
 
@@ -7,7 +9,6 @@ import dxpy
 import pandas as pd
 import pandas.core.series
 import pysam
-
 from general_utilities.job_management.command_executor import build_default_command_executor
 from general_utilities.mrc_logger import MRCLogger
 
@@ -60,23 +61,52 @@ def get_chromosomes(is_snp_tar: bool = False, is_gene_tar: bool = False,
 
     return chromosomes
 
+def get_chromosome_from_bgen(bgen_chrom: str, chromosome: str) -> str:
+    """
+    Aligns the chromosome naming convention between BGEN file and user input. Some BGEN files use 'chr' prefix, others don't.
+    This function makes sure that we are using the correct chromosome naming convention for matrix generation.
 
-def build_transcript_table() -> pd.DataFrame:
+    :param bgen_chrom: The chromosome name as it appears in the BGEN file.
+    :param chromosome: The chromosome name provided by the user.
+    :return: The chromosome name to use for matrix generation.
+    """
+    if isinstance(chromosome, int):
+        chromosome = str(chromosome)
+    elif bgen_chrom.lower().startswith("chr") and not chromosome.lower().startswith("chr"):
+        chromosome = "chr" + str(chromosome)
+    elif not bgen_chrom.lower().startswith("chr") and chromosome.lower().startswith("chr"):
+        chromosome = str(chromosome)[3:]
+    return chromosome
+
+
+def build_transcript_table(transcripts_path: Path = Path('transcripts.tsv.gz'),
+                           filter_genes: bool = True) -> pd.DataFrame:
     """A wrapper around pd.read_csv to load transcripts.tsv.gz into a pd.DataFrame
 
-    Here we just read the transcripts.tsv.gz file downloaded during ingest_data into a pd.DataFrame. There is some
+    Read the transcripts.tsv.gz file downloaded during ingest_data into a pd.DataFrame. This file contains information
+    about all transcripts that can be burden tested for. The index of the resulting pd.DataFrame is the ENST ID.
 
+    :param transcripts_path: A Path to the transcripts.tsv.gz file. Defaults to hardcoded 'transcripts.tsv.gz' for
+        backwards compatibility.
+    :param filter_genes: If True, filter out transcripts that have failed QC. Defaults to True.
     :return: A pd.DataFrame representation of all transcripts that can be burden tested for.
     """
 
-    transcripts_table = pd.read_csv('transcripts.tsv.gz', sep="\t", index_col='ENST')
-    transcripts_table = transcripts_table[transcripts_table['fail'] == False]
-    transcripts_table = transcripts_table.drop(columns=['syn.count', 'fail.cat', 'fail'])
-    transcripts_table = transcripts_table[transcripts_table['chrom'] != 'Y']
+    transcripts_table = pd.read_csv(transcripts_path, sep="\t", index_col='ENST')
 
-    # ensure columns are in the expected order:
-    transcripts_table = transcripts_table[['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
-                                           'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']]
+    if filter_genes:
+        # Only filter if the 'fail' column exists (i.e., we're reading the original file)
+        if 'fail' in transcripts_table.columns:
+            transcripts_table = transcripts_table[transcripts_table['fail'] == False]
+            transcripts_table = transcripts_table.drop(columns=['syn.count', 'fail.cat', 'fail'])
+            transcripts_table = transcripts_table[transcripts_table['chrom'] != 'Y']
+
+        # Select specific columns
+        expected_cols = ['chrom', 'start', 'end', 'ENSG', 'MANE', 'transcript_length', 'SYMBOL',
+                         'CANONICAL', 'BIOTYPE', 'cds_length', 'coord', 'manh.pos']
+        available_cols = [col for col in expected_cols if col in transcripts_table.columns]
+        transcripts_table = transcripts_table[available_cols]
+    # When filter_genes=False, don't modify the dataframe at all - keep ALL columns
 
     # Also generate a table of mean chromosome positions for plotting
     mean_chr_pos = transcripts_table[['chrom', 'manh.pos']].groupby('chrom').mean()
@@ -116,7 +146,6 @@ def get_gene_id(gene_id: str, transcripts_table: pandas.DataFrame) -> pandas.cor
             LOGGER.info(f'Found one matching ENST ({gene_id} - {gene_info["coord"]})... proceeding...')
         except KeyError:
             raise KeyError(f'Did not find a transcript with ENST value {gene_id}... terminating...')
-
     # Otherwise see if we can find a SINGLE gene with a given SYMBOL in the table using ==
     else:
         LOGGER.warning("gene_id – " + gene_id + " – does not look like an ENST value, searching for symbol instead...")
@@ -162,8 +191,8 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
 
     # And filter the relevant SAIGE file to just the individuals we want so we can get actual MAC
     cmd_executor = build_default_command_executor()
-    cmd = f'bcftools view --threads 4 -S /test/SAMPLES_Include.bcf.txt -Ob -o /test/' \
-          f'{tarball_prefix}.{file_prefix}.saige_input.bcf /test/' \
+    cmd = f'bcftools view --threads 4 -S SAMPLES_Include.bcf.txt -Ob -o ' \
+          f'{tarball_prefix}.{file_prefix}.saige_input.bcf ' \
           f'{tarball_prefix}.{file_prefix}.SAIGE.bcf'
     cmd_executor.run_cmd_on_docker(cmd)
 
@@ -174,26 +203,98 @@ def process_snp_or_gene_tar(is_snp_tar, is_gene_tar, tarball_prefix) -> tuple:
     return gene_info, chromosomes
 
 
-# These two methods help the different tools in defining the correct field names to include in outputs
-def define_field_names_from_pandas(field_one: pd.Series) -> List[str]:
+def process_gene_or_snp_wgs(identifier: str, tarball_prefix: Path, chunk: str) -> set:
+    """
+    Given a gene symbol/ENST or a SNP identifier (chr:pos:ref:alt),
+    check whether it exists in a chunk’s STAAR variant table.
+
+    :param identifier: The gene symbol or ENST or SNP identifier.
+    :param tarball_prefix: The prefix of the tarball files.
+    :param chunk: The chunk identifier (e.g., chromosome number) to list through.
+
+    :return chromosomes: set of chromosome(s) found in that chunk (empty if none)
+    """
+
+    tarball_prefix = Path(tarball_prefix.name)
+    variant_table_path = f"{tarball_prefix}.{chunk}.STAAR.variants_table.tsv"
+
+    result = set()
+
+    if not Path(variant_table_path).exists():
+        raise FileNotFoundError(f"Variant table not found: {variant_table_path}")
+    else:
+        is_variant = bool(re.match(r"^chr?\w+:\d+:[ACGTN]+:[ACGTN]+$", identifier, re.IGNORECASE))
+        chromosomes = set()
+        match_found = False
+
+        with open(variant_table_path, "r") as f:
+            reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
+            for row in reader:
+                chrom = str(row.get("CHROM") or row.get("chrom"))
+                gene_id = row.get("ENST") or row.get("gene")
+                var_id = row.get("varID")
+
+                chromosomes.add(chrom)
+
+                if (is_variant and var_id == identifier) or (not is_variant and gene_id == identifier):
+                    match_found = True
+                    break
+
+        if match_found:
+            LOGGER.info(f"Found {identifier} in chunk {chunk} (chromosome(s): {chromosomes})")
+            result = chromosomes
+        else:
+            LOGGER.debug(f"No matches for {identifier} in chunk {chunk}")
+
+    return result
+
+
+def define_field_names_from_pandas(id_field: str, default_fields: List[str] = None) -> List[str]:
+    """These two methods help the different tools in defining the correct field names to include in outputs
+
+    This method will search a dash(-)-delimited string of the format <CSQ>-<FREQ>, where CSQ is a vep CSQ and <FREQ> is
+    some frequency definition that MUST include either 'MAF' or 'AC'. This is the standard format used by
+    mrcepid-collapsevariants.
+
+    The user can extend this search to additional fields using the :param: default_fields parameter, which will
+    be amended to the front of the list by naming additional fields found before the above. For example, for an input
+    of 'ENST00000000001-HC_PTV-MAF_01' and default field of ['ENST'], the output field names will be:
+
+    [ENST, MASK, MAF]
+
+    :param id_field: A string that should be searched for information on mask names
+    :param default_fields: A list of additional fields to include in the output.
+    :return: A List of field string names to use for outputs
+    """
+
     # Test what columns we have in the 'SNP' field, so we can name them...
-    field_one = field_one['SNP'].split("-")
-    field_names = ['ENST']
-    if len(field_one) == 2:  # This is the bare minimum, always name first column ENST, and second column 'var1'
+    if 'SNP' in id_field:
+        split_id_field = id_field['SNP'].split("-")
+    else:
+        split_id_field = id_field.split("-")
+    field_names = [] if default_fields is None else default_fields
+    num_default = len(field_names)
+
+    # Logic to identify standard mrcepid-collapsevariants format: MASK-MAF or MASK-AC
+    if len(split_id_field) == num_default + 1:
         field_names.append('var1')
-    elif len(field_one) == 3:  # This could be the standard naming format... check that column [2] is MAF/AC
-        if 'MAF' in field_one[2] or 'AC' in field_one[2]:
+    elif len(split_id_field) == num_default + 2:
+        # Check if the last part looks like a frequency definition (MAF or AC)
+        if 'MAF' in split_id_field[num_default + 1] or 'AC' in split_id_field[num_default + 1]:
             field_names.extend(['MASK', 'MAF'])
-        else:  # This means we didn't hit on MAF in column [2] and a different naming convention is used...
+        else:
             field_names.extend(['var1', 'var2'])
     else:
-        for i in range(2, len(field_one) + 1):
+        # Last resort: Generate generic names for the number of parts found
+        # starting from the count of already present default_fields
+        for i in range(len(field_names) + 1, len(split_id_field) + 1):
             field_names.append('var%i' % i)
 
     return field_names
 
 
-def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: pd.DataFrame) -> pd.DataFrame:
+def define_field_names_from_tarball_prefix(tarball_prefix: Path, variant_table: pd.DataFrame) -> pd.DataFrame:
+    tarball_prefix = str(tarball_prefix)
     tarball_prefix_split = tarball_prefix.split("-")
     if len(tarball_prefix_split) == 2:  # This could be the standard naming format. Check that column [1] is MAF/AC
         if 'MAF' in tarball_prefix_split[1] or 'AC' in tarball_prefix_split[1]:
@@ -212,21 +313,18 @@ def define_field_names_from_tarball_prefix(tarball_prefix: str, variant_table: p
 
 # Helper function to decide what covariates are included in the various REGENIE commands
 def define_covariate_string(found_quantitative_covariates: List[str], found_categorical_covariates: List[str],
-                            is_binary: bool, add_array: bool, ignore_base: bool) -> str:
-    quant_covars = [] if ignore_base else ['PC{1:10}', 'age', 'age_squared', 'sex']
-    quant_covars.extend(found_quantitative_covariates)
+                            is_binary: bool) -> str:
 
-    cat_covars = [] if ignore_base else (['wes_batch', 'array_batch'] if add_array else ['wes_batch'])
-    cat_covars.extend(found_categorical_covariates)
-
+    # Build String
     covar_string = ''
-    if len(quant_covars) > 0:
-        quant_covars_join = ','.join(quant_covars)
-        covar_string += f'--covarColList {quant_covars_join} '
+    if found_quantitative_covariates:
+        # Use a dict to preserve order while removing any potential duplicates
+        unique_quant = list(dict.fromkeys(found_quantitative_covariates))
+        covar_string += f'--covarColList {",".join(unique_quant)} '
 
-    if len(cat_covars) > 0:
-        cat_covars_join = ','.join(cat_covars)
-        covar_string += f'--catCovarList {cat_covars_join} '
+    if found_categorical_covariates:
+        unique_cat = list(dict.fromkeys(found_categorical_covariates))
+        covar_string += f'--catCovarList {",".join(unique_cat)} '
 
     if is_binary:
         covar_string += '--bt --firth --approx '
@@ -250,7 +348,7 @@ def gt_to_float(gt: str) -> float:
     """
     if gt == '0/0':
         return 0
-    elif gt == '0/1':
+    elif gt == '0/1' or gt == '1/0':
         return 1
     elif gt == '1/1':
         return 2
@@ -284,7 +382,8 @@ def find_index(parent_file: Union[dxpy.DXFile, dict], index_suffix: str) -> dxpy
 
 
 def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0,
-                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3) -> Tuple[Path, Path]:
+                    sequence_row: int = 1, begin_row: int = 2, end_row: int = 3, force: bool = False) -> Tuple[
+    Path, Path]:
     """Compress a file using bgzip and create a tabix index.
 
     This function uses pysam to compress a file with bgzip and create a corresponding tabix index.
@@ -300,6 +399,7 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
         sequence_row: 1-based column number containing sequence names (default: 1)
         begin_row: 1-based column number containing start positions (default: 2)
         end_row: 1-based column number containing end positions (default: 3)
+        force: Whether to overwrite existing files (default: False)
 
     Returns:
         Tuple[Path, Path]: Paths to the compressed file (.gz) and its index (.tbi)
@@ -311,12 +411,12 @@ def bgzip_and_tabix(file_path: Path, comment_char: str = None, skip_row: int = 0
 
     # Compress using pysam
     outfile_compress = f'{file_path}.gz'
-    pysam.tabix_compress(str(file_path.absolute()), outfile_compress)
+    pysam.tabix_compress(str(file_path.absolute()), outfile_compress, force=force)
 
     try:
         # Run indexing via pysam, and incorporate comment character if requested
         pysam.tabix_index(outfile_compress, seq_col=sequence_row - 1, start_col=begin_row - 1, end_col=end_row - 1,
-                          meta_char=comment_char, line_skip=skip_row)
+                          meta_char=comment_char, line_skip=skip_row, force=force)
     except Exception as e:
         LOGGER.error(f"Failed to index file {outfile_compress}: {e}. Check the bgzip_and_tabix command in "
                      f"general_utilities - it's likely that the header settings need to be adjusted for your "
@@ -388,7 +488,7 @@ def fix_plink_bgen_sample_sex(sample_file: Path) -> Path:
     return fixed_sample
 
 
-def replace_multi_suffix(original_path: Path, new_suffix: str) -> Path:
+def replace_multi_suffix(original_path: Union[Path, str], new_suffix: str) -> Path:
     """A helper function to replace a path on a file with multiple suffixes (e.g., .tsv.gz)
 
     This function just loops through the path and recursively removes the string after '.'. Once there are no more
@@ -398,6 +498,10 @@ def replace_multi_suffix(original_path: Path, new_suffix: str) -> Path:
     :param new_suffix: The new suffix to add
     :return: A Pathlike to the new file
     """
+
+    # Ensure we are working with a Path object to use .suffix and .with_suffix
+    if isinstance(original_path, str):
+        original_path = Path(original_path)
 
     while original_path.suffix:
         original_path = original_path.with_suffix('')

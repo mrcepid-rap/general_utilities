@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "general_utilities"
-version = "1.6.1"
+version = "2.0.0"
 description = ""
 readme = "README.md"
 authors = [
@@ -31,3 +31,12 @@ dependencies = [
 [project.urls]
 Repository = "https://github.com/mrcepid-rap/general_utilities"
 
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["general_utilities*"]
+
+[tool.setuptools.package-data]
+"general_utilities.linear_model.R_resources" = ["*.R"]
+"general_utilities.plot_lib.R_resources" = ["*.R"]

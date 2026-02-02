@@ -1,13 +1,10 @@
 import gzip
+from pathlib import Path
+from typing import List
 
 import pandas as pd
-
-from typing import List
-from pathlib import Path
-
-# from importlib.resources import files
 from importlib_resources import files
-from general_utilities.plot_lib.R_resources.manhattan_plotter_call import get_r_plotter
+
 from general_utilities.job_management.command_executor import CommandExecutor
 from general_utilities.plot_lib.cluster_plotter import ClusterPlotter
 
@@ -75,14 +72,11 @@ class ManhattanPlotter(ClusterPlotter):
 
         final_plots = []
 
-        r_script = get_r_plotter()
-
-        # r_script = files('general_utilities.plot_lib.R_resources').joinpath('manhattan_plotter.R')
-        # Add something to invert the plot... if (curr_test == paste0('ADD-INT_', interaction_var)) {
+        r_script = files('general_utilities.plot_lib.R_resources').joinpath('manhattan_plotter.R')
 
         # Do plotting
-        options = [f'/test/{self._plot_table_path}', f'/test/{self._index_table_path}', self._p_column, self._test_name,
-                   self._sig_threshold, self._suggestive_threshold, self._label_qq]
+        options = [f'{self._plot_table_path}', f'{self._index_table_path}', self._p_column, self._id_column,
+                   self._test_name, self._sig_threshold, self._suggestive_threshold, self._label_qq]
         final_plots.append(self._run_R_script(r_script, options, Path('manhattan_plot.png')))
 
         return final_plots

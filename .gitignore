@@ -15,3 +15,12 @@ general_utilities/platform_utils/__pycache__/
 general_utilities/import_utils/file_handlers/__pycache__/
 test/__pycache__/
 test/dx_run.log
+/test/test_data/linear_model/chr1_chunk?.*
+/test/test_data/linear_model/*.tar.gz
+/test/test_data/linear_model/phenotype.tsv
+/test/test_data/linear_model/*.covariates
+general_utilities/bgen_utilities/__pycache__/
+general_utilities/job_management/__pyacache__/
+general_utilities/linear_model/__pycache__/
+general_utilities/job_management/__pyacache__/*
+general_utilities/job_management/__pycache__/
