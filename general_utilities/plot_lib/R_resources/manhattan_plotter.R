@@ -35,7 +35,7 @@ standardize_table <- function(table_path, p_val_col) {
 
 }
 
-load_and_plot_data <- function(result_path, label_path, p_val_col, plot_header, p_sig, p_sugg, label_qq) {
+load_and_plot_data <- function(result_path, label_path, p_val_col, var_id_col, plot_header, p_sig, p_sugg, label_qq) {
 
   # Read in and standardize tables
   result_table <- standardize_table(result_path, p_val_col)
@@ -52,7 +52,7 @@ load_and_plot_data <- function(result_path, label_path, p_val_col, plot_header, 
 
   manh.plot <- plot_manh(stats = result_table[!is.infinite(log_p)], ymax=ymax, p_sig = p_sig, p_sugg = p_sugg,
                          label_data = label_table)
-  qq.plot <- plot_qq(result_table[!is.infinite(log_p)], ymax=ymax, label.markers = label_qq)
+  qq.plot <- plot_qq(result_table[!is.infinite(log_p)], ymax=ymax, label.data = label_table, var.id.col = tolower(var_id_col), label.markers = label_qq)
 
   # Decide header
   if (plot_header != 'None') {
@@ -92,6 +92,7 @@ plot_manh <- function(stats, ymax, p_sig, p_sugg, label_data) {
     theme + theme(panel.grid.major = element_blank())
 
   if (nrow(label_data) != 0) {
+    label_data[,symbol:=ifelse(symbol == ".", "", symbol)]
     manh.plot <- manh.plot + geom_text(inherit.aes = F, data = label_data, aes(manh.pos, log_p, label = symbol),hjust=0,angle=45, size=3)
   }
 
@@ -99,11 +100,13 @@ plot_manh <- function(stats, ymax, p_sig, p_sugg, label_data) {
 
 }
 
-plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers = TRUE) {
+plot_qq <- function(stats, ymax, label.data, var.id.col, label.y = FALSE, is.null = FALSE, label.markers = TRUE) {
 
   ## QQplot
+  stats[,is_index:=get(var.id.col) %in% label.data[,get(var.id.col)]]
   qqplot.data <- data.table(observed = stats[,p_value_selected],
-                            symbol = stats[,symbol])
+                            symbol = stats[,symbol],
+                            is_index=stats[,is_index])
   setkey(qqplot.data,observed)
   qqplot.data <- qqplot.data[!is.na(observed)]
   lam <- qqplot.data[,median(qchisq(1 - observed, 1))] / qchisq(0.5, 1)
@@ -126,8 +129,9 @@ plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers
       geom_point(size=0.25)
 
     if (label.markers) {
+      qqplot.data[,symbol:=ifelse(symbol == ".", "", symbol)]
       qq.plot <- qq.plot +
-        geom_text(inherit.aes = F, data = qqplot.data[observed > -log10(1.4e-6)], aes(expected, observed, label = symbol), position = position_nudge(-0.04,0),hjust=1, size=3)
+        geom_text(inherit.aes = F, data = qqplot.data[is_index == T], aes(expected, observed, label = symbol), position = position_nudge(-0.04,0),hjust=1, angle=315, size=3)
     }
   }
 
@@ -152,13 +156,14 @@ plot_qq <- function(stats, ymax, label.y = FALSE, is.null = FALSE, label.markers
 # 1: summary_table
 # 2: label data
 # 3: p_val column
-# 4: plot name
-# 5: p.sig
-# 6: p.sugg
-# 7: label qq plots
+# 4: var_id column
+# 5: plot name
+# 6: p.sig
+# 7: p.sugg
+# 8: label qq plots
 args <- commandArgs(trailingOnly = T)
 mean_chr_pos <- fread('mean_chr_pos.tsv')
 
-manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], as.numeric(args[5]), as.numeric(args[6]), as.logical(args[7]))
+manh_plot <- load_and_plot_data(args[1], args[2], args[3], args[4], args[5], as.numeric(args[6]), as.numeric(args[7]), as.logical(args[8]))
 
 ggsave('manhattan_plot.png', manh_plot, units='in', width = 15, height = 6)
