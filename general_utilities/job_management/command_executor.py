@@ -182,7 +182,7 @@ class CommandExecutor:
             # No custom mounts provided — assume safe default
             docker_mount_string = '-w /mnt/host_cwd'
 
-        return f'docker run {docker_mount_string} '
+        return f'docker run --rm {docker_mount_string} '
 
     def _get_dockermount_for_file(self, argument: Path, safe_mount_point: Path):
         """
