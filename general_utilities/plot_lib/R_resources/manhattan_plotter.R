@@ -117,6 +117,8 @@ plot_qq <- function(stats, ymax, label.data, var.id.col, label.y = FALSE, is.nul
   # will be different)
   expected_ymax <- qqplot.data[,ceiling(max(expected))]
 
+  print(qqplot.data)
+
   if (is.null) {
 
     qq.plot <- ggplot() +
