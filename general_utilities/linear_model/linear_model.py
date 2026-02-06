@@ -217,7 +217,7 @@ def load_mask_genetic_data(tarball_path: Path, bgen_prefix: str = None) -> pd.Da
     geno_tables = []
 
     # This finds any .bgen file in the directory
-    all_bgens = list(tarball_path.parent.glob("*.bgen"))
+    all_bgens = list(tarball_path.parent.glob(f"{tarball_path.name}*.bgen"))
 
     # Initialize the list with ALL bgens by default so it is defined even if bgen_prefix is None
     bolt_bgen_list = all_bgens
